@@ -1,5 +1,6 @@
 import bpy
 import bmesh
+import mathutils
 from .psk import Psk, Vector3
 
 
@@ -41,25 +42,83 @@ class PskBuilder(object):
 
         psk = Psk()
 
-        # vertices
-        for vertex in mesh.vertices:
+        # VERTICES
+        for vertex in object.data.vertices:
             psk.points.append(Vector3(*vertex.co))
 
-        # TODO: wedges (a "wedge" is actually a UV'd vertex, basically)
-        # for wedge in mesh.wedges:
-        #     pass
+        # WEDGES
+        uv_layer = object.data.uv_layers.active.data
+        psk.wedges = [psk.Wedge() for _ in range(len(object.data.loops))]
 
-        # materials
+        for loop_index, loop in enumerate(object.data.loops):
+            wedge = psk.wedges[loop_index]
+            wedge.material_index = -1
+            wedge.point_index = loop.vertex_index
+            wedge.u, wedge.v = uv_layer[loop_index].uv
+            psk.wedges.append(wedge)
+
+        # MATERIALS
         for i, m in enumerate(object.data.materials):
             material = Psk.Material()
             material.name = m.name
             material.texture_index = i
             psk.materials.append(material)
 
-        # TODO: should we make the wedges/faces at the same time??
-        f = Psk.Face()
-        # f.wedge_index_1 = 0
+        # FACES
+        object.data.calc_loop_triangles()
+        poly_groups, groups = object.data.calc_smooth_groups(use_bitflags=True)
+        for f in object.data.loop_triangles:
+            face = Psk.Face()
+            face.material_index = f.material_index
+            face.wedge_index_1 = f.loops[2]
+            face.wedge_index_2 = f.loops[1]
+            face.wedge_index_3 = f.loops[0]
+            face.smoothing_groups = poly_groups[f.polygon_index]
+            psk.faces.append(face)
 
-        # TODO: weights
+        # BONES
+        bone_list = list(armature_object.data.bones)
+        for b in armature_object.data.bones:
+            bone = psk.Bone()
+            bone.name = b.name
+            bone.children_count = len(b.children)
+            bone.flags = 0  # look up what this is
+            bone.length = 10.0  # TODO: not sure what this is
+            try:
+                bone.parent_index = bone_list.index(b.parent)
+            except ValueError:
+                # this should be -1?
+                bone.parent_index = 0
+            rotation = b.matrix.to_quaternion()
+            bone.position.x = b.head.x
+            bone.position.y = b.head.y
+            bone.position.z = b.head.z
+            bone.rotation.x = rotation.x
+            bone.rotation.y = rotation.y
+            bone.rotation.z = rotation.z
+            bone.rotation.w = rotation.w
+            # TODO: not sure what "size" is supposed to be
+            bone.size.x = 1
+            bone.size.y = 1
+            bone.size.z = 1
+            psk.bones.append(bone)
+
+        # WEIGHTS
+        # TODO: bone ~> vg might not be 1:1, provide a nice error message if this is the case
+        armature = armature_object.data
+        bone_names = [x.name for x in armature.bones]
+        vertex_group_names = [x.name for x in object.vertex_groups]
+        bone_indices = [bone_names.index(name) for name in vertex_group_names]
+        for vertex_group_index, vertex_group in enumerate(object.vertex_groups):
+            bone_index = bone_indices[vertex_group_index]
+            for vertex_index in range(len(object.data.vertices)):
+                weight = vertex_group.weight(vertex_index)
+                if weight == 0.0:
+                    continue
+                w = Psk.Weight()
+                w.bone_index = bone_index
+                w.point_index = vertex_index
+                w.weight = weight
+                psk.weights.append(w)
 
         return psk
