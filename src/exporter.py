@@ -59,7 +59,9 @@ class PskExporter(object):
             if len(self.psk.wedges) <= 65536:
                 fmt = 'hhffbbh'
                 for w in self.psk.wedges:
-                    write(data, fmt, w.point_index, 0, w.u, w.v, w.material_index, 0, 0)
+                    # NOTE: there's some sort of problem here where the wedges mtl indx is wrong
+                    # in the documentation.
+                    write(data, fmt, w.point_index, 0, w.u, w.v, w.material_index, w.material_index, 0)
             else:
                 fmt = 'iffi'
                 for w in self.psk.wedges:

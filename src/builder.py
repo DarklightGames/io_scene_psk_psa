@@ -10,8 +10,12 @@ class PskBuilder(object):
 
     def build(self, context) -> Psk:
         object = context.view_layer.objects.active
+
         if object.type != 'MESH':
-            raise RuntimeError('Selected object must be a Mesh')
+            raise RuntimeError('selected object must be a mesh')
+
+        if len(object.data.materials) == 0:
+            raise RuntimeError('the mesh must have at least one material')
 
         # ensure that there is exactly one armature modifier
         modifiers = [x for x in object.modifiers if x.type == 'ARMATURE']
@@ -52,7 +56,7 @@ class PskBuilder(object):
 
         for loop_index, loop in enumerate(object.data.loops):
             wedge = psk.wedges[loop_index]
-            wedge.material_index = -1
+            wedge.material_index = 0
             wedge.point_index = loop.vertex_index
             wedge.u, wedge.v = uv_layer[loop_index].uv
             psk.wedges.append(wedge)
@@ -75,6 +79,9 @@ class PskBuilder(object):
             face.wedge_index_3 = f.loops[0]
             face.smoothing_groups = poly_groups[f.polygon_index]
             psk.faces.append(face)
+            # update the material index of the wedges
+            for i in range(3):
+                psk.wedges[f.loops[i]].material_index = f.material_index
 
         # BONES
         bone_list = list(armature_object.data.bones)
