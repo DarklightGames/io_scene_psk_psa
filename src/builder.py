@@ -19,8 +19,10 @@ class PskBuilder(object):
 
         # ensure that there is exactly one armature modifier
         modifiers = [x for x in object.modifiers if x.type == 'ARMATURE']
+
         if len(modifiers) != 1:
             raise RuntimeError('the mesh must have one armature modifier')
+
         armature_modifier = modifiers[0]
         armature_object = armature_modifier.object
 
@@ -48,11 +50,19 @@ class PskBuilder(object):
 
         # VERTICES
         for vertex in object.data.vertices:
-            psk.points.append(Vector3(*vertex.co))
+            point = Vector3()
+            point.x = vertex.co.x
+            point.y = vertex.co.y
+            point.z = vertex.co.z
+            psk.points.append(point)
 
         # WEDGES
         uv_layer = object.data.uv_layers.active.data
-        psk.wedges = [psk.Wedge() for _ in range(len(object.data.loops))]
+        if len(object.data.loops) <= 65536:
+            wedge_type = Psk.Wedge16
+        else:
+            wedge_type = Psk.Wedge32
+        psk.wedges = [wedge_type() for _ in range(len(object.data.loops))]
 
         for loop_index, loop in enumerate(object.data.loops):
             wedge = psk.wedges[loop_index]
@@ -64,11 +74,12 @@ class PskBuilder(object):
         # MATERIALS
         for i, m in enumerate(object.data.materials):
             material = Psk.Material()
-            material.name = m.name
+            material.name = bytes(m.name, encoding='utf-8')
             material.texture_index = i
             psk.materials.append(material)
 
         # FACES
+        # TODO: this is making the assumption that the mesh is triangulated
         object.data.calc_loop_triangles()
         poly_groups, groups = object.data.calc_smooth_groups(use_bitflags=True)
         for f in object.data.loop_triangles:
@@ -87,7 +98,7 @@ class PskBuilder(object):
         bone_list = list(armature_object.data.bones)
         for b in armature_object.data.bones:
             bone = psk.Bone()
-            bone.name = b.name
+            bone.name = bytes(b.name, encoding='utf-8')
             bone.children_count = len(b.children)
             bone.flags = 0  # look up what this is
             bone.length = 10.0  # TODO: not sure what this is
@@ -96,15 +107,20 @@ class PskBuilder(object):
             except ValueError:
                 # this should be -1?
                 bone.parent_index = 0
-            rotation = b.matrix.to_quaternion()
-            bone.position.x = b.head.x
-            bone.position.y = b.head.y
-            bone.position.z = b.head.z
+            bone.position.x = b.head_local.x
+            bone.position.y = b.head_local.y
+            bone.position.z = b.head_local.z
+            print(bone.name)
+            print(bone.position.x)
+            print(bone.position.y)
+            print(bone.position.z)
+            print('----')
+            rotation = b.matrix_local.to_quaternion()
             bone.rotation.x = rotation.x
             bone.rotation.y = rotation.y
             bone.rotation.z = rotation.z
             bone.rotation.w = rotation.w
-            # TODO: not sure what "size" is supposed to be
+            # TODO: not sure what "size" is supposed to be exactly
             bone.size.x = 1
             bone.size.y = 1
             bone.size.z = 1
