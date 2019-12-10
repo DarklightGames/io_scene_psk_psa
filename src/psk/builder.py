@@ -1,9 +1,9 @@
 import bpy
 import bmesh
-import mathutils
-from .psk import Psk, Vector3, Quaternion
+from .data import *
 
 
+# TODO: move to another file
 def make_fquat(bquat):
     quat = Quaternion()
     # flip handedness for UT = set x,y,z to negative (rotate in other direction)
@@ -22,30 +22,32 @@ def make_fquat_default(bquat):
     quat.w = bquat.w
     return quat
 
+
 class PskBuilder(object):
     def __init__(self):
+        # TODO: add options in here
         pass
 
     def build(self, context) -> Psk:
         object = context.view_layer.objects.active
 
         if object.type != 'MESH':
-            raise RuntimeError('selected object must be a mesh')
+            raise RuntimeError('Selected object must be a mesh')
 
         if len(object.data.materials) == 0:
-            raise RuntimeError('the mesh must have at least one material')
+            raise RuntimeError('Mesh must have at least one material')
 
         # ensure that there is exactly one armature modifier
         modifiers = [x for x in object.modifiers if x.type == 'ARMATURE']
 
         if len(modifiers) != 1:
-            raise RuntimeError('the mesh must have one armature modifier')
+            raise RuntimeError('Mesh must have one armature modifier')
 
         armature_modifier = modifiers[0]
         armature_object = armature_modifier.object
 
         if armature_object is None:
-            raise RuntimeError('the armature modifier has no linked object')
+            raise RuntimeError('Armature modifier has no linked object')
 
         # TODO: probably requires at least one bone? not sure
         mesh_data = object.data
@@ -127,7 +129,6 @@ class PskBuilder(object):
                 psk_bone.parent_index = 0
 
             if bone.parent is not None:
-                # calc parented bone transform
                 rotation = bone.matrix.to_quaternion()
                 rotation.x = -rotation.x
                 rotation.y = -rotation.y
@@ -137,9 +138,8 @@ class PskBuilder(object):
                 parent_tail = quat_parent @ bone.parent.tail
                 location = (parent_tail - parent_head) + bone.head
             else:
-                # calc root bone transform
-                location = armature_object.matrix_local @ bone.head  # ARMATURE OBJECT Location
-                rot_matrix = bone.matrix @ armature_object.matrix_local.to_3x3()  # ARMATURE OBJECT Rotation
+                location = armature_object.matrix_local @ bone.head
+                rot_matrix = bone.matrix @ armature_object.matrix_local.to_3x3()
                 rotation = rot_matrix.to_quaternion()
 
             psk_bone.location.x = location.x
