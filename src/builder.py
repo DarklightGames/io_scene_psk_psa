@@ -1,8 +1,26 @@
 import bpy
 import bmesh
 import mathutils
-from .psk import Psk, Vector3
+from .psk import Psk, Vector3, Quaternion
 
+
+def make_fquat(bquat):
+    quat = Quaternion()
+    # flip handedness for UT = set x,y,z to negative (rotate in other direction)
+    quat.x = -bquat.x
+    quat.y = -bquat.y
+    quat.z = -bquat.z
+    quat.w = bquat.w
+    return quat
+
+
+def make_fquat_default(bquat):
+    quat = Quaternion()
+    quat.x = bquat.x
+    quat.y = bquat.y
+    quat.z = bquat.z
+    quat.w = bquat.w
+    return quat
 
 class PskBuilder(object):
     def __init__(self):
@@ -69,6 +87,7 @@ class PskBuilder(object):
             wedge.material_index = 0
             wedge.point_index = loop.vertex_index
             wedge.u, wedge.v = uv_layer[loop_index].uv
+            wedge.v = 1.0 - wedge.v
             psk.wedges.append(wedge)
 
         # MATERIALS
@@ -94,37 +113,45 @@ class PskBuilder(object):
             for i in range(3):
                 psk.wedges[f.loops[i]].material_index = f.material_index
 
-        # BONES
-        bone_list = list(armature_object.data.bones)
-        for b in armature_object.data.bones:
-            bone = psk.Bone()
-            bone.name = bytes(b.name, encoding='utf-8')
-            bone.children_count = len(b.children)
-            bone.flags = 0  # look up what this is
-            bone.length = 10.0  # TODO: not sure what this is
+        # https://github.com/bwrsandman/blender-addons/blob/master/io_export_unreal_psk_psa.py
+        bones = list(armature_object.data.bones)
+        for bone in bones:
+            psk_bone = Psk.Bone()
+            psk_bone.name = bytes(bone.name, encoding='utf-8')
+            psk_bone.flags = 0
+            psk_bone.children_count = len(bone.children)
+
             try:
-                bone.parent_index = bone_list.index(b.parent)
+                psk_bone.parent_index = bones.index(bone.parent)
             except ValueError:
-                # this should be -1?
-                bone.parent_index = 0
-            bone.position.x = b.head_local.x
-            bone.position.y = b.head_local.y
-            bone.position.z = b.head_local.z
-            print(bone.name)
-            print(bone.position.x)
-            print(bone.position.y)
-            print(bone.position.z)
-            print('----')
-            rotation = b.matrix_local.to_quaternion()
-            bone.rotation.x = rotation.x
-            bone.rotation.y = rotation.y
-            bone.rotation.z = rotation.z
-            bone.rotation.w = rotation.w
-            # TODO: not sure what "size" is supposed to be exactly
-            bone.size.x = 1
-            bone.size.y = 1
-            bone.size.z = 1
-            psk.bones.append(bone)
+                psk_bone.parent_index = 0
+
+            if bone.parent is not None:
+                # calc parented bone transform
+                rotation = bone.matrix.to_quaternion()
+                rotation.x = -rotation.x
+                rotation.y = -rotation.y
+                rotation.z = -rotation.z
+                quat_parent = bone.parent.matrix.to_quaternion().inverted()
+                parent_head = quat_parent @ bone.parent.head
+                parent_tail = quat_parent @ bone.parent.tail
+                location = (parent_tail - parent_head) + bone.head
+            else:
+                # calc root bone transform
+                location = armature_object.matrix_local @ bone.head  # ARMATURE OBJECT Location
+                rot_matrix = bone.matrix @ armature_object.matrix_local.to_3x3()  # ARMATURE OBJECT Rotation
+                rotation = rot_matrix.to_quaternion()
+
+            psk_bone.location.x = location.x
+            psk_bone.location.y = location.y
+            psk_bone.location.z = location.z
+
+            psk_bone.rotation.x = rotation.x
+            psk_bone.rotation.y = rotation.y
+            psk_bone.rotation.z = rotation.z
+            psk_bone.rotation.w = rotation.w
+
+            psk.bones.append(psk_bone)
 
         # WEIGHTS
         # TODO: bone ~> vg might not be 1:1, provide a nice error message if this is the case
@@ -135,7 +162,10 @@ class PskBuilder(object):
         for vertex_group_index, vertex_group in enumerate(object.vertex_groups):
             bone_index = bone_indices[vertex_group_index]
             for vertex_index in range(len(object.data.vertices)):
-                weight = vertex_group.weight(vertex_index)
+                try:
+                    weight = vertex_group.weight(vertex_index)
+                except RuntimeError:
+                    continue
                 if weight == 0.0:
                     continue
                 w = Psk.Weight()

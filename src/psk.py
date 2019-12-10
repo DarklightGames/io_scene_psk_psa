@@ -78,7 +78,7 @@ class Psk(object):
             ('children_count', c_int32),
             ('parent_index', c_int32),
             ('rotation', Quaternion),
-            ('position', Vector3),
+            ('location', Vector3),
             ('length', c_float),
             ('size', Vector3)
         ]
