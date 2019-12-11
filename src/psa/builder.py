@@ -2,6 +2,8 @@ import bpy
 import mathutils
 from .data import *
 
+
+# https://git.cth451.me/cth451/blender-addons/blob/master/io_export_unreal_psk_psa.py
 class PsaBuilder(object):
     def __init__(self):
         # TODO: add options in here (selected anims, eg.)
@@ -21,6 +23,14 @@ class PsaBuilder(object):
         psa = Psa()
 
         bones = list(armature.data.bones)
+
+        # The order of the armature bones and the pose bones is not guaranteed to be the same.
+        # As as a result, we need to reconstruct the list of pose bones in the same order as the
+        # armature bones.
+        bone_names = [x.name for x in bones]
+        pose_bones = [(bone_names.index(bone.name), bone) for bone in armature.pose.bones]
+        pose_bones.sort(key=lambda x: x[0])
+        pose_bones = [x[1] for x in pose_bones]
 
         for bone in bones:
             psa_bone = Psa.Bone()
@@ -58,8 +68,8 @@ class PsaBuilder(object):
             psa.bones.append(psa_bone)
 
         print('---- ACTIONS ----')
-
         frame_start_index = 0
+
         for action in bpy.data.actions:
             if len(action.fcurves) == 0:
                 continue
@@ -73,15 +83,18 @@ class PsaBuilder(object):
             sequence.name = bytes(action.name, encoding='utf-8')
             sequence.frame_count = frame_max - frame_min + 1
             sequence.frame_start_index = frame_start_index
+            print(frame_start_index)
             sequence.fps = 30  # TODO: fill in later with r
 
-            for frame in range(frame_min, frame_max + 1):
+            print(action.name, frame_min, frame_max)
+
+            frame_count = frame_max - frame_min + 1
+
+            for frame in range(frame_count):
                 context.scene.frame_set(frame)
 
-                print(frame)
-
-                for bone_index, bone in enumerate(armature.pose.bones):
-                    # TODO: is the cast-to-matrix necesssary? (guessing no)
+                for bone in pose_bones:
+                    # TODO: is the cast-to-matrix necessary? (guessing no)
                     key = Psa.Key()
                     pose_bone_matrix = bone.matrix
 
@@ -91,6 +104,9 @@ class PsaBuilder(object):
 
                     location = pose_bone_matrix.to_translation()
                     rotation = pose_bone_matrix.to_quaternion().normalized()
+
+                    if action.name == 'shoot_open' and bone.name == 'barrel':
+                        print(location)
 
                     if bone.parent is not None:
                         rotation.x = -rotation.x
@@ -109,6 +125,9 @@ class PsaBuilder(object):
                     psa.keys.append(key)
 
                 frame_start_index += 1
+
+                sequence.bone_count = len(pose_bones)
+                sequence.track_time = frame_count
 
             psa.sequences.append(sequence)
 
