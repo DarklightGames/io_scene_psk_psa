@@ -3,13 +3,18 @@ import mathutils
 from .data import *
 
 
+class PsaBuilderOptions(object):
+    def __init__(self):
+        self.actions = []
+
+
 # https://git.cth451.me/cth451/blender-addons/blob/master/io_export_unreal_psk_psa.py
 class PsaBuilder(object):
     def __init__(self):
         # TODO: add options in here (selected anims, eg.)
         pass
 
-    def build(self, context) -> Psa:
+    def build(self, context, options) -> Psa:
         object = context.view_layer.objects.active
 
         if object.type != 'ARMATURE':
@@ -70,7 +75,7 @@ class PsaBuilder(object):
         print('---- ACTIONS ----')
         frame_start_index = 0
 
-        for action in bpy.data.actions:
+        for action in options.actions:
             if len(action.fcurves) == 0:
                 continue
 

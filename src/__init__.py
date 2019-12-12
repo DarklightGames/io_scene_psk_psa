@@ -42,11 +42,14 @@ classes = [
     psa_operator.ActionListItem
 ]
 
+
 def psk_menu_func(self, context):
     self.layout.operator(psk_operator.PskExportOperator.bl_idname, text ='Unreal PSK (.psk)')
 
+
 def psa_menu_func(self, context):
     self.layout.operator(psa_operator.PsaExportOperator.bl_idname, text='Unreal PSA (.psa)')
+
 
 def register():
     from bpy.utils import register_class
@@ -57,6 +60,7 @@ def register():
     bpy.types.Scene.psa_action_list = CollectionProperty(type=psa_operator.ActionListItem)
     bpy.types.Scene.psa_action_list_index = IntProperty(name='index for list??', default=0)
 
+
 def unregister():
     del bpy.types.Scene.psa_action_list_index
     del bpy.types.Scene.psa_action_list
@@ -65,6 +69,7 @@ def unregister():
     from bpy.utils import unregister_class
     for cls in reversed(classes):
         unregister_class(cls)
+
 
 if __name__ == '__main__':
     register()
