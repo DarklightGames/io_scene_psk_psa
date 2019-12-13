@@ -12,7 +12,7 @@ class PskExportOperator(Operator, ExportHelper):
     filename_ext = '.psk'
     filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
 
-    filepath : StringProperty(
+    filepath: StringProperty(
         name='File Path',
         description='File path used for exporting the PSK file',
         maxlen=1024,
