@@ -1,6 +1,6 @@
 from bpy.types import Operator, Action, UIList, PropertyGroup
 from bpy_extras.io_utils import ExportHelper
-from bpy.props import StringProperty, BoolProperty, FloatProperty, CollectionProperty, PointerProperty
+from bpy.props import StringProperty, BoolProperty, CollectionProperty, PointerProperty
 from .builder import PsaBuilder, PsaBuilderOptions
 from .exporter import PsaExporter
 import bpy

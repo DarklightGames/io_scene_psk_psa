@@ -1,5 +1,6 @@
 from ctypes import *
 
+
 class Vector3(Structure):
     _fields_ = [
         ('x', c_float),

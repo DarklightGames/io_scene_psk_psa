@@ -63,7 +63,6 @@ class Psk(object):
             ('bone_index', c_int32),
         ]
 
-
     def __init__(self):
         self.points: List[Vector3] = []
         self.wedges: List[Psk.Wedge16] = []

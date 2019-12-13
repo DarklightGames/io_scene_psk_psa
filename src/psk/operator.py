@@ -10,7 +10,7 @@ class PskExportOperator(Operator, ExportHelper):
     bl_label = 'Export'
     __doc__ = 'PSK Exporter (.psk)'
     filename_ext = '.psk'
-    filter_glob : StringProperty(default='*.psk', options={'HIDDEN'})
+    filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
 
     filepath : StringProperty(
         name='File Path',

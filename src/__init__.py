@@ -52,9 +52,8 @@ def psa_menu_func(self, context):
 
 
 def register():
-    from bpy.utils import register_class
     for cls in classes:
-        register_class(cls)
+        bpy.utils.register_class(cls)
     bpy.types.TOPBAR_MT_file_export.append(psk_menu_func)
     bpy.types.TOPBAR_MT_file_export.append(psa_menu_func)
     bpy.types.Scene.psa_action_list = CollectionProperty(type=psa_operator.ActionListItem)
@@ -66,9 +65,8 @@ def unregister():
     del bpy.types.Scene.psa_action_list
     bpy.types.TOPBAR_MT_file_export.remove(psa_menu_func)
     bpy.types.TOPBAR_MT_file_export.remove(psk_menu_func)
-    from bpy.utils import unregister_class
     for cls in reversed(classes):
-        unregister_class(cls)
+        bpy.utils.unregister_class(cls)
 
 
 if __name__ == '__main__':

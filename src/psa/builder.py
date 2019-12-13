@@ -1,5 +1,3 @@
-import bpy
-import mathutils
 from .data import *
 
 
@@ -72,7 +70,6 @@ class PsaBuilder(object):
 
             psa.bones.append(psa_bone)
 
-        print('---- ACTIONS ----')
         frame_start_index = 0
 
         for action in options.actions:
@@ -88,10 +85,7 @@ class PsaBuilder(object):
             sequence.name = bytes(action.name, encoding='utf-8')
             sequence.frame_count = frame_max - frame_min + 1
             sequence.frame_start_index = frame_start_index
-            print(frame_start_index)
             sequence.fps = 30  # TODO: fill in later with r
-
-            print(action.name, frame_min, frame_max)
 
             frame_count = frame_max - frame_min + 1
 
@@ -109,9 +103,6 @@ class PsaBuilder(object):
 
                     location = pose_bone_matrix.to_translation()
                     rotation = pose_bone_matrix.to_quaternion().normalized()
-
-                    if action.name == 'shoot_open' and bone.name == 'barrel':
-                        print(location)
 
                     if bone.parent is not None:
                         rotation.x = -rotation.x

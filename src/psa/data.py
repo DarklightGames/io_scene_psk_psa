@@ -1,6 +1,7 @@
 from typing import List
 from ..data import *
 
+
 class Psa(object):
 
     class Bone(Structure):

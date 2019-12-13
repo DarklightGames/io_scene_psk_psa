@@ -3,26 +3,6 @@ import bmesh
 from .data import *
 
 
-# TODO: move to another file
-def make_fquat(bquat):
-    quat = Quaternion()
-    # flip handedness for UT = set x,y,z to negative (rotate in other direction)
-    quat.x = -bquat.x
-    quat.y = -bquat.y
-    quat.z = -bquat.z
-    quat.w = bquat.w
-    return quat
-
-
-def make_fquat_default(bquat):
-    quat = Quaternion()
-    quat.x = bquat.x
-    quat.y = bquat.y
-    quat.z = bquat.z
-    quat.w = bquat.w
-    return quat
-
-
 class PskBuilder(object):
     def __init__(self):
         # TODO: add options in here
