@@ -32,7 +32,7 @@ class PskBuilder(object):
         # TODO: probably requires at least one bone? not sure
         mesh_data = object.data
 
-        # TODO: if there is an edge-split modifier, we need to apply it.
+        # TODO: if there is an edge-split modifier, we need to apply it (maybe?)
 
         # TODO: duplicate all the data
         mesh = bpy.data.meshes.new('export')
@@ -40,7 +40,6 @@ class PskBuilder(object):
         # copy the contents of the mesh
         bm = bmesh.new()
         bm.from_mesh(mesh_data)
-        # triangulate everything
         bmesh.ops.triangulate(bm, faces=bm.faces)
         bm.to_mesh(mesh)
         bm.free()
@@ -74,6 +73,8 @@ class PskBuilder(object):
 
         # MATERIALS
         for i, m in enumerate(object.data.materials):
+            if m is None:
+                raise RuntimeError('Material cannot be empty (index ' + str(i) + ')')
             material = Psk.Material()
             material.name = bytes(m.name, encoding='utf-8')
             material.texture_index = i
