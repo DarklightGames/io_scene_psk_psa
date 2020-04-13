@@ -56,8 +56,9 @@ class PsaExportOperator(Operator, ExportHelper):
         row.template_list('PSA_UL_ActionList', 'asd', scene, 'psa_action_list', scene, 'psa_action_list_index', rows=len(context.scene.psa_action_list))
 
     def is_action_for_armature(self, action):
+        if len(action.fcurves) == 0:
+            return False
         bone_names = [x.name for x in self.armature.data.bones]
-        print(bone_names)
         for fcurve in action.fcurves:
             match = re.match('pose\.bones\["(.+)"\].\w+', fcurve.data_path)
             if not match:

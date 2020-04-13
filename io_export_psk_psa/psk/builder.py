@@ -26,6 +26,9 @@ class PskBuilder(object):
         armature_modifier = modifiers[0]
         armature_object = armature_modifier.object
 
+        if object.modifiers[-1] != armature_modifier:
+            raise RuntimeError('Armature modifier must be the last modifier in the stack')
+
         if armature_object is None:
             raise RuntimeError('Armature modifier has no linked object')
 
@@ -97,6 +100,7 @@ class PskBuilder(object):
                 psk.wedges[f.loops[i]].material_index = f.material_index
 
         # https://github.com/bwrsandman/blender-addons/blob/master/io_export_unreal_psk_psa.py
+        # TODO: maybe we should use the EDIT bones instead???
         bones = list(armature_object.data.bones)
         for bone in bones:
             psk_bone = Psk.Bone()
