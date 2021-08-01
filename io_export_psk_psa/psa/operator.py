@@ -58,15 +58,15 @@ class PsaExportOperator(Operator, ExportHelper):
     def is_action_for_armature(self, action):
         if len(action.fcurves) == 0:
             return False
-        bone_names = [x.name for x in self.armature.data.bones]
+        bone_names = set([x.name for x in self.armature.data.bones])
         for fcurve in action.fcurves:
-            match = re.match('pose\.bones\["(.+)"\].\w+', fcurve.data_path)
+            match = re.match(r'pose\.bones\["(.+)"\].\w+', fcurve.data_path)
             if not match:
                 continue
             bone_name = match.group(1)
-            if bone_name not in bone_names:
-                return False
-        return True
+            if bone_name in bone_names:
+                return True
+        return False
 
     def invoke(self, context, event):
         if context.view_layer.objects.active.type != 'ARMATURE':
