@@ -5,47 +5,53 @@ from .data import *
 
 # https://github.com/bwrsandman/blender-addons/blob/master/io_export_unreal_psk_psa.py
 
+class PskInputObjects(object):
+    def __init__(self):
+        self.mesh_objects = []
+        self.armature_object = None
+
 class PskBuilder(object):
     def __init__(self):
-        # TODO: add options in here
         pass
 
-    def build(self, context) -> Psk:
-        # TODO: it would be nice to be able to do this with MULTIPLE meshes so long as they both have the same armature
-        mesh_objects =[]
-        for object in context.view_layer.objects.selected:
-            if object.type != 'MESH':
-                raise RuntimeError(f'Selected object "{object.name}" is not a mesh')
-            mesh_objects.append(object)
+    @staticmethod
+    def get_input_objects(context) -> PskInputObjects:
+        input_objects = PskInputObjects()
+        for obj in context.view_layer.objects.selected:
+            if obj.type != 'MESH':
+                raise RuntimeError(f'Selected object "{obj.name}" is not a mesh')
 
-        if len(mesh_objects) == 0:
+        input_objects.mesh_objects = context.view_layer.objects.selected
+
+        if len(input_objects.mesh_objects) == 0:
             raise RuntimeError('At least one mesh must be selected')
 
-        for object in mesh_objects:
-            if len(object.data.materials) == 0:
-                raise RuntimeError(f'Mesh "{object.name}" must have at least one material')
+        for obj in input_objects.mesh_objects:
+            if len(obj.data.materials) == 0:
+                raise RuntimeError(f'Mesh "{obj.name}" must have at least one material')
 
         # ensure that there is exactly one armature modifier object shared between all selected meshes
         armature_modifier_objects = set()
 
-        for object in mesh_objects:
-            modifiers = [x for x in object.modifiers if x.type == 'ARMATURE']
+        for obj in input_objects.mesh_objects:
+            modifiers = [x for x in obj.modifiers if x.type == 'ARMATURE']
             if len(modifiers) != 1:
-                raise RuntimeError(f'Mesh "{object.name}" must have one armature modifier')
+                raise RuntimeError(f'Mesh "{obj.name}" must have one armature modifier')
             armature_modifier_objects.add(modifiers[0].object)
 
         if len(armature_modifier_objects) > 1:
             raise RuntimeError('All selected meshes must have the same armature modifier')
 
-        armature_object = list(armature_modifier_objects)[0]
+        input_objects.armature_object = list(armature_modifier_objects)[0]
 
-        if armature_object is None:
+        if input_objects.armature_object is None:
             raise RuntimeError('Armature modifier has no linked object')
 
-        # TODO: probably requires at least one bone? not sure
+        return input_objects
 
-        wedge_count = sum([len(m.data.loops) for m in mesh_objects])
-        print(wedge_count)
+    def build(self, context) -> Psk:
+        input_objects = PskBuilder.get_input_objects(context)
+        wedge_count = sum([len(m.data.loops) for m in input_objects.mesh_objects])
         if wedge_count <= 65536:
             wedge_type = Psk.Wedge16
         else:
@@ -55,7 +61,7 @@ class PskBuilder(object):
 
         materials = OrderedDict()
 
-        bones = list(armature_object.data.bones)
+        bones = list(input_objects.armature_object.data.bones)
         for bone in bones:
             psk_bone = Psk.Bone()
             psk_bone.name = bytes(bone.name, encoding='utf-8')
@@ -77,8 +83,8 @@ class PskBuilder(object):
                 parent_tail = quat_parent @ bone.parent.tail
                 location = (parent_tail - parent_head) + bone.head
             else:
-                location = armature_object.matrix_local @ bone.head
-                rot_matrix = bone.matrix @ armature_object.matrix_local.to_3x3()
+                location = input_objects.armature_object.matrix_local @ bone.head
+                rot_matrix = bone.matrix @ input_objects.armature_object.matrix_local.to_3x3()
                 rotation = rot_matrix.to_quaternion()
 
             psk_bone.location.x = location.x
@@ -97,7 +103,7 @@ class PskBuilder(object):
         weight_offset = 0
 
         # TODO: if there is an edge-split modifier, we need to apply it (maybe?)
-        for object in mesh_objects:
+        for object in input_objects.mesh_objects:
             # VERTICES
             for vertex in object.data.vertices:
                 point = Vector3()
@@ -154,7 +160,7 @@ class PskBuilder(object):
 
             # WEIGHTS
             # TODO: bone ~> vg might not be 1:1, provide a nice error message if this is the case
-            armature = armature_object.data
+            armature = input_objects.armature_object.data
             bone_names = [x.name for x in armature.bones]
             vertex_group_names = [x.name for x in object.vertex_groups]
             bone_indices = [bone_names.index(name) for name in vertex_group_names]
