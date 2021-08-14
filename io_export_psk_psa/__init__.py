@@ -1,7 +1,7 @@
 bl_info = {
     "name": "PSK/PSA Exporter",
     "author": "Colin Basnett",
-    "version": ( 1, 0, 0 ),
+    "version": ( 1, 1, 0 ),
     "blender": ( 2, 80, 0 ),
     "location": "File > Export > PSK Export (.psk)",
     "description": "PSK/PSA Export (.psk)",
