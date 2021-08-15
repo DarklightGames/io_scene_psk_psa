@@ -30,22 +30,23 @@ class PskBuilder(object):
             if len(obj.data.materials) == 0:
                 raise RuntimeError(f'Mesh "{obj.name}" must have at least one material')
 
-        # ensure that there is exactly one armature modifier object shared between all selected meshes
+        # Ensure that there are either no armature modifiers (static mesh)
+        # or that there is exactly one armature modifier object shared between
+        # all selected meshes
         armature_modifier_objects = set()
 
         for obj in input_objects.mesh_objects:
             modifiers = [x for x in obj.modifiers if x.type == 'ARMATURE']
-            if len(modifiers) != 1:
-                raise RuntimeError(f'Mesh "{obj.name}" must have one armature modifier')
+            if len(modifiers) == 0:
+                continue
+            elif len(modifiers) == 2:
+                raise RuntimeError(f'Mesh "{obj.name}" must have only one armature modifier')
             armature_modifier_objects.add(modifiers[0].object)
 
         if len(armature_modifier_objects) > 1:
             raise RuntimeError('All selected meshes must have the same armature modifier')
-
-        input_objects.armature_object = list(armature_modifier_objects)[0]
-
-        if input_objects.armature_object is None:
-            raise RuntimeError('Armature modifier has no linked object')
+        elif len(armature_modifier_objects) == 1:
+            input_objects.armature_object = list(armature_modifier_objects)[0]
 
         return input_objects
 
@@ -61,42 +62,53 @@ class PskBuilder(object):
 
         materials = OrderedDict()
 
-        bones = list(input_objects.armature_object.data.bones)
-        for bone in bones:
+        if input_objects.armature_object is None:
+            # Static mesh (no armature)
             psk_bone = Psk.Bone()
-            psk_bone.name = bytes(bone.name, encoding='utf-8')
+            psk_bone.name = bytes('static', encoding='utf-8')
             psk_bone.flags = 0
-            psk_bone.children_count = len(bone.children)
-
-            try:
-                psk_bone.parent_index = bones.index(bone.parent)
-            except ValueError:
-                psk_bone.parent_index = 0
-
-            if bone.parent is not None:
-                rotation = bone.matrix.to_quaternion()
-                rotation.x = -rotation.x
-                rotation.y = -rotation.y
-                rotation.z = -rotation.z
-                quat_parent = bone.parent.matrix.to_quaternion().inverted()
-                parent_head = quat_parent @ bone.parent.head
-                parent_tail = quat_parent @ bone.parent.tail
-                location = (parent_tail - parent_head) + bone.head
-            else:
-                location = input_objects.armature_object.matrix_local @ bone.head
-                rot_matrix = bone.matrix @ input_objects.armature_object.matrix_local.to_3x3()
-                rotation = rot_matrix.to_quaternion()
-
-            psk_bone.location.x = location.x
-            psk_bone.location.y = location.y
-            psk_bone.location.z = location.z
-
-            psk_bone.rotation.x = rotation.x
-            psk_bone.rotation.y = rotation.y
-            psk_bone.rotation.z = rotation.z
-            psk_bone.rotation.w = rotation.w
-
+            psk_bone.children_count = 0
+            psk_bone.parent_index = 0
+            psk_bone.location = Vector3(0, 0, 0)
+            psk_bone.rotation = Quaternion(0, 0, 0, 1)
             psk.bones.append(psk_bone)
+        else:
+            bones = list(input_objects.armature_object.data.bones)
+            for bone in bones:
+                psk_bone = Psk.Bone()
+                psk_bone.name = bytes(bone.name, encoding='utf-8')
+                psk_bone.flags = 0
+                psk_bone.children_count = len(bone.children)
+
+                try:
+                    psk_bone.parent_index = bones.index(bone.parent)
+                except ValueError:
+                    psk_bone.parent_index = 0
+
+                if bone.parent is not None:
+                    rotation = bone.matrix.to_quaternion()
+                    rotation.x = -rotation.x
+                    rotation.y = -rotation.y
+                    rotation.z = -rotation.z
+                    quat_parent = bone.parent.matrix.to_quaternion().inverted()
+                    parent_head = quat_parent @ bone.parent.head
+                    parent_tail = quat_parent @ bone.parent.tail
+                    location = (parent_tail - parent_head) + bone.head
+                else:
+                    location = input_objects.armature_object.matrix_local @ bone.head
+                    rot_matrix = bone.matrix @ input_objects.armature_object.matrix_local.to_3x3()
+                    rotation = rot_matrix.to_quaternion()
+
+                psk_bone.location.x = location.x
+                psk_bone.location.y = location.y
+                psk_bone.location.z = location.z
+
+                psk_bone.rotation.x = rotation.x
+                psk_bone.rotation.y = rotation.y
+                psk_bone.rotation.z = rotation.z
+                psk_bone.rotation.w = rotation.w
+
+                psk.bones.append(psk_bone)
 
         vertex_offset = 0
         wedge_offset = 0
@@ -143,7 +155,6 @@ class PskBuilder(object):
                 material_indices.append(material_index)
 
             # FACES
-            # TODO: this is making the assumption that the mesh is triangulated
             object.data.calc_loop_triangles()
             poly_groups, groups = object.data.calc_smooth_groups(use_bitflags=True)
             for f in object.data.loop_triangles:
@@ -160,24 +171,25 @@ class PskBuilder(object):
 
             # WEIGHTS
             # TODO: bone ~> vg might not be 1:1, provide a nice error message if this is the case
-            armature = input_objects.armature_object.data
-            bone_names = [x.name for x in armature.bones]
-            vertex_group_names = [x.name for x in object.vertex_groups]
-            bone_indices = [bone_names.index(name) for name in vertex_group_names]
-            for vertex_group_index, vertex_group in enumerate(object.vertex_groups):
-                bone_index = bone_indices[vertex_group_index]
-                for vertex_index in range(len(object.data.vertices)):
-                    try:
-                        weight = vertex_group.weight(vertex_index)
-                    except RuntimeError:
-                        continue
-                    if weight == 0.0:
-                        continue
-                    w = Psk.Weight()
-                    w.bone_index = bone_index
-                    w.point_index = vertex_offset + vertex_index
-                    w.weight = weight
-                    psk.weights.append(w)
+            if input_objects.armature_object is not None:
+                armature = input_objects.armature_object.data
+                bone_names = [x.name for x in armature.bones]
+                vertex_group_names = [x.name for x in object.vertex_groups]
+                bone_indices = [bone_names.index(name) for name in vertex_group_names]
+                for vertex_group_index, vertex_group in enumerate(object.vertex_groups):
+                    bone_index = bone_indices[vertex_group_index]
+                    for vertex_index in range(len(object.data.vertices)):
+                        try:
+                            weight = vertex_group.weight(vertex_index)
+                        except RuntimeError:
+                            continue
+                        if weight == 0.0:
+                            continue
+                        w = Psk.Weight()
+                        w.bone_index = bone_index
+                        w.point_index = vertex_offset + vertex_index
+                        w.weight = weight
+                        psk.weights.append(w)
 
             vertex_offset += len(psk.points)
             wedge_offset += len(psk.wedges)
