@@ -127,7 +127,6 @@ class PskBuilder(object):
 
             # WEDGES
             uv_layer = object.data.uv_layers.active.data
-            # needs to be additive!!!
             psk.wedges.extend([wedge_type() for _ in range(len(object.data.loops))])
 
             for loop_index, loop in enumerate(object.data.loops):

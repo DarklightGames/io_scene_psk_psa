@@ -19,13 +19,11 @@ class PskExporter(object):
                 fp.write(datum)
 
     def export(self, path: str):
-        # TODO: add logic somewhere to assert lengths of ctype structs
         with open(path, 'wb') as fp:
             self.write_section(fp, b'ACTRHEAD')
             self.write_section(fp, b'PNTS0000', Vector3, self.psk.points)
 
             # WEDGES
-            # TODO: this really should be on the level of the builder, not the exporter
             if len(self.psk.wedges) <= 65536:
                 wedge_type = Psk.Wedge16
             else:
