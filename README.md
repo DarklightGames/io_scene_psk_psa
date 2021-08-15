@@ -1,5 +1,3 @@
-# io_export_psk_psa
-
 This Blender add-on allows you to export meshes and animations to the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats).
 
 # Installation
