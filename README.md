@@ -22,4 +22,8 @@ This Blender add-on allows you to export meshes and animations to the [PSK and P
 
 # FAQ
 ## Can I use this addon to import PSK and PSA files?
-Currently, no. If you are looking for a PSK/PSA importer, use [this one](https://github.com/Befzz/blender3d_import_psk_psa)!
+Currently, no.
+
+Presumably you are using this in concert with the [UE Viewer](https://www.gildor.org/en/projects/umodel) program to import extracted meshes. It is *not recommended* to export PSK/PSA from UE Viewer since it [does not preserve smoothing groups](https://github.com/gildor2/UEViewer/issues/235). As a result, the shading of imported models will be incorrect and will need to be manually fixed. Instead, it is recommended to export meshes to the glTF format for import into Blender since it preserves the correct mesh shading.
+
+Regardless, if you are dead set on using a PSK/PSA importer, use [this one](https://github.com/Befzz/blender3d_import_psk_psa).
