@@ -85,7 +85,7 @@ class PsaBuilder(object):
             sequence.name = bytes(action.name, encoding='utf-8')
             sequence.frame_count = frame_max - frame_min + 1
             sequence.frame_start_index = frame_start_index
-            sequence.fps = 30  # TODO: fill in later with r
+            sequence.fps = context.scene.render.fps
 
             frame_count = frame_max - frame_min + 1
 
@@ -93,7 +93,6 @@ class PsaBuilder(object):
                 context.scene.frame_set(frame)
 
                 for bone in pose_bones:
-                    # TODO: is the cast-to-matrix necessary? (guessing no)
                     key = Psa.Key()
                     pose_bone_matrix = bone.matrix
 
