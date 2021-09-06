@@ -159,9 +159,9 @@ class PskBuilder(object):
             for f in object.data.loop_triangles:
                 face = Psk.Face()
                 face.material_index = material_indices[f.material_index]
-                face.wedge_index_1 = f.loops[2] + wedge_offset
-                face.wedge_index_2 = f.loops[1] + wedge_offset
-                face.wedge_index_3 = f.loops[0] + wedge_offset
+                face.wedge_indices[0] = f.loops[2] + wedge_offset
+                face.wedge_indices[1] = f.loops[1] + wedge_offset
+                face.wedge_indices[2] = f.loops[0] + wedge_offset
                 face.smoothing_groups = poly_groups[f.polygon_index]
                 psk.faces.append(face)
                 # update the material index of the wedges
@@ -174,9 +174,11 @@ class PskBuilder(object):
                 armature = input_objects.armature_object.data
                 bone_names = [x.name for x in armature.bones]
                 vertex_group_names = [x.name for x in object.vertex_groups]
-                bone_indices = [bone_names.index(name) for name in vertex_group_names]
+                bone_indices = [bone_names.index(name) if name in bone_names else None for name in vertex_group_names]
                 for vertex_group_index, vertex_group in enumerate(object.vertex_groups):
                     bone_index = bone_indices[vertex_group_index]
+                    if bone_index is None:
+                        continue
                     for vertex_index in range(len(object.data.vertices)):
                         try:
                             weight = vertex_group.weight(vertex_index)
