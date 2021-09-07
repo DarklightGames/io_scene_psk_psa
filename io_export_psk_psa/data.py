@@ -17,6 +17,12 @@ class Quaternion(Structure):
         ('w', c_float),
     ]
 
+    def __iter__(self):
+        yield self.x
+        yield self.y
+        yield self.z
+        yield self.w
+
 
 class Section(Structure):
     _fields_ = [

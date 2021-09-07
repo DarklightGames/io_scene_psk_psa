@@ -159,9 +159,9 @@ class PskBuilder(object):
             for f in object.data.loop_triangles:
                 face = Psk.Face()
                 face.material_index = material_indices[f.material_index]
-                face.wedge_index_1 = f.loops[2] + wedge_offset
-                face.wedge_index_2 = f.loops[1] + wedge_offset
-                face.wedge_index_3 = f.loops[0] + wedge_offset
+                face.wedge_indices[0] = f.loops[2] + wedge_offset
+                face.wedge_indices[1] = f.loops[1] + wedge_offset
+                face.wedge_indices[2] = f.loops[0] + wedge_offset
                 face.smoothing_groups = poly_groups[f.polygon_index]
                 psk.faces.append(face)
                 # update the material index of the wedges

@@ -22,7 +22,7 @@ class Psa(object):
             ('bone_count', c_int32),
             ('root_include', c_int32),
             ('compression_style', c_int32),
-            ('key_quotum', c_int32),  # what the fuck is a quotum
+            ('key_quotum', c_int32),
             ('key_reduction', c_float),
             ('track_time', c_float),
             ('fps', c_float),

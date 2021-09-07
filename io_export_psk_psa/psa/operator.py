@@ -1,10 +1,21 @@
 from bpy.types import Operator, Action, UIList, PropertyGroup
-from bpy_extras.io_utils import ExportHelper
+from bpy_extras.io_utils import ExportHelper, ImportHelper
 from bpy.props import StringProperty, BoolProperty, CollectionProperty, PointerProperty
 from .builder import PsaBuilder, PsaBuilderOptions
 from .exporter import PsaExporter
+from .reader import PsaReader
+from .importer import PsaImporter
 import bpy
 import re
+
+
+class ImportActionListItem(PropertyGroup):
+    action_name: StringProperty()
+    is_selected: BoolProperty(default=True)
+
+    @property
+    def name(self):
+        return self.action_name
 
 
 class ActionListItem(PropertyGroup):
@@ -14,6 +25,22 @@ class ActionListItem(PropertyGroup):
     @property
     def name(self):
         return self.action.name
+
+
+class PSA_UL_ImportActionList(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        layout.alignment = 'LEFT'
+        layout.prop(item, 'is_selected', icon_only=True)
+        layout.label(text=item.action_name)
+
+    # def filter_items(self, context, data, property):
+    #     # TODO: returns two lists, apparently
+    #     actions = getattr(data, property)
+    #     flt_flags = []
+    #     flt_neworder = []
+    #     if self.filter_name:
+    #         flt_flags = bpy.types.UI_UL_list.filter_items_by_name(self.filter_name, self.bitflag_filter_item, actions, 'name', reverse=self.use_filter_invert)
+    #     return flt_flags, flt_neworder
 
 
 class PSA_UL_ActionList(UIList):
@@ -37,8 +64,8 @@ class PsaExportOperator(Operator, ExportHelper):
     bl_label = 'Export'
     __doc__ = 'PSA Exporter (.psa)'
     filename_ext = '.psa'
-    filter_glob : StringProperty(default='*.psa', options={'HIDDEN'})
-    filepath : StringProperty(
+    filter_glob: StringProperty(default='*.psa', options={'HIDDEN'})
+    filepath: StringProperty(
         name='File Path',
         description='File path used for exporting the PSA file',
         maxlen=1024,
@@ -102,4 +129,48 @@ class PsaExportOperator(Operator, ExportHelper):
         psk = builder.build(context, options)
         exporter = PsaExporter(psk)
         exporter.export(self.filepath)
+        return {'FINISHED'}
+
+
+class PsaImportOperator(Operator, ImportHelper):
+    # TODO: list out the actions to be imported
+    bl_idname = 'import.psa'
+    bl_label = 'Import'
+    __doc__ = 'PSA Importer (.psa)'
+    filename_ext = '.psa'
+    filter_glob: StringProperty(default='*.psa', options={'HIDDEN'})
+    filepath: StringProperty(
+        name='File Path',
+        description='File path used for importing the PSA file',
+        maxlen=1024,
+        default='')
+
+    def invoke(self, context, event):
+        action_names = []
+        try:
+            action_names = PsaReader().scan_sequence_names(self.filepath)
+        except IOError:
+            pass
+
+        context.scene.psa_import_action_list.clear()
+        for action_name in action_names:
+            item = context.scene.psa_action_list.add()
+            item.action_name = action_name
+            item.is_selected = True
+
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        box = layout.box()
+        box.label(text='Actions', icon='ACTION')
+        row = box.row()
+        row.template_list('PSA_UL_ImportActionList', 'asd', scene, 'psa_import_action_list', scene, 'psa_import_action_list_index', rows=len(context.scene.psa_import_action_list))
+
+    def execute(self, context):
+        reader = PsaReader()
+        psa = reader.read(self.filepath)
+        PsaImporter().import_psa(psa, context)
         return {'FINISHED'}

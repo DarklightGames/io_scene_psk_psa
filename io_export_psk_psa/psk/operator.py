@@ -1,8 +1,29 @@
 from bpy.types import Operator
-from bpy_extras.io_utils import ExportHelper
+from bpy_extras.io_utils import ExportHelper, ImportHelper
 from bpy.props import StringProperty, BoolProperty, FloatProperty
 from .builder import PskBuilder
 from .exporter import PskExporter
+from .reader import PskReader
+from .importer import PskImporter
+
+
+class PskImportOperator(Operator, ImportHelper):
+    bl_idname = 'import.psk'
+    bl_label = 'Export'
+    __doc__ = 'PSK Importer (.psk)'
+    filename_ext = '.psk'
+    filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
+    filepath: StringProperty(
+        name='File Path',
+        description='File path used for exporting the PSK file',
+        maxlen=1024,
+        default='')
+
+    def execute(self, context):
+        reader = PskReader()
+        psk = reader.read(self.filepath)
+        PskImporter().import_psk(psk, context)
+        return {'FINISHED'}
 
 
 class PskExportOperator(Operator, ExportHelper):
