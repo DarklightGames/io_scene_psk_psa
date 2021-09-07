@@ -90,7 +90,7 @@ class PsaBuilder(object):
             frame_count = frame_max - frame_min + 1
 
             for frame in range(frame_count):
-                context.scene.frame_set(frame)
+                context.scene.frame_set(frame_min + frame)
 
                 for bone in pose_bones:
                     key = Psa.Key()
