@@ -70,6 +70,8 @@ class PsaBuilder(object):
 
             psa.bones.append(psa_bone)
 
+        frame_start_index = 0
+
         for action in options.actions:
             if len(action.fcurves) == 0:
                 continue
@@ -82,7 +84,7 @@ class PsaBuilder(object):
             sequence = Psa.Sequence()
             sequence.name = bytes(action.name, encoding='utf-8')
             sequence.frame_count = frame_max - frame_min + 1
-            sequence.frame_start_index = 0
+            sequence.frame_start_index = frame_start_index
             sequence.fps = context.scene.render.fps
 
             frame_count = frame_max - frame_min + 1
