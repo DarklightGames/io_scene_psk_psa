@@ -10,6 +10,7 @@ class PskInputObjects(object):
         self.mesh_objects = []
         self.armature_object = None
 
+
 class PskBuilder(object):
     def __init__(self):
         pass
@@ -52,14 +53,8 @@ class PskBuilder(object):
 
     def build(self, context) -> Psk:
         input_objects = PskBuilder.get_input_objects(context)
-        wedge_count = sum([len(m.data.loops) for m in input_objects.mesh_objects])
-        if wedge_count <= 65536:
-            wedge_type = Psk.Wedge16
-        else:
-            wedge_type = Psk.Wedge32
 
         psk = Psk()
-
         materials = OrderedDict()
 
         if input_objects.armature_object is None:
@@ -111,10 +106,7 @@ class PskBuilder(object):
                 psk.bones.append(psk_bone)
 
         vertex_offset = 0
-        wedge_offset = 0
-        weight_offset = 0
 
-        # TODO: if there is an edge-split modifier, we need to apply it (maybe?)
         for object in input_objects.mesh_objects:
             # VERTICES
             for vertex in object.data.vertices:
@@ -125,17 +117,7 @@ class PskBuilder(object):
                 point.z = v.z
                 psk.points.append(point)
 
-            # WEDGES
             uv_layer = object.data.uv_layers.active.data
-            psk.wedges.extend([wedge_type() for _ in range(len(object.data.loops))])
-
-            for loop_index, loop in enumerate(object.data.loops):
-                wedge = psk.wedges[wedge_offset + loop_index]
-                wedge.material_index = 0  # NOTE: this material index is set properly while building the faces
-                wedge.point_index = loop.vertex_index + vertex_offset
-                wedge.u, wedge.v = uv_layer[loop_index].uv
-                wedge.v = 1.0 - wedge.v
-                psk.wedges.append(wedge)
 
             # MATERIALS
             material_indices = []
@@ -153,20 +135,46 @@ class PskBuilder(object):
                     material_index = material.texture_index
                 material_indices.append(material_index)
 
-            # FACES
+            # WEDGES
             object.data.calc_loop_triangles()
+
+            # Build a list of non-unique wedges.
+            wedges = []
+            for loop_index, loop in enumerate(object.data.loops):
+                wedge = Psk.Wedge()
+                wedge.point_index = loop.vertex_index + vertex_offset
+                wedge.u, wedge.v = uv_layer[loop_index].uv
+                wedge.v = 1.0 - wedge.v
+                wedges.append(wedge)
+
+            # Assign material indices to the wedges.
+            for triangle in object.data.loop_triangles:
+                for loop_index in triangle.loops:
+                    wedges[loop_index].material_index = material_indices[triangle.material_index]
+
+            # Populate the list of wedges with unique wedges & build a look-up table of loop indices to wedge indices
+            wedge_indices = {}
+            loop_wedge_indices = [-1] * len(object.data.loops)
+            for loop_index, wedge in enumerate(wedges):
+                wedge_hash = hash(wedge)
+                if wedge_hash in wedge_indices:
+                    loop_wedge_indices[loop_index] = wedge_indices[wedge_hash]
+                else:
+                    wedge_index = len(psk.wedges)
+                    wedge_indices[wedge_hash] = wedge_index
+                    psk.wedges.append(wedge)
+                    loop_wedge_indices[loop_index] = wedge_index
+
+            # FACES
             poly_groups, groups = object.data.calc_smooth_groups(use_bitflags=True)
             for f in object.data.loop_triangles:
                 face = Psk.Face()
                 face.material_index = material_indices[f.material_index]
-                face.wedge_index_1 = f.loops[2] + wedge_offset
-                face.wedge_index_2 = f.loops[1] + wedge_offset
-                face.wedge_index_3 = f.loops[0] + wedge_offset
+                face.wedge_indices[0] = loop_wedge_indices[f.loops[2]]
+                face.wedge_indices[1] = loop_wedge_indices[f.loops[1]]
+                face.wedge_indices[2] = loop_wedge_indices[f.loops[0]]
                 face.smoothing_groups = poly_groups[f.polygon_index]
                 psk.faces.append(face)
-                # update the material index of the wedges
-                for i in range(3):
-                    psk.wedges[wedge_offset + f.loops[i]].material_index = face.material_index
 
             # WEIGHTS
             # TODO: bone ~> vg might not be 1:1, provide a nice error message if this is the case
@@ -190,8 +198,6 @@ class PskBuilder(object):
                         w.weight = weight
                         psk.weights.append(w)
 
-            vertex_offset += len(psk.points)
-            wedge_offset += len(psk.wedges)
-            weight_offset += len(psk.weights)
+            vertex_offset = len(psk.points)
 
         return psk
