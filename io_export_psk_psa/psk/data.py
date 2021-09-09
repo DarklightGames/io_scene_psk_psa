@@ -4,28 +4,38 @@ from ..data import *
 
 class Psk(object):
 
+    class Wedge(object):
+        def __init__(self):
+            self.point_index: int = 0
+            self.u: float = 0.0
+            self.v: float = 0.0
+            self.material_index: int = 0
+
+        def __hash__(self):
+            return hash(f'{self.point_index}-{self.u}-{self.v}-{self.material_index}')
+
     class Wedge16(Structure):
         _fields_ = [
-            ('point_index', c_int16),
+            ('point_index', c_uint16),
             ('padding1', c_int16),
             ('u', c_float),
             ('v', c_float),
-            ('material_index', c_int8),
+            ('material_index', c_uint8),
             ('reserved', c_int8),
             ('padding2', c_int16)
         ]
 
     class Wedge32(Structure):
         _fields_ = [
-            ('point_index', c_int32),
+            ('point_index', c_uint32),
             ('u', c_float),
             ('v', c_float),
-            ('material_index', c_int32)
+            ('material_index', c_uint32)
         ]
 
     class Face(Structure):
         _fields_ = [
-            ('wedge_indices', c_int16 * 3),
+            ('wedge_indices', c_uint16 * 3),
             ('material_index', c_int8),
             ('aux_material_index', c_int8),
             ('smoothing_groups', c_int32)
@@ -63,7 +73,7 @@ class Psk(object):
 
     def __init__(self):
         self.points: List[Vector3] = []
-        self.wedges: List[Psk.Wedge16] = []
+        self.wedges: List[Psk.Wedge] = []
         self.faces: List[Psk.Face] = []
         self.materials: List[Psk.Material] = []
         self.weights: List[Psk.Weight] = []

@@ -29,7 +29,16 @@ class PskExporter(object):
             else:
                 wedge_type = Psk.Wedge32
 
-            self.write_section(fp, b'VTXW0000', wedge_type, self.psk.wedges)
+            wedges = []
+            for index, w in enumerate(self.psk.wedges):
+                wedge = wedge_type()
+                wedge.material_index = w.material_index
+                wedge.u = w.u
+                wedge.v = w.v
+                wedge.point_index = w.point_index
+                wedges.append(wedge)
+
+            self.write_section(fp, b'VTXW0000', wedge_type, wedges)
             self.write_section(fp, b'FACE0000', Psk.Face, self.psk.faces)
             self.write_section(fp, b'MATT0000', Psk.Material, self.psk.materials)
             self.write_section(fp, b'REFSKELT', Psk.Bone, self.psk.bones)
