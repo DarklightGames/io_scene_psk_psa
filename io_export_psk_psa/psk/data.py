@@ -36,8 +36,8 @@ class Psk(object):
     class Face(Structure):
         _fields_ = [
             ('wedge_indices', c_uint16 * 3),
-            ('material_index', c_int8),
-            ('aux_material_index', c_int8),
+            ('material_index', c_uint8),
+            ('aux_material_index', c_uint8),
             ('smoothing_groups', c_int32)
         ]
 

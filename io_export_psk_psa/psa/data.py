@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 from ..data import *
 
 
@@ -40,5 +40,5 @@ class Psa(object):
 
     def __init__(self):
         self.bones: List[Psa.Bone] = []
-        self.sequences: List[Psa.Sequence] = []
+        self.sequences: Dict[Psa.Sequence] = {}
         self.keys: List[Psa.Key] = []

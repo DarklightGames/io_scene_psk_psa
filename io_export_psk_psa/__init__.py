@@ -18,11 +18,9 @@ if 'bpy' in locals():
     importlib.reload(psk_exporter)
     importlib.reload(psk_importer)
     importlib.reload(psk_reader)
-    importlib.reload(psk_operator)
     importlib.reload(psa_data)
     importlib.reload(psa_builder)
     importlib.reload(psa_exporter)
-    importlib.reload(psa_operator)
     importlib.reload(psa_reader)
     importlib.reload(psa_importer)
 else:
@@ -32,43 +30,48 @@ else:
     from .psk import exporter as psk_exporter
     from .psk import reader as psk_reader
     from .psk import importer as psk_importer
-    from .psk import operator as psk_operator
     from .psa import data as psa_data
     from .psa import builder as psa_builder
     from .psa import exporter as psa_exporter
-    from .psa import operator as psa_operator
     from .psa import reader as psa_reader
     from .psa import importer as psa_importer
 
 import bpy
-from bpy.props import IntProperty, CollectionProperty
+from bpy.props import PointerProperty
+
 
 classes = [
-    psk_operator.PskExportOperator,
-    psk_operator.PskImportOperator,
-    psa_operator.PsaExportOperator,
-    psa_operator.PsaImportOperator,
-    psa_operator.PSA_UL_ActionList,
-    psa_operator.PSA_UL_ImportActionList,
-    psa_operator.ActionListItem,
-    psa_operator.ImportActionListItem
+    psk_exporter.PskExportOperator,
+    psk_importer.PskImportOperator,
+    psa_exporter.PsaExportOperator,
+    psa_importer.PsaImportOperator,
+    psa_importer.PsaImportFileSelectOperator,
+    psa_importer.PSA_UL_ActionList,
+    psa_importer.PSA_UL_ImportActionList,
+    psa_exporter.PsaExportActionListItem,
+    psa_importer.PsaImportActionListItem,
+    psa_importer.PsaImportSelectAll,
+    psa_importer.PsaImportDeselectAll,
+    psa_importer.PSA_PT_ImportPanel,
+    psa_importer.PsaImportPropertyGroup,
+    psa_exporter.PsaExportPropertyGroup,
 ]
 
 
 def psk_export_menu_func(self, context):
-    self.layout.operator(psk_operator.PskExportOperator.bl_idname, text ='Unreal PSK (.psk)')
+    self.layout.operator(psk_exporter.PskExportOperator.bl_idname, text='Unreal PSK (.psk)')
 
 
 def psk_import_menu_func(self, context):
-    self.layout.operator(psk_operator.PskImportOperator.bl_idname, text ='Unreal PSK (.psk)')
+    self.layout.operator(psk_importer.PskImportOperator.bl_idname, text='Unreal PSK (.psk)')
 
 
 def psa_export_menu_func(self, context):
-    self.layout.operator(psa_operator.PsaExportOperator.bl_idname, text='Unreal PSA (.psa)')
+    self.layout.operator(psa_exporter.PsaExportOperator.bl_idname, text='Unreal PSA (.psa)')
 
 
 def psa_import_menu_func(self, context):
-    self.layout.operator(psa_operator.PsaImportOperator.bl_idname, text ='Unreal PSA (.psa)')
+    self.layout.operator(psa_importer.PsaImportOperator.bl_idname, text='Unreal PSA (.psa)')
 
 
 def register():
@@ -78,17 +81,13 @@ def register():
     bpy.types.TOPBAR_MT_file_import.append(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.append(psa_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.append(psa_import_menu_func)
-    bpy.types.Scene.psa_action_list = CollectionProperty(type=psa_operator.ActionListItem)
-    bpy.types.Scene.psa_import_action_list = CollectionProperty(type=psa_operator.ImportActionListItem)
-    bpy.types.Scene.psa_action_list_index = IntProperty(name='index for list??', default=0)
-    bpy.types.Scene.psa_import_action_list_index = IntProperty(name='index for list??', default=0)
+    bpy.types.Scene.psa_import = PointerProperty(type=psa_importer.PsaImportPropertyGroup)
+    bpy.types.Scene.psa_export = PointerProperty(type=psa_exporter.PsaExportPropertyGroup)
 
 
 def unregister():
-    del bpy.types.Scene.psa_action_list_index
-    del bpy.types.Scene.psa_import_action_list_index
-    del bpy.types.Scene.psa_action_list
-    del bpy.types.Scene.psa_import_action_list
+    del bpy.types.Scene.psa_export
+    del bpy.types.Scene.psa_import
     bpy.types.TOPBAR_MT_file_export.remove(psk_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.remove(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.remove(psa_export_menu_func)

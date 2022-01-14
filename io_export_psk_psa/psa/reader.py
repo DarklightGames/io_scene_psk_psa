@@ -20,9 +20,6 @@ class PsaReader(object):
     def scan_sequence_names(self, path) -> List[AnyStr]:
         sequences = []
         with open(path, 'rb') as fp:
-            if fp.read(8) != b'ANIMINFO':
-                raise IOError('Unexpected file format')
-            fp.seek(0, 0)
             while fp.read(1):
                 fp.seek(-1, 1)
                 section = Section.from_buffer_copy(fp.read(ctypes.sizeof(Section)))
@@ -44,9 +41,14 @@ class PsaReader(object):
                 elif section.name == b'BONENAMES':
                     PsaReader.read_types(fp, Psa.Bone, section, psa.bones)
                 elif section.name == b'ANIMINFO':
-                    PsaReader.read_types(fp, Psa.Sequence, section, psa.sequences)
+                    sequences = []
+                    PsaReader.read_types(fp, Psa.Sequence, section, sequences)
+                    for sequence in sequences:
+                        psa.sequences[sequence.name.decode()] = sequence
                 elif section.name == b'ANIMKEYS':
                     PsaReader.read_types(fp, Psa.Key, section, psa.keys)
+                elif section.name in [b'SCALEKEYS']:
+                    fp.seek(section.data_size * section.data_count, 1)
                 else:
                     raise RuntimeError(f'Unrecognized section "{section.name}"')
         return psa
