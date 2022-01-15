@@ -1,9 +1,13 @@
 from typing import List, Dict
 from ..data import *
 
+"""
+Note that keys are not stored within the Psa object.
+Use the PsaReader::get_sequence_keys to get a the keys for a sequence.
+"""
+
 
 class Psa(object):
-
     class Bone(Structure):
         _fields_ = [
             ('name', c_char * 64),
@@ -38,7 +42,9 @@ class Psa(object):
             ('time', c_float)
         ]
 
+        def __repr__(self) -> str:
+            return repr((self.location, self.rotation, self.time))
+
     def __init__(self):
         self.bones: List[Psa.Bone] = []
         self.sequences: Dict[Psa.Sequence] = {}
-        self.keys: List[Psa.Key] = []

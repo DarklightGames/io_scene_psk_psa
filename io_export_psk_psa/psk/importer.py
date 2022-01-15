@@ -79,13 +79,12 @@ class PskImporter(object):
                 edit_bone.parent = armature_data.edit_bones[bone.psk_bone.parent_index]
             elif not should_invert_root:
                 bone.local_rotation.conjugate()
-            post_quat = bone.local_rotation.conjugated()
             edit_bone.tail = Vector((0.0, new_bone_size, 0.0))
-            m = post_quat.copy()
-            m.rotate(bone.world_matrix)
-            m = m.to_matrix().to_4x4()
-            m.translation = bone.world_matrix.translation
-            edit_bone.matrix = m
+            edit_bone_matrix = bone.local_rotation.conjugated()
+            edit_bone_matrix.rotate(bone.world_matrix)
+            edit_bone_matrix = edit_bone_matrix.to_matrix().to_4x4()
+            edit_bone_matrix.translation = bone.world_matrix.translation
+            edit_bone.matrix = edit_bone_matrix
 
         # MESH
         mesh_data = bpy.data.meshes.new(name)
