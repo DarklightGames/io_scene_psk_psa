@@ -124,6 +124,6 @@ class PsaBuilder(object):
                 sequence.bone_count = len(pose_bones)
                 sequence.track_time = frame_count
 
-            psa.sequences.append(sequence)
+            psa.sequences[action.name] = sequence
 
         return psa

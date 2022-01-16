@@ -29,7 +29,7 @@ class PsaExporter(object):
         with open(path, 'wb') as fp:
             self.write_section(fp, b'ANIMHEAD')
             self.write_section(fp, b'BONENAMES', Psa.Bone, self.psa.bones)
-            self.write_section(fp, b'ANIMINFO', Psa.Sequence, self.psa.sequences)
+            self.write_section(fp, b'ANIMINFO', Psa.Sequence, list(self.psa.sequences.values()))
             self.write_section(fp, b'ANIMKEYS', Psa.Key, self.psa.keys)
 
 
@@ -70,7 +70,7 @@ class PsaExportOperator(Operator, ExportHelper):
         box = layout.box()
         box.label(text='Actions', icon='ACTION')
         row = box.row()
-        row.template_list('PSA_UL_ActionList', 'asd', scene, 'psa_export.action_list', scene, 'psa_export.action_list_index', rows=len(context.scene.psa_export.action_list))
+        row.template_list('PSA_UL_ActionList', 'asd', scene.psa_export, 'action_list', scene.psa_export, 'action_list_index', rows=10)
 
     def is_action_for_armature(self, action):
         if len(action.fcurves) == 0:

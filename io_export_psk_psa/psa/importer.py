@@ -60,28 +60,44 @@ class PsaImporter(object):
 
         # Create intermediate bone data for import operations.
         import_bones = []
+        import_bones_dict = dict()
         for psa_bone_index, psa_bone in enumerate(psa.bones):
             bone_name = psa_bone.name.decode('windows-1252')
-            if psa_bone_index not in psa_to_armature_bone_indices:
+            print(bone_name)
+            if psa_bone_index not in psa_to_armature_bone_indices:  # TODO: replace with bone_name in armature_data.bones
                 # PSA bone does not map to armature bone, skip it and leave an empty bone in its place.
                 import_bones.append(None)
                 continue
+
             import_bone = ImportBone(psa_bone)
             armature_bone = armature_data.bones[bone_name]
             import_bone.pose_bone = armature_object.pose.bones[bone_name]
-            if psa_bone_index > 0:
-                import_bone.parent = import_bones[psa_bone.parent_index]
+
+            if armature_bone.parent is not None:
+                if armature_bone.parent.name in psa_bone_names:
+                    import_bone.parent = import_bones_dict[armature_bone.parent.name]
+                else:
+                    import_bone.parent = None
+
             # Calculate the original location & rotation of each bone (in world space maybe?)
-            if import_bone.parent is not None:
-                import_bone.orig_loc = armature_bone.matrix_local.translation - armature_bone.parent.matrix_local.translation
-                import_bone.orig_loc.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
-                import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
-                import_bone.orig_quat.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
-                import_bone.orig_quat.conjugate()
+            # TODO: check if the armature bones have custom data written to them and use that instead.
+            if armature_bone.get('orig_quat') is not None:
+                # TODO: ideally we don't rely on bone auxiliary data like this, the non-aux data path is incorrect (animations are flipped 180)
+                import_bone.orig_quat = Quaternion(armature_bone['orig_quat'])
+                import_bone.orig_loc = Vector(armature_bone['orig_loc'])
+                import_bone.post_quat = Quaternion(armature_bone['post_quat'])
             else:
-                import_bone.orig_loc = armature_bone.matrix_local.translation.copy()
-                import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
-            import_bone.post_quat = import_bone.orig_quat.conjugated()
+                if import_bone.parent is not None:
+                    import_bone.orig_loc = armature_bone.matrix_local.translation - armature_bone.parent.matrix_local.translation
+                    import_bone.orig_loc.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
+                    import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
+                    import_bone.orig_quat.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
+                    import_bone.orig_quat.conjugate()
+                else:
+                    import_bone.orig_loc = armature_bone.matrix_local.translation.copy()
+                    import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
+                import_bone.post_quat = import_bone.orig_quat.conjugated()
+            import_bones_dict[bone_name] = import_bone
             import_bones.append(import_bone)
 
         # Create and populate the data for new sequences.
@@ -114,9 +130,7 @@ class PsaImporter(object):
                 import_bone.fcurve_location_y.keyframe_points.add(sequence.frame_count)
                 import_bone.fcurve_location_z.keyframe_points.add(sequence.frame_count)
 
-            fcurve_interpolation = 'LINEAR'
             should_invert_root = False
-
             key_index = 0
             sequence_name = sequence.name.decode('windows-1252')
             sequence_keys = psa_reader.get_sequence_keys(sequence_name)
@@ -131,13 +145,12 @@ class PsaImporter(object):
                     key_location = Vector(tuple(sequence_keys[key_index].location))
                     key_rotation = Quaternion(tuple(sequence_keys[key_index].rotation))
 
-                    # TODO: what is this doing exactly?
                     q = import_bone.post_quat.copy()
                     q.rotate(import_bone.orig_quat)
                     quat = q
                     q = import_bone.post_quat.copy()
-                    if import_bone.parent is None and should_invert_root:
-                        q.rotate(import_bone.orig_quat)
+                    if import_bone.parent is None and not should_invert_root:
+                        q.rotate(key_rotation.conjugated())
                     else:
                         q.rotate(key_rotation)
                     quat.rotate(q.conjugated())
@@ -152,14 +165,6 @@ class PsaImporter(object):
                     import_bone.fcurve_location_x.keyframe_points[frame_index].co = frame_index, loc.x
                     import_bone.fcurve_location_y.keyframe_points[frame_index].co = frame_index, loc.y
                     import_bone.fcurve_location_z.keyframe_points[frame_index].co = frame_index, loc.z
-
-                    import_bone.fcurve_quat_w.keyframe_points[frame_index].interpolation = fcurve_interpolation
-                    import_bone.fcurve_quat_x.keyframe_points[frame_index].interpolation = fcurve_interpolation
-                    import_bone.fcurve_quat_y.keyframe_points[frame_index].interpolation = fcurve_interpolation
-                    import_bone.fcurve_quat_z.keyframe_points[frame_index].interpolation = fcurve_interpolation
-                    import_bone.fcurve_location_x.keyframe_points[frame_index].interpolation = fcurve_interpolation
-                    import_bone.fcurve_location_z.keyframe_points[frame_index].interpolation = fcurve_interpolation
-                    import_bone.fcurve_location_z.keyframe_points[frame_index].interpolation = fcurve_interpolation
 
                     key_index += 1
 

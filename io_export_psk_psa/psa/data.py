@@ -1,4 +1,6 @@
-from typing import List, Dict
+import typing
+from typing import List
+from collections import OrderedDict
 from ..data import *
 
 """
@@ -47,4 +49,5 @@ class Psa(object):
 
     def __init__(self):
         self.bones: List[Psa.Bone] = []
-        self.sequences: Dict[Psa.Sequence] = {}
+        self.sequences: typing.OrderedDict[Psa.Sequence] = OrderedDict()
+        self.keys: List[Psa.Key] = []

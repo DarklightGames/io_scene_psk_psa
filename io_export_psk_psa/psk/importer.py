@@ -43,6 +43,9 @@ class PskImporter(object):
                 self.world_rotation_matrix: Matrix = Matrix()
                 self.world_matrix: Matrix = Matrix()
                 self.vertex_group = None
+                self.orig_quat: Quaternion = Quaternion()
+                self.orig_loc: Vector = Vector()
+                self.post_quat: Quaternion = Quaternion()
 
         import_bones = []
         should_invert_root = False
@@ -73,18 +76,27 @@ class PskImporter(object):
             bone.world_rotation_matrix = bone.local_rotation.conjugated().to_matrix()
             bone.world_rotation_matrix.rotate(parent.world_rotation_matrix)
 
-        for bone in import_bones:
-            edit_bone = armature_data.edit_bones.new(bone.psk_bone.name.decode('utf-8'))
-            if bone.parent is not None:
-                edit_bone.parent = armature_data.edit_bones[bone.psk_bone.parent_index]
+        for import_bone in import_bones:
+            bone_name = import_bone.psk_bone.name.decode('utf-8')
+            edit_bone = armature_data.edit_bones.new(bone_name)
+
+            if import_bone.parent is not None:
+                edit_bone.parent = armature_data.edit_bones[import_bone.psk_bone.parent_index]
             elif not should_invert_root:
-                bone.local_rotation.conjugate()
+                import_bone.local_rotation.conjugate()
+
             edit_bone.tail = Vector((0.0, new_bone_size, 0.0))
-            edit_bone_matrix = bone.local_rotation.conjugated()
-            edit_bone_matrix.rotate(bone.world_matrix)
+            edit_bone_matrix = import_bone.local_rotation.conjugated()
+            edit_bone_matrix.rotate(import_bone.world_matrix)
             edit_bone_matrix = edit_bone_matrix.to_matrix().to_4x4()
-            edit_bone_matrix.translation = bone.world_matrix.translation
+            edit_bone_matrix.translation = import_bone.world_matrix.translation
             edit_bone.matrix = edit_bone_matrix
+
+            # Store bind pose information in the bone's custom properties.
+            # This information is used when importing animations from PSA files.
+            edit_bone['orig_quat'] = import_bone.local_rotation
+            edit_bone['orig_loc'] = import_bone.local_translation
+            edit_bone['post_quat'] = import_bone.local_rotation.conjugated()
 
         # MESH
         mesh_data = bpy.data.meshes.new(name)
