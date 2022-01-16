@@ -116,10 +116,17 @@ class PskImporter(object):
 
         bm.verts.ensure_lookup_table()
 
-        for face in psk.faces:
+        degenerate_face_indices = set()
+        for face_index, face in enumerate(psk.faces):
             point_indices = [bm.verts[psk.wedges[i].point_index] for i in reversed(face.wedge_indices)]
-            bm_face = bm.faces.new(point_indices)
-            bm_face.material_index = face.material_index
+            try:
+                bm_face = bm.faces.new(point_indices)
+                bm_face.material_index = face.material_index
+            except ValueError:
+                degenerate_face_indices.add(face_index)
+                pass
+
+        print(f'WARNING: Discarded {len(degenerate_face_indices)} degenerate face(s).')
 
         bm.to_mesh(mesh_data)
 
@@ -127,6 +134,8 @@ class PskImporter(object):
         data_index = 0
         uv_layer = mesh_data.uv_layers.new()
         for face_index, face in enumerate(psk.faces):
+            if face_index in degenerate_face_indices:
+                continue
             face_wedges = [psk.wedges[i] for i in reversed(face.wedge_indices)]
             for wedge in face_wedges:
                 uv_layer.data[data_index].uv = wedge.u, 1.0 - wedge.v
@@ -139,8 +148,8 @@ class PskImporter(object):
 
         # Get a list of all bones that have weights associated with them.
         vertex_group_bone_indices = set(map(lambda weight: weight.bone_index, psk.weights))
-        for bone_index in sorted(list(vertex_group_bone_indices)):
-            import_bones[bone_index].vertex_group = mesh_object.vertex_groups.new(name=import_bones[bone_index].psk_bone.name.decode('windows-1252'))
+        for import_bone in map(lambda x: import_bones[x], sorted(list(vertex_group_bone_indices))):
+            import_bone.vertex_group = mesh_object.vertex_groups.new(name=import_bone.psk_bone.name.decode('windows-1252'))
 
         for weight in psk.weights:
             import_bones[weight.bone_index].vertex_group.add((weight.point_index,), weight.weight, 'ADD')
