@@ -45,7 +45,7 @@ classes = [
     psk_importer.PskImportOperator,
     psa_importer.PsaImportOperator,
     psa_importer.PsaImportFileSelectOperator,
-    psa_importer.PSA_UL_ActionList,
+    psa_exporter.PSA_UL_ExportActionList,
     psa_importer.PSA_UL_ImportActionList,
     psa_importer.PsaImportActionListItem,
     psa_importer.PsaImportSelectAll,

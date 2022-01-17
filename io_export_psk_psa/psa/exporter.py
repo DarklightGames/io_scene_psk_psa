@@ -1,5 +1,5 @@
 import bpy
-from bpy.types import Operator, PropertyGroup, Action
+from bpy.types import Operator, PropertyGroup, Action, UIList
 from bpy.props import CollectionProperty, IntProperty, PointerProperty, StringProperty, BoolProperty
 from bpy_extras.io_utils import ExportHelper
 from typing import Type
@@ -35,6 +35,7 @@ class PsaExporter(object):
 
 class PsaExportActionListItem(PropertyGroup):
     action: PointerProperty(type=Action)
+    action_name: StringProperty()
     is_selected: BoolProperty(default=False)
 
     @property
@@ -70,7 +71,7 @@ class PsaExportOperator(Operator, ExportHelper):
         box = layout.box()
         box.label(text='Actions', icon='ACTION')
         row = box.row()
-        row.template_list('PSA_UL_ActionList', 'asd', scene.psa_export, 'action_list', scene.psa_export, 'action_list_index', rows=10)
+        row.template_list('PSA_UL_ExportActionList', 'asd', scene.psa_export, 'action_list', scene.psa_export, 'action_list_index', rows=10)
         row = box.row()
         row.operator('psa_export.actions_select_all', text='Select All')
         row.operator('psa_export.actions_deselect_all', text='Deselect All')
@@ -99,6 +100,7 @@ class PsaExportOperator(Operator, ExportHelper):
         for action in bpy.data.actions:
             item = context.scene.psa_export.action_list.add()
             item.action = action
+            item.action_name = action.name
             if self.is_action_for_armature(action):
                 item.is_selected = True
 
@@ -123,6 +125,28 @@ class PsaExportOperator(Operator, ExportHelper):
         exporter = PsaExporter(psa)
         exporter.export(self.filepath)
         return {'FINISHED'}
+
+
+class PSA_UL_ExportActionList(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        layout.alignment = 'LEFT'
+        layout.prop(item, 'is_selected', icon_only=True)
+        layout.label(text=item.action_name)
+
+    def filter_items(self, context, data, property):
+        # TODO: returns two lists, apparently
+        actions = getattr(data, property)
+        flt_flags = []
+        flt_neworder = []
+        if self.filter_name:
+            flt_flags = bpy.types.UI_UL_list.filter_items_by_name(
+                self.filter_name,
+                self.bitflag_filter_item,
+                actions,
+                'action_name',
+                reverse=self.use_filter_invert
+            )
+        return flt_flags, flt_neworder
 
 
 class PsaExportSelectAll(bpy.types.Operator):

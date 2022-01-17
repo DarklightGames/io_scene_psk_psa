@@ -189,7 +189,6 @@ class PSA_UL_ImportActionList(UIList):
         layout.label(text=item.action_name)
 
     def filter_items(self, context, data, property):
-        # TODO: returns two lists, apparently
         actions = getattr(data, property)
         flt_flags = []
         flt_neworder = []
@@ -201,22 +200,6 @@ class PSA_UL_ImportActionList(UIList):
                 'action_name',
                 reverse=self.use_filter_invert
             )
-        return flt_flags, flt_neworder
-
-
-class PSA_UL_ActionList(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        layout.alignment = 'LEFT'
-        layout.prop(item, 'is_selected', icon_only=True)
-        layout.label(text=item.action.name)
-
-    def filter_items(self, context, data, property):
-        # TODO: returns two lists, apparently
-        actions = getattr(data, property)
-        flt_flags = []
-        flt_neworder = []
-        if self.filter_name:
-            flt_flags = bpy.types.UI_UL_list.filter_items_by_name(self.filter_name, self.bitflag_filter_item, actions, 'name', reverse=self.use_filter_invert)
         return flt_flags, flt_neworder
 
 
