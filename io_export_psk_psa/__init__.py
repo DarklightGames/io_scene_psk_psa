@@ -43,17 +43,19 @@ from bpy.props import PointerProperty
 classes = [
     psk_exporter.PskExportOperator,
     psk_importer.PskImportOperator,
-    psa_exporter.PsaExportOperator,
     psa_importer.PsaImportOperator,
     psa_importer.PsaImportFileSelectOperator,
     psa_importer.PSA_UL_ActionList,
     psa_importer.PSA_UL_ImportActionList,
-    psa_exporter.PsaExportActionListItem,
     psa_importer.PsaImportActionListItem,
     psa_importer.PsaImportSelectAll,
     psa_importer.PsaImportDeselectAll,
     psa_importer.PSA_PT_ImportPanel,
     psa_importer.PsaImportPropertyGroup,
+    psa_exporter.PsaExportOperator,
+    psa_exporter.PsaExportSelectAll,
+    psa_exporter.PsaExportDeselectAll,
+    psa_exporter.PsaExportActionListItem,
     psa_exporter.PsaExportPropertyGroup,
 ]
 

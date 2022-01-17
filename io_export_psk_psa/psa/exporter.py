@@ -71,6 +71,9 @@ class PsaExportOperator(Operator, ExportHelper):
         box.label(text='Actions', icon='ACTION')
         row = box.row()
         row.template_list('PSA_UL_ActionList', 'asd', scene.psa_export, 'action_list', scene.psa_export, 'action_list_index', rows=10)
+        row = box.row()
+        row.operator('psa_export.actions_select_all', text='Select All')
+        row.operator('psa_export.actions_deselect_all', text='Deselect All')
 
     def is_action_for_armature(self, action):
         if len(action.fcurves) == 0:
@@ -119,4 +122,24 @@ class PsaExportOperator(Operator, ExportHelper):
         psa = builder.build(context, options)
         exporter = PsaExporter(psa)
         exporter.export(self.filepath)
+        return {'FINISHED'}
+
+
+class PsaExportSelectAll(bpy.types.Operator):
+    bl_idname = 'psa_export.actions_select_all'
+    bl_label = 'Select All'
+
+    def execute(self, context):
+        for action in context.scene.psa_export.action_list:
+            action.is_selected = True
+        return {'FINISHED'}
+
+
+class PsaExportDeselectAll(bpy.types.Operator):
+    bl_idname = 'psa_export.actions_deselect_all'
+    bl_label = 'Deselect All'
+
+    def execute(self, context):
+        for action in context.scene.psa_export.action_list:
+            action.is_selected = False
         return {'FINISHED'}

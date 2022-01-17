@@ -61,28 +61,26 @@ class PsaImporter(object):
         # Create intermediate bone data for import operations.
         import_bones = []
         import_bones_dict = dict()
+
         for psa_bone_index, psa_bone in enumerate(psa.bones):
             bone_name = psa_bone.name.decode('windows-1252')
-            print(bone_name)
             if psa_bone_index not in psa_to_armature_bone_indices:  # TODO: replace with bone_name in armature_data.bones
                 # PSA bone does not map to armature bone, skip it and leave an empty bone in its place.
                 import_bones.append(None)
                 continue
-
             import_bone = ImportBone(psa_bone)
-            armature_bone = armature_data.bones[bone_name]
+            import_bone.armature_bone = armature_data.bones[bone_name]
             import_bone.pose_bone = armature_object.pose.bones[bone_name]
+            import_bones_dict[bone_name] = import_bone
+            import_bones.append(import_bone)
 
-            if armature_bone.parent is not None:
-                if armature_bone.parent.name in psa_bone_names:
-                    import_bone.parent = import_bones_dict[armature_bone.parent.name]
-                else:
-                    import_bone.parent = None
-
-            # Calculate the original location & rotation of each bone (in world space maybe?)
-            # TODO: check if the armature bones have custom data written to them and use that instead.
+        for import_bone in filter(lambda x: x is not None, import_bones):
+            armature_bone = import_bone.armature_bone
+            if armature_bone.parent is not None and armature_bone.parent.name in psa_bone_names:
+                import_bone.parent = import_bones_dict[armature_bone.parent.name]
+            # Calculate the original location & rotation of each bone (in world-space maybe?)
             if armature_bone.get('orig_quat') is not None:
-                # TODO: ideally we don't rely on bone auxiliary data like this, the non-aux data path is incorrect (animations are flipped 180)
+                # TODO: ideally we don't rely on bone auxiliary data like this, the non-aux data path is incorrect (animations are flipped 180 around Z)
                 import_bone.orig_quat = Quaternion(armature_bone['orig_quat'])
                 import_bone.orig_loc = Vector(armature_bone['orig_loc'])
                 import_bone.post_quat = Quaternion(armature_bone['post_quat'])
@@ -97,16 +95,13 @@ class PsaImporter(object):
                     import_bone.orig_loc = armature_bone.matrix_local.translation.copy()
                     import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
                 import_bone.post_quat = import_bone.orig_quat.conjugated()
-            import_bones_dict[bone_name] = import_bone
-            import_bones.append(import_bone)
 
         # Create and populate the data for new sequences.
         for sequence in sequences:
             action = bpy.data.actions.new(name=sequence.name.decode())
-            # TODO: problem might be here (yea, we are confused about the ordering of these things!)
             for psa_bone_index, armature_bone_index in psa_to_armature_bone_indices.items():
                 import_bone = import_bones[psa_bone_index]
-                pose_bone = armature_object.pose.bones[armature_bone_index]
+                pose_bone = import_bone.pose_bone
 
                 # rotation
                 rotation_data_path = pose_bone.path_from_id('rotation_quaternion')
