@@ -40,7 +40,7 @@ class PskBuilder(object):
             modifiers = [x for x in obj.modifiers if x.type == 'ARMATURE']
             if len(modifiers) == 0:
                 continue
-            elif len(modifiers) == 2:
+            elif len(modifiers) > 1:
                 raise RuntimeError(f'Mesh "{obj.name}" must have only one armature modifier')
             armature_modifier_objects.add(modifiers[0].object)
 

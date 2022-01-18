@@ -46,6 +46,7 @@ classes = [
     psa_importer.PsaImportOperator,
     psa_importer.PsaImportFileSelectOperator,
     psa_exporter.PSA_UL_ExportActionList,
+    psa_exporter.PSA_UL_ExportBoneGroupList,
     psa_importer.PSA_UL_ImportActionList,
     psa_importer.PsaImportActionListItem,
     psa_importer.PsaImportSelectAll,
@@ -56,6 +57,7 @@ classes = [
     psa_exporter.PsaExportSelectAll,
     psa_exporter.PsaExportDeselectAll,
     psa_exporter.PsaExportActionListItem,
+    psa_exporter.PsaExportBoneGroupListItem,
     psa_exporter.PsaExportPropertyGroup,
 ]
 

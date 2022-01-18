@@ -48,7 +48,6 @@ class PskImporter(object):
                 self.post_quat: Quaternion = Quaternion()
 
         import_bones = []
-        should_invert_root = False
         new_bone_size = 8.0
 
         for bone_index, psk_bone in enumerate(psk.bones):
@@ -57,10 +56,7 @@ class PskImporter(object):
             import_bone.local_rotation = Quaternion(tuple(psk_bone.rotation))
             import_bone.local_translation = Vector(tuple(psk_bone.location))
             if psk_bone.parent_index == 0 and bone_index == 0:
-                if should_invert_root:
-                    import_bone.world_rotation_matrix = import_bone.local_rotation.conjugated().to_matrix()
-                else:
-                    import_bone.world_rotation_matrix = import_bone.local_rotation.to_matrix()
+                import_bone.world_rotation_matrix = import_bone.local_rotation.to_matrix()
                 import_bone.world_matrix = Matrix.Translation(import_bone.local_translation)
             import_bones.append(import_bone)
 
@@ -82,7 +78,7 @@ class PskImporter(object):
 
             if import_bone.parent is not None:
                 edit_bone.parent = armature_data.edit_bones[import_bone.psk_bone.parent_index]
-            elif not should_invert_root:
+            else:
                 import_bone.local_rotation.conjugate()
 
             edit_bone.tail = Vector((0.0, new_bone_size, 0.0))
@@ -126,7 +122,8 @@ class PskImporter(object):
                 degenerate_face_indices.add(face_index)
                 pass
 
-        print(f'WARNING: Discarded {len(degenerate_face_indices)} degenerate face(s).')
+        if len(degenerate_face_indices) > 0:
+            print(f'WARNING: Discarded {len(degenerate_face_indices)} degenerate face(s).')
 
         bm.to_mesh(mesh_data)
 

@@ -1,6 +1,6 @@
 import bpy
-from bpy.types import Operator, PropertyGroup, Action, UIList
-from bpy.props import CollectionProperty, IntProperty, PointerProperty, StringProperty, BoolProperty
+from bpy.types import Operator, PropertyGroup, Action, UIList, BoneGroup
+from bpy.props import CollectionProperty, IntProperty, PointerProperty, StringProperty, BoolProperty, EnumProperty
 from bpy_extras.io_utils import ExportHelper
 from typing import Type
 from .builder import PsaBuilder, PsaBuilderOptions
@@ -43,11 +43,28 @@ class PsaExportActionListItem(PropertyGroup):
         return self.action.name
 
 
-class PsaExportPropertyGroup(bpy.types.PropertyGroup):
+class PsaExportBoneGroupListItem(PropertyGroup):
+    name: StringProperty()
+    index: IntProperty()
+    is_selected: BoolProperty(default=False)
+
+    @property
+    def name(self):
+        return self.bone_group.name
+
+
+class PsaExportPropertyGroup(PropertyGroup):
     action_list: CollectionProperty(type=PsaExportActionListItem)
-    import_action_list: CollectionProperty(type=PsaExportActionListItem)
-    action_list_index: IntProperty(name='index for list??', default=0)
-    import_action_list_index: IntProperty(name='index for list??', default=0)
+    action_list_index: IntProperty(default=0)
+    bone_filter_mode: EnumProperty(
+        name='Bone Filter',
+        items={
+            ('NONE', 'None', 'All bones will be exported.'),
+            ('BONE_GROUPS', 'Bone Groups', 'Only bones belonging to the selected bone groups will be exported.'),
+        }
+    )
+    bone_group_list: CollectionProperty(type=PsaExportBoneGroupListItem)
+    bone_group_list_index: IntProperty(default=0)
 
 
 class PsaExportOperator(Operator, ExportHelper):
@@ -68,13 +85,28 @@ class PsaExportOperator(Operator, ExportHelper):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
+
         box = layout.box()
         box.label(text='Actions', icon='ACTION')
+
         row = box.row()
         row.template_list('PSA_UL_ExportActionList', 'asd', scene.psa_export, 'action_list', scene.psa_export, 'action_list_index', rows=10)
+
         row = box.row()
         row.operator('psa_export.actions_select_all', text='Select All')
         row.operator('psa_export.actions_deselect_all', text='Deselect All')
+
+        box = layout.box()
+        box.label(text='Bone Filter', icon='FILTER')
+
+        row = box.row()
+        row.alignment = 'EXPAND'
+        row.prop(scene.psa_export, 'bone_filter_mode', expand=True, text='Bone Filter')
+
+        if scene.psa_export.bone_filter_mode == 'BONE_GROUPS':
+            row = box.row()
+            rows = max(3, min(len(scene.psa_export.bone_group_list), 10))
+            row.template_list('PSA_UL_ExportBoneGroupList', 'asd', scene.psa_export, 'bone_group_list', scene.psa_export, 'bone_group_list_index', rows=rows)
 
     def is_action_for_armature(self, action):
         if len(action.fcurves) == 0:
@@ -90,12 +122,17 @@ class PsaExportOperator(Operator, ExportHelper):
         return False
 
     def invoke(self, context, event):
+        if context.view_layer.objects.active is None:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'An armature must be selected')
+            return {'CANCELLED'}
+
         if context.view_layer.objects.active.type != 'ARMATURE':
             self.report({'ERROR_INVALID_CONTEXT'}, 'The selected object must be an armature.')
             return {'CANCELLED'}
 
         self.armature = context.view_layer.objects.active
 
+        # Populate actions list.
         context.scene.psa_export.action_list.clear()
         for action in bpy.data.actions:
             item = context.scene.psa_export.action_list.add()
@@ -105,10 +142,20 @@ class PsaExportOperator(Operator, ExportHelper):
                 item.is_selected = True
 
         if len(context.scene.psa_export.action_list) == 0:
+            # If there are no actions at all, we have nothing to export, so just cancel the operation.
             self.report({'ERROR_INVALID_CONTEXT'}, 'There are no actions to export.')
             return {'CANCELLED'}
 
+        # Populate bone groups list.
+        context.scene.psa_export.bone_group_list.clear()
+        for bone_group_index, bone_group in enumerate(self.armature.pose.bone_groups):
+            item = context.scene.psa_export.bone_group_list.add()
+            item.name = bone_group.name
+            item.index = bone_group_index
+            item.is_selected = False
+
         context.window_manager.fileselect_add(self)
+
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
@@ -120,11 +167,20 @@ class PsaExportOperator(Operator, ExportHelper):
 
         options = PsaBuilderOptions()
         options.actions = actions
+        options.bone_filter_mode = context.scene.psa_export.bone_filter_mode
+        options.bone_group_indices = [x.index for x in context.scene.psa_export.bone_group_list if x.is_selected]
         builder = PsaBuilder()
         psa = builder.build(context, options)
         exporter = PsaExporter(psa)
         exporter.export(self.filepath)
         return {'FINISHED'}
+
+
+class PSA_UL_ExportBoneGroupList(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        layout.alignment = 'LEFT'
+        layout.prop(item, 'is_selected', icon_only=True)
+        layout.label(text=item.name, icon='GROUP_BONE')
 
 
 class PSA_UL_ExportActionList(UIList):
@@ -134,7 +190,6 @@ class PSA_UL_ExportActionList(UIList):
         layout.label(text=item.action_name)
 
     def filter_items(self, context, data, property):
-        # TODO: returns two lists, apparently
         actions = getattr(data, property)
         flt_flags = []
         flt_neworder = []
@@ -153,6 +208,12 @@ class PsaExportSelectAll(bpy.types.Operator):
     bl_idname = 'psa_export.actions_select_all'
     bl_label = 'Select All'
 
+    @classmethod
+    def poll(cls, context):
+        action_list = context.scene.psa_export.action_list
+        has_unselected_actions = any(map(lambda action: not action.is_selected, action_list))
+        return len(action_list) > 0 and has_unselected_actions
+
     def execute(self, context):
         for action in context.scene.psa_export.action_list:
             action.is_selected = True
@@ -162,6 +223,12 @@ class PsaExportSelectAll(bpy.types.Operator):
 class PsaExportDeselectAll(bpy.types.Operator):
     bl_idname = 'psa_export.actions_deselect_all'
     bl_label = 'Deselect All'
+
+    @classmethod
+    def poll(cls, context):
+        action_list = context.scene.psa_export.action_list
+        has_selected_actions = any(map(lambda action: action.is_selected, action_list))
+        return len(action_list) > 0 and has_selected_actions
 
     def execute(self, context):
         for action in context.scene.psa_export.action_list:

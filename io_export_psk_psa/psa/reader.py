@@ -34,19 +34,13 @@ class PsaReader(object):
                     fp.seek(section.data_size * section.data_count, 1)
         return []
 
-    def get_sequence_keys(self, sequence_name) -> List[Psa.Key]:
+    def read_sequence_keys(self, sequence_name) -> List[Psa.Key]:
         # Set the file reader to the beginning of the keys data
         sequence = self.psa.sequences[sequence_name]
         data_size = sizeof(Psa.Key)
         bone_count = len(self.psa.bones)
         buffer_length = data_size * bone_count * sequence.frame_count
-        print(f'data_size: {data_size}')
-        print(f'buffer_length: {buffer_length}')
-        print(f'bone_count: {bone_count}')
-        print(f'sequence.frame_count: {sequence.frame_count}')
-        print(f'self.keys_data_offset: {self.keys_data_offset}')
         sequence_keys_offset = self.keys_data_offset + (sequence.frame_start_index * bone_count * data_size)
-        print(f'sequence_keys_offset: {sequence_keys_offset}')
         self.fp.seek(sequence_keys_offset, 0)
         buffer = self.fp.read(buffer_length)
         offset = 0

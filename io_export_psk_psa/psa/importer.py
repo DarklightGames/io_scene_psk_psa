@@ -4,10 +4,11 @@ from mathutils import Vector, Quaternion, Matrix
 from .data import Psa
 from typing import List, AnyStr, Optional
 import bpy
-from bpy.types import Operator, Action, UIList, PropertyGroup, Panel, Armature
+from bpy.types import Operator, Action, UIList, PropertyGroup, Panel, Armature, FileSelectParams
 from bpy_extras.io_utils import ExportHelper, ImportHelper
 from bpy.props import StringProperty, BoolProperty, CollectionProperty, PointerProperty, IntProperty
 from .reader import PsaReader
+import numpy as np
 
 
 class PsaImporter(object):
@@ -30,14 +31,7 @@ class PsaImporter(object):
                 self.orig_loc: Vector = Vector()
                 self.orig_quat: Quaternion = Quaternion()
                 self.post_quat: Quaternion = Quaternion()
-                # TODO: this is UGLY, come up with a way to just map indices for these
-                self.fcurve_quat_w = None
-                self.fcurve_quat_x = None
-                self.fcurve_quat_y = None
-                self.fcurve_quat_z = None
-                self.fcurve_location_x = None
-                self.fcurve_location_y = None
-                self.fcurve_location_z = None
+                self.fcurves = []
 
         # create an index mapping from bones in the PSA to bones in the target armature.
         psa_to_armature_bone_indices = {}
@@ -103,90 +97,105 @@ class PsaImporter(object):
                 import_bone = import_bones[psa_bone_index]
                 pose_bone = import_bone.pose_bone
 
-                # rotation
+                # create fcurves from rotation and location data
                 rotation_data_path = pose_bone.path_from_id('rotation_quaternion')
-                import_bone.fcurve_quat_w = action.fcurves.new(rotation_data_path, index=0)
-                import_bone.fcurve_quat_x = action.fcurves.new(rotation_data_path, index=1)
-                import_bone.fcurve_quat_y = action.fcurves.new(rotation_data_path, index=2)
-                import_bone.fcurve_quat_z = action.fcurves.new(rotation_data_path, index=3)
-
-                # location
                 location_data_path = pose_bone.path_from_id('location')
-                import_bone.fcurve_location_x = action.fcurves.new(location_data_path, index=0)
-                import_bone.fcurve_location_y = action.fcurves.new(location_data_path, index=1)
-                import_bone.fcurve_location_z = action.fcurves.new(location_data_path, index=2)
+                import_bone.fcurves.extend([
+                    action.fcurves.new(rotation_data_path, index=0),  # Qw
+                    action.fcurves.new(rotation_data_path, index=1),  # Qx
+                    action.fcurves.new(rotation_data_path, index=2),  # Qy
+                    action.fcurves.new(rotation_data_path, index=3),  # Qz
+                    action.fcurves.new(location_data_path, index=0),  # Lx
+                    action.fcurves.new(location_data_path, index=1),  # Ly
+                    action.fcurves.new(location_data_path, index=2),  # Lz
+                ])
 
-                # add keyframes
-                import_bone.fcurve_quat_w.keyframe_points.add(sequence.frame_count)
-                import_bone.fcurve_quat_x.keyframe_points.add(sequence.frame_count)
-                import_bone.fcurve_quat_y.keyframe_points.add(sequence.frame_count)
-                import_bone.fcurve_quat_z.keyframe_points.add(sequence.frame_count)
-                import_bone.fcurve_location_x.keyframe_points.add(sequence.frame_count)
-                import_bone.fcurve_location_y.keyframe_points.add(sequence.frame_count)
-                import_bone.fcurve_location_z.keyframe_points.add(sequence.frame_count)
-
-            should_invert_root = False
             key_index = 0
+
+            # Read the sequence keys from the PSA file.
             sequence_name = sequence.name.decode('windows-1252')
-            sequence_keys = psa_reader.get_sequence_keys(sequence_name)
+            sequence_keys = psa_reader.read_sequence_keys(sequence_name)
 
             for frame_index in range(sequence.frame_count):
-                for import_bone in import_bones:
+                for bone_index, import_bone in enumerate(import_bones):
                     if import_bone is None:
                         # bone does not exist in the armature, skip it
                         key_index += 1
                         continue
 
-                    key_location = Vector(tuple(sequence_keys[key_index].location))
+                    # Convert world-space transforms to local-space transforms.
                     key_rotation = Quaternion(tuple(sequence_keys[key_index].rotation))
-
                     q = import_bone.post_quat.copy()
                     q.rotate(import_bone.orig_quat)
                     quat = q
                     q = import_bone.post_quat.copy()
-                    if import_bone.parent is None and not should_invert_root:
+                    if import_bone.parent is None:
                         q.rotate(key_rotation.conjugated())
                     else:
                         q.rotate(key_rotation)
                     quat.rotate(q.conjugated())
 
+                    key_location = Vector(tuple(sequence_keys[key_index].location))
                     loc = key_location - import_bone.orig_loc
                     loc.rotate(import_bone.post_quat.conjugated())
 
-                    import_bone.fcurve_quat_w.keyframe_points[frame_index].co = frame_index, quat.w
-                    import_bone.fcurve_quat_x.keyframe_points[frame_index].co = frame_index, quat.x
-                    import_bone.fcurve_quat_y.keyframe_points[frame_index].co = frame_index, quat.y
-                    import_bone.fcurve_quat_z.keyframe_points[frame_index].co = frame_index, quat.z
-                    import_bone.fcurve_location_x.keyframe_points[frame_index].co = frame_index, loc.x
-                    import_bone.fcurve_location_y.keyframe_points[frame_index].co = frame_index, loc.y
-                    import_bone.fcurve_location_z.keyframe_points[frame_index].co = frame_index, loc.z
+                    bone_fcurve_data = quat.w, quat.x, quat.y, quat.z, loc.x, loc.y, loc.z
+                    for fcurve, datum in zip(import_bone.fcurves, bone_fcurve_data):
+                        fcurve.keyframe_points.insert(frame_index, datum)
 
                     key_index += 1
 
 
 class PsaImportActionListItem(PropertyGroup):
     action_name: StringProperty()
-    is_selected: BoolProperty(default=True)
+    frame_count: IntProperty()
+    is_selected: BoolProperty(default=False)
 
     @property
     def name(self):
         return self.action_name
 
 
+def on_psa_filepath_updated(property, context):
+    context.scene.psa_import.action_list.clear()
+    try:
+        # Read the file and populate the action list.
+        psa = PsaReader(context.scene.psa_import.psa_filepath).psa
+        for sequence in psa.sequences.values():
+            item = context.scene.psa_import.action_list.add()
+            item.action_name = sequence.name.decode('windows-1252')
+            item.frame_count = sequence.frame_count
+            item.is_selected = True
+    except IOError:
+        # TODO: set an error somewhere so the user knows the PSA could not be read.
+        pass
+
+
 class PsaImportPropertyGroup(bpy.types.PropertyGroup):
-    cool_filepath: StringProperty(default='')
-    armature_object: PointerProperty(type=bpy.types.Object)  # TODO: figure out how to filter this to only objects of a specific type
+    psa_filepath: StringProperty(default='', subtype='FILE_PATH', update=on_psa_filepath_updated)
+    armature_object: PointerProperty(name='Armature', type=bpy.types.Object)
     action_list: CollectionProperty(type=PsaImportActionListItem)
-    import_action_list: CollectionProperty(type=PsaImportActionListItem)
-    action_list_index: IntProperty(name='index for list??', default=0)
-    import_action_list_index: IntProperty(name='index for list??', default=0)
+    action_list_index: IntProperty(name='', default=0)
+    action_filter_name: StringProperty(default='')
 
 
 class PSA_UL_ImportActionList(UIList):
+
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        layout.alignment = 'LEFT'
-        layout.prop(item, 'is_selected', icon_only=True)
-        layout.label(text=item.action_name)
+        row = layout.row(align=True)
+        split = row.split(align=True, factor=0.75)
+        action_col = split.row(align=True)
+        action_col.alignment = 'LEFT'
+        action_col.prop(item, 'is_selected', icon_only=True)
+        action_col.label(text=item.action_name)
+
+    def draw_filter(self, context, layout):
+        row = layout.row()
+        subrow = row.row(align=True)
+        subrow.prop(self, 'filter_name', text="")
+        subrow.prop(self, 'use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
+        subrow = row.row(align=True)
+        subrow.prop(self, 'use_filter_sort_reverse', text='', icon='SORT_ASC')
 
     def filter_items(self, context, data, property):
         actions = getattr(data, property)
@@ -205,7 +214,13 @@ class PSA_UL_ImportActionList(UIList):
 
 class PsaImportSelectAll(bpy.types.Operator):
     bl_idname = 'psa_import.actions_select_all'
-    bl_label = 'Select All'
+    bl_label = 'All'
+
+    @classmethod
+    def poll(cls, context):
+        action_list = context.scene.psa_import.action_list
+        has_unselected_actions = any(map(lambda action: not action.is_selected, action_list))
+        return len(action_list) > 0 and has_unselected_actions
 
     def execute(self, context):
         for action in context.scene.psa_import.action_list:
@@ -215,7 +230,13 @@ class PsaImportSelectAll(bpy.types.Operator):
 
 class PsaImportDeselectAll(bpy.types.Operator):
     bl_idname = 'psa_import.actions_deselect_all'
-    bl_label = 'Deselect All'
+    bl_label = 'None'
+
+    @classmethod
+    def poll(cls, context):
+        action_list = context.scene.psa_import.action_list
+        has_selected_actions = any(map(lambda action: action.is_selected, action_list))
+        return len(action_list) > 0 and has_selected_actions
 
     def execute(self, context):
         for action in context.scene.psa_import.action_list:
@@ -234,25 +255,34 @@ class PSA_PT_ImportPanel(Panel):
         layout = self.layout
         scene = context.scene
         row = layout.row()
-        row.operator('psa_import.file_select', icon='FILE_FOLDER', text='')
-        row.label(text=scene.psa_import.cool_filepath)
+        row.prop(scene.psa_import, 'psa_filepath', text='PSA File')
+        row = layout.row()
+        row.prop_search(scene.psa_import, 'armature_object', bpy.data, 'objects')
         box = layout.box()
-        box.label(text='Actions', icon='ACTION')
+        box.label(text=f'Actions ({len(scene.psa_import.action_list)})', icon='ACTION')
         row = box.row()
-        row.template_list('PSA_UL_ImportActionList', 'asd', scene.psa_import, 'action_list', scene.psa_import, 'action_list_index', rows=10)
-        row = box.row()
-        row.operator('psa_import.actions_select_all', text='Select All')
-        row.operator('psa_import.actions_deselect_all', text='Deselect All')
-        layout.prop(scene.psa_import, 'armature_object', icon_only=True)
-        layout.operator('psa_import.import', text='Import')
+        rows = max(3, min(len(scene.psa_import.action_list), 10))
+        row.template_list('PSA_UL_ImportActionList', 'asd', scene.psa_import, 'action_list', scene.psa_import, 'action_list_index', rows=rows)
+        row = box.row(align=True)
+        row.label(text='Select')
+        row.operator('psa_import.actions_select_all', text='All')
+        row.operator('psa_import.actions_deselect_all', text='None')
+        layout.operator('psa_import.import', text=f'Import')
 
 
 class PsaImportOperator(Operator):
     bl_idname = 'psa_import.import'
     bl_label = 'Import'
 
+    @classmethod
+    def poll(cls, context):
+        action_list = context.scene.psa_import.action_list
+        has_selected_actions = any(map(lambda action: action.is_selected, action_list))
+        armature_object = context.scene.psa_import.armature_object
+        return has_selected_actions and armature_object is not None
+
     def execute(self, context):
-        psa_reader = PsaReader(context.scene.psa_import.cool_filepath)
+        psa_reader = PsaReader(context.scene.psa_import.psa_filepath)
         sequence_names = [x.action_name for x in context.scene.psa_import.action_list if x.is_selected]
         PsaImporter().import_psa(psa_reader, sequence_names, context)
         return {'FINISHED'}
@@ -274,16 +304,6 @@ class PsaImportFileSelectOperator(Operator, ImportHelper):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        context.scene.psa_import.cool_filepath = self.filepath
+        context.scene.psa_import.psa_filepath = self.filepath
         # Load the sequence names from the selected file
-        sequence_names = []
-        try:
-            sequence_names = PsaReader.scan_sequence_names(self.filepath)
-        except IOError:
-            pass
-        context.scene.psa_import.action_list.clear()
-        for sequence_name in sequence_names:
-            item = context.scene.psa_import.action_list.add()
-            item.action_name = sequence_name.decode('windows-1252')
-            item.is_selected = True
         return {'FINISHED'}
