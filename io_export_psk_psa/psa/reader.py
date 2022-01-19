@@ -1,17 +1,28 @@
 from .data import *
-from typing import AnyStr
 import ctypes
 
 
 class PsaReader(object):
-
+    """
+    This class will read the sequences and bone information immediately upon instantiation and hold onto a file handle.
+    The key data is not read into memory upon instantiation due to it's potentially very large size.
+    To read the key data for a particular sequence, call `read_sequence_keys`.
+    """
     def __init__(self, path):
-        self.keys_data_offset = 0
+        self.keys_data_offset: int = 0
         self.fp = open(path, 'rb')
-        self.psa = self._read(self.fp)
+        self.psa: Psa = self._read(self.fp)
+
+    @property
+    def bones(self):
+        return self.psa.bones
+
+    @property
+    def sequences(self):
+        return self.psa.sequences
 
     @staticmethod
-    def read_types(fp, data_class: ctypes.Structure, section: Section, data):
+    def _read_types(fp, data_class: ctypes.Structure, section: Section, data):
         buffer_length = section.data_size * section.data_count
         buffer = fp.read(buffer_length)
         offset = 0
@@ -19,22 +30,12 @@ class PsaReader(object):
             data.append(data_class.from_buffer_copy(buffer, offset))
             offset += section.data_size
 
-    # TODO: this probably isn't actually needed anymore, we can just read it once.
-    @staticmethod
-    def scan_sequence_names(path) -> List[AnyStr]:
-        sequences = []
-        with open(path, 'rb') as fp:
-            while fp.read(1):
-                fp.seek(-1, 1)
-                section = Section.from_buffer_copy(fp.read(ctypes.sizeof(Section)))
-                if section.name == b'ANIMINFO':
-                    PsaReader.read_types(fp, Psa.Sequence, section, sequences)
-                    return [sequence.name for sequence in sequences]
-                else:
-                    fp.seek(section.data_size * section.data_count, 1)
-        return []
-
     def read_sequence_keys(self, sequence_name) -> List[Psa.Key]:
+        """ Reads and returns the key data for a sequence.
+
+        :param sequence_name: The name of the sequence.
+        :return: A list of Psa.Keys.
+        """
         # Set the file reader to the beginning of the keys data
         sequence = self.psa.sequences[sequence_name]
         data_size = sizeof(Psa.Key)
@@ -59,10 +60,10 @@ class PsaReader(object):
             if section.name == b'ANIMHEAD':
                 pass
             elif section.name == b'BONENAMES':
-                PsaReader.read_types(fp, Psa.Bone, section, psa.bones)
+                PsaReader._read_types(fp, Psa.Bone, section, psa.bones)
             elif section.name == b'ANIMINFO':
                 sequences = []
-                PsaReader.read_types(fp, Psa.Sequence, section, sequences)
+                PsaReader._read_types(fp, Psa.Sequence, section, sequences)
                 for sequence in sequences:
                     psa.sequences[sequence.name.decode()] = sequence
             elif section.name == b'ANIMKEYS':

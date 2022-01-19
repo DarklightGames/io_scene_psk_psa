@@ -1,14 +1,12 @@
 import bpy
-import mathutils
+import os
 from mathutils import Vector, Quaternion, Matrix
 from .data import Psa
 from typing import List, AnyStr, Optional
-import bpy
 from bpy.types import Operator, Action, UIList, PropertyGroup, Panel, Armature, FileSelectParams
 from bpy_extras.io_utils import ExportHelper, ImportHelper
 from bpy.props import StringProperty, BoolProperty, CollectionProperty, PointerProperty, IntProperty
 from .reader import PsaReader
-import numpy as np
 
 
 class PsaImporter(object):
@@ -16,9 +14,8 @@ class PsaImporter(object):
         pass
 
     def import_psa(self, psa_reader: PsaReader, sequence_names: List[AnyStr], context):
-        psa = psa_reader.psa
         properties = context.scene.psa_import
-        sequences = map(lambda x: psa.sequences[x], sequence_names)
+        sequences = map(lambda x: psa_reader.sequences[x], sequence_names)
         armature_object = properties.armature_object
         armature_data = armature_object.data
 
@@ -33,11 +30,11 @@ class PsaImporter(object):
                 self.post_quat: Quaternion = Quaternion()
                 self.fcurves = []
 
-        # create an index mapping from bones in the PSA to bones in the target armature.
+        # Create an index mapping from bones in the PSA to bones in the target armature.
         psa_to_armature_bone_indices = {}
         armature_bone_names = [x.name for x in armature_data.bones]
         psa_bone_names = []
-        for psa_bone_index, psa_bone in enumerate(psa.bones):
+        for psa_bone_index, psa_bone in enumerate(psa_reader.bones):
             psa_bone_name = psa_bone.name.decode('windows-1252')
             psa_bone_names.append(psa_bone_name)
             try:
@@ -45,7 +42,7 @@ class PsaImporter(object):
             except ValueError:
                 pass
 
-        # report if there are missing bones in the target armature
+        # Report if there are missing bones in the target armature.
         missing_bone_names = set(psa_bone_names).difference(set(armature_bone_names))
         if len(missing_bone_names) > 0:
             print(f'The armature object \'{armature_object.name}\' is missing the following bones that exist in the PSA:')
@@ -56,7 +53,7 @@ class PsaImporter(object):
         import_bones = []
         import_bones_dict = dict()
 
-        for psa_bone_index, psa_bone in enumerate(psa.bones):
+        for psa_bone_index, psa_bone in enumerate(psa_reader.bones):
             bone_name = psa_bone.name.decode('windows-1252')
             if psa_bone_index not in psa_to_armature_bone_indices:  # TODO: replace with bone_name in armature_data.bones
                 # PSA bone does not map to armature bone, skip it and leave an empty bone in its place.
@@ -93,14 +90,14 @@ class PsaImporter(object):
         # Create and populate the data for new sequences.
         for sequence in sequences:
             action = bpy.data.actions.new(name=sequence.name.decode())
+
+            # Create f-curves for the rotation and location of each bone.
             for psa_bone_index, armature_bone_index in psa_to_armature_bone_indices.items():
                 import_bone = import_bones[psa_bone_index]
                 pose_bone = import_bone.pose_bone
-
-                # create fcurves from rotation and location data
                 rotation_data_path = pose_bone.path_from_id('rotation_quaternion')
                 location_data_path = pose_bone.path_from_id('location')
-                import_bone.fcurves.extend([
+                import_bone.fcurves = [
                     action.fcurves.new(rotation_data_path, index=0),  # Qw
                     action.fcurves.new(rotation_data_path, index=1),  # Qx
                     action.fcurves.new(rotation_data_path, index=2),  # Qy
@@ -108,14 +105,14 @@ class PsaImporter(object):
                     action.fcurves.new(location_data_path, index=0),  # Lx
                     action.fcurves.new(location_data_path, index=1),  # Ly
                     action.fcurves.new(location_data_path, index=2),  # Lz
-                ])
-
-            key_index = 0
+                ]
 
             # Read the sequence keys from the PSA file.
             sequence_name = sequence.name.decode('windows-1252')
             sequence_keys = psa_reader.read_sequence_keys(sequence_name)
 
+            # Add keyframes for each frame of the sequence.
+            key_index = 0
             for frame_index in range(sequence.frame_count):
                 for bone_index, import_bone in enumerate(import_bones):
                     if import_bone is None:
@@ -134,16 +131,21 @@ class PsaImporter(object):
                     else:
                         q.rotate(key_rotation)
                     quat.rotate(q.conjugated())
-
                     key_location = Vector(tuple(sequence_keys[key_index].location))
                     loc = key_location - import_bone.orig_loc
                     loc.rotate(import_bone.post_quat.conjugated())
 
+                    # Add keyframe data for each of the associated f-curves.
                     bone_fcurve_data = quat.w, quat.x, quat.y, quat.z, loc.x, loc.y, loc.z
                     for fcurve, datum in zip(import_bone.fcurves, bone_fcurve_data):
-                        fcurve.keyframe_points.insert(frame_index, datum)
+                        fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
 
                     key_index += 1
+
+            # Explicitly update the f-curves.
+            for import_bone in filter(lambda x: x is not None, import_bones):
+                for fcurve in import_bone.fcurves:
+                    fcurve.update()
 
 
 class PsaImportActionListItem(PropertyGroup):
@@ -156,23 +158,27 @@ class PsaImportActionListItem(PropertyGroup):
         return self.action_name
 
 
-def on_psa_filepath_updated(property, context):
+def on_psa_file_path_updated(property, context):
     context.scene.psa_import.action_list.clear()
     try:
         # Read the file and populate the action list.
-        psa = PsaReader(context.scene.psa_import.psa_filepath).psa
-        for sequence in psa.sequences.values():
+        p = os.path.abspath(context.scene.psa_import.psa_file_path)
+        print(p)
+        psa_reader = PsaReader(p)
+        for sequence in psa_reader.sequences.values():
             item = context.scene.psa_import.action_list.add()
             item.action_name = sequence.name.decode('windows-1252')
             item.frame_count = sequence.frame_count
             item.is_selected = True
-    except IOError:
+    except IOError as e:
+        print('ERROR READING FILE')
+        print(e)
         # TODO: set an error somewhere so the user knows the PSA could not be read.
         pass
 
 
 class PsaImportPropertyGroup(bpy.types.PropertyGroup):
-    psa_filepath: StringProperty(default='', subtype='FILE_PATH', update=on_psa_filepath_updated)
+    psa_file_path: StringProperty(default='', subtype='FILE_PATH', update=on_psa_file_path_updated)
     armature_object: PointerProperty(name='Armature', type=bpy.types.Object)
     action_list: CollectionProperty(type=PsaImportActionListItem)
     action_list_index: IntProperty(name='', default=0)
@@ -255,7 +261,7 @@ class PSA_PT_ImportPanel(Panel):
         layout = self.layout
         scene = context.scene
         row = layout.row()
-        row.prop(scene.psa_import, 'psa_filepath', text='PSA File')
+        row.prop(scene.psa_import, 'psa_file_path', text='PSA File')
         row = layout.row()
         row.prop_search(scene.psa_import, 'armature_object', bpy.data, 'objects')
         box = layout.box()
@@ -282,7 +288,7 @@ class PsaImportOperator(Operator):
         return has_selected_actions and armature_object is not None
 
     def execute(self, context):
-        psa_reader = PsaReader(context.scene.psa_import.psa_filepath)
+        psa_reader = PsaReader(context.scene.psa_import.psa_file_path)
         sequence_names = [x.action_name for x in context.scene.psa_import.action_list if x.is_selected]
         PsaImporter().import_psa(psa_reader, sequence_names, context)
         return {'FINISHED'}
@@ -304,6 +310,6 @@ class PsaImportFileSelectOperator(Operator, ImportHelper):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        context.scene.psa_import.psa_filepath = self.filepath
+        context.scene.psa_import.psa_file_path = self.filepath
         # Load the sequence names from the selected file
         return {'FINISHED'}
