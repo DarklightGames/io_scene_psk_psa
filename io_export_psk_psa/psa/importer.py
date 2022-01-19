@@ -90,10 +90,6 @@ class PsaImporter(object):
                     import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
                 import_bone.post_quat = import_bone.orig_quat.conjugated()
 
-        io_time = datetime.timedelta()
-        math_time = datetime.timedelta()
-        keyframe_time = datetime.timedelta()
-
         # Create and populate the data for new sequences.
         for sequence in sequences:
             # F-curve data buffer for all bones. This is used later on to avoid adding redundant keyframes.
@@ -120,10 +116,7 @@ class PsaImporter(object):
 
             # Read the sequence keys from the PSA file.
             sequence_name = sequence.name.decode('windows-1252')
-
-            now = datetime.datetime.now()
             sequence_keys = psa_reader.read_sequence_keys(sequence_name)
-            io_time += datetime.datetime.now() - now
 
             # Add keyframes for each frame of the sequence.
             for frame_index in reversed(range(sequence.frame_count)):
@@ -134,7 +127,6 @@ class PsaImporter(object):
                         key_index += 1
                         continue
 
-                    now = datetime.datetime.now()
                     # Convert world-space transforms to local-space transforms.
                     key_rotation = Quaternion(tuple(sequence_keys[key_index].rotation))
                     q = import_bone.post_quat.copy()
@@ -149,9 +141,7 @@ class PsaImporter(object):
                     key_location = Vector(tuple(sequence_keys[key_index].location))
                     loc = key_location - import_bone.orig_loc
                     loc.rotate(import_bone.post_quat.conjugated())
-                    math_time += datetime.datetime.now() - now
 
-                    now = datetime.datetime.now()
                     # Add keyframe data for each of the associated f-curves.
                     bone_fcurve_data = quat.w, quat.x, quat.y, quat.z, loc.x, loc.y, loc.z
 
@@ -171,16 +161,14 @@ class PsaImporter(object):
 
                     next_frame_bones_fcurve_data[bone_index] = bone_fcurve_data
 
-                    keyframe_time += datetime.datetime.now() - now
                     key_index += 1
 
-            # TODO: eliminate last keyframe if there are only two keyframes (beginning + end and the values are identical)
-            # in this way, we will effectively have cleaned the keyframes inline.
-            pass
-
-        print(f'io_time: {io_time}')
-        print(f'math_time: {math_time}')
-        print(f'keyframe_time: {keyframe_time}')
+            # Eliminate redundant final keyframe if the f-curve value is identical to the previous keyframe.
+            for import_bone in filter(lambda x: x is not None, import_bones):
+                for fcurve in filter(lambda x: len(x.keyframe_points) > 1, import_bone.fcurves):
+                    second_to_last_keyframe, last_keyframe = fcurve.keyframe_points[-2:]
+                    if second_to_last_keyframe.co[1] == last_keyframe.co[1]:
+                        fcurve.keyframe_points.remove(last_keyframe)
 
 
 class PsaImportActionListItem(PropertyGroup):
