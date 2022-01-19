@@ -1,5 +1,6 @@
 from .data import *
 import ctypes
+import numpy as np
 
 
 class PsaReader(object):
@@ -30,7 +31,19 @@ class PsaReader(object):
             data.append(data_class.from_buffer_copy(buffer, offset))
             offset += section.data_size
 
-    def read_sequence_keys(self, sequence_name) -> List[Psa.Key]:
+    def read_sequence_data_matrix(self, sequence_name: str):
+        sequence = self.psa.sequences[sequence_name]
+        keys = self.read_sequence_keys(sequence_name)
+        bone_count = len(self.bones)
+        matrix_size = sequence.frame_count, bone_count, 7
+        matrix = np.zeros(matrix_size)
+        keys_iter = iter(keys)
+        for frame_index in range(sequence.frame_count):
+            for bone_index in range(bone_count):
+                matrix[frame_index, bone_index, :] = list(next(keys_iter).data)
+        return matrix
+
+    def read_sequence_keys(self, sequence_name: str) -> List[Psa.Key]:
         """ Reads and returns the key data for a sequence.
 
         :param sequence_name: The name of the sequence.

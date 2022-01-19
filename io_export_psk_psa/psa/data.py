@@ -44,6 +44,16 @@ class Psa(object):
             ('time', c_float)
         ]
 
+        @property
+        def data(self):
+            yield self.rotation.w
+            yield self.rotation.x
+            yield self.rotation.y
+            yield self.rotation.z
+            yield self.location.x
+            yield self.location.y
+            yield self.location.z
+
         def __repr__(self) -> str:
             return repr((self.location, self.rotation, self.time))
 

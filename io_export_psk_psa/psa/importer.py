@@ -33,6 +33,23 @@ class PsaImporter(object):
                 self.post_quat: Quaternion = Quaternion()
                 self.fcurves = []
 
+        def calculate_fcurve_data(import_bone: ImportBone, key_data: []):
+            # Convert world-space transforms to local-space transforms.
+            key_rotation = Quaternion(key_data[0:4])
+            key_location = Vector(key_data[4:])
+            q = import_bone.post_quat.copy()
+            q.rotate(import_bone.orig_quat)
+            quat = q
+            q = import_bone.post_quat.copy()
+            if import_bone.parent is None:
+                q.rotate(key_rotation.conjugated())
+            else:
+                q.rotate(key_rotation)
+            quat.rotate(q.conjugated())
+            loc = key_location - import_bone.orig_loc
+            loc.rotate(import_bone.post_quat.conjugated())
+            return quat.w, quat.x, quat.y, quat.z, loc.x, loc.y, loc.z
+
         # Create an index mapping from bones in the PSA to bones in the target armature.
         psa_to_armature_bone_indices = {}
         armature_bone_names = [x.name for x in armature_data.bones]
@@ -90,6 +107,13 @@ class PsaImporter(object):
                     import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
                 import_bone.post_quat = import_bone.orig_quat.conjugated()
 
+        io_time = datetime.timedelta()
+        math_time = datetime.timedelta()
+        keyframe_time = datetime.timedelta()
+        total_time = datetime.timedelta()
+
+        total_datetime_start = datetime.datetime.now()
+
         # Create and populate the data for new sequences.
         for sequence in sequences:
             # F-curve data buffer for all bones. This is used later on to avoid adding redundant keyframes.
@@ -116,59 +140,54 @@ class PsaImporter(object):
 
             # Read the sequence keys from the PSA file.
             sequence_name = sequence.name.decode('windows-1252')
-            sequence_keys = psa_reader.read_sequence_keys(sequence_name)
 
-            # Add keyframes for each frame of the sequence.
-            for frame_index in reversed(range(sequence.frame_count)):
-                key_index = frame_index * len(import_bones)
+            # Read the sequence data matrix from the PSA.
+            start_datetime = datetime.datetime.now()
+            sequence_data_matrix = psa_reader.read_sequence_data_matrix(sequence_name)
+            keyframe_write_matrix = np.ones(sequence_data_matrix.shape, dtype=np.int8)
+            io_time += datetime.datetime.now() - start_datetime
+
+            # The first step is to determine the frames at which each bone will write out a keyframe.
+            threshold = 0.001
+            for bone_index, import_bone in enumerate(import_bones):
+                if import_bone is None:
+                    continue
+                for fcurve_index, fcurve in enumerate(import_bone.fcurves):
+                    # Get all the keyframe data for the bone's f-curve data from the sequence data matrix.
+                    fcurve_frame_data = sequence_data_matrix[:, bone_index, fcurve_index]
+                    last_written_datum = 0
+                    for frame_index, datum in enumerate(fcurve_frame_data):
+                        # If the f-curve data is not different enough to the last written frame, un-mark this data for writing.
+                        if frame_index > 0 and abs(datum - last_written_datum) < threshold:
+                            keyframe_write_matrix[frame_index, bone_index, fcurve_index] = 0
+                        else:
+                            last_written_datum = fcurve_frame_data[frame_index]
+
+            # Write the keyframes out!
+            for frame_index in range(sequence.frame_count):
                 for bone_index, import_bone in enumerate(import_bones):
                     if import_bone is None:
-                        # bone does not exist in the armature, skip it
-                        key_index += 1
                         continue
-
-                    # Convert world-space transforms to local-space transforms.
-                    key_rotation = Quaternion(tuple(sequence_keys[key_index].rotation))
-                    q = import_bone.post_quat.copy()
-                    q.rotate(import_bone.orig_quat)
-                    quat = q
-                    q = import_bone.post_quat.copy()
-                    if import_bone.parent is None:
-                        q.rotate(key_rotation.conjugated())
-                    else:
-                        q.rotate(key_rotation)
-                    quat.rotate(q.conjugated())
-                    key_location = Vector(tuple(sequence_keys[key_index].location))
-                    loc = key_location - import_bone.orig_loc
-                    loc.rotate(import_bone.post_quat.conjugated())
-
-                    # Add keyframe data for each of the associated f-curves.
-                    bone_fcurve_data = quat.w, quat.x, quat.y, quat.z, loc.x, loc.y, loc.z
-
-                    if frame_index == 0:
-                        # Always add a keyframe on the first frame.
-                        for fcurve, datum in zip(import_bone.fcurves, bone_fcurve_data):
-                            fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
-                    else:
-                        # For each f-curve, check that the next frame has data that differs from the current frame.
-                        # If so, add a keyframe for the current frame.
-                        # Note that we are iterating the frames in reverse order.
-                        threshold = 0.001
-                        for fcurve, datum, old_datum in zip(import_bone.fcurves, bone_fcurve_data, next_frame_bones_fcurve_data[bone_index]):
-                            # Only
-                            if abs(datum - old_datum) > threshold:
+                    bone_has_writeable_keyframes = any(keyframe_write_matrix[frame_index, bone_index])
+                    if bone_has_writeable_keyframes:
+                        # This bone has writeable keyframes for this frame.
+                        key_data = sequence_data_matrix[frame_index, bone_index]
+                        # Calculate the local-space key data for the bone.
+                        start_datetime = datetime.datetime.now()
+                        fcurve_data = calculate_fcurve_data(import_bone, key_data)
+                        math_time += datetime.datetime.now() - start_datetime
+                        for fcurve, should_write, datum in zip(import_bone.fcurves, keyframe_write_matrix[frame_index, bone_index], fcurve_data):
+                            if should_write:
+                                start_datetime = datetime.datetime.now()
                                 fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
+                                keyframe_time += datetime.datetime.now() - start_datetime
 
-                    next_frame_bones_fcurve_data[bone_index] = bone_fcurve_data
+        total_time = datetime.datetime.now() - total_datetime_start
 
-                    key_index += 1
-
-            # Eliminate redundant final keyframe if the f-curve value is identical to the previous keyframe.
-            for import_bone in filter(lambda x: x is not None, import_bones):
-                for fcurve in filter(lambda x: len(x.keyframe_points) > 1, import_bone.fcurves):
-                    second_to_last_keyframe, last_keyframe = fcurve.keyframe_points[-2:]
-                    if second_to_last_keyframe.co[1] == last_keyframe.co[1]:
-                        fcurve.keyframe_points.remove(last_keyframe)
+        print(f'io_time: {io_time}')
+        print(f'math_time: {math_time}')
+        print(f'keyframe_time: {keyframe_time}')
+        print(f'total_time: {total_time}')
 
 
 class PsaImportActionListItem(PropertyGroup):
@@ -186,7 +205,6 @@ def on_psa_file_path_updated(property, context):
     try:
         # Read the file and populate the action list.
         p = os.path.abspath(context.scene.psa_import.psa_file_path)
-        print(p)
         psa_reader = PsaReader(p)
         for sequence in psa_reader.sequences.values():
             item = context.scene.psa_import.action_list.add()
