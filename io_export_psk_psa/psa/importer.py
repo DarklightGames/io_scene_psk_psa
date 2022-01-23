@@ -216,7 +216,7 @@ def on_armature_object_updated(property, context):
 
 
 class PsaImportPropertyGroup(bpy.types.PropertyGroup):
-    psa_file_path: StringProperty(default='', update=on_psa_file_path_updated)
+    psa_file_path: StringProperty(default='', update=on_psa_file_path_updated, name='PSA File Path')
     psa_bones: CollectionProperty(type=PsaImportPsaBoneItem)
     # armature_object: PointerProperty(name='Object', type=bpy.types.Object, update=on_armature_object_updated)
     action_list: CollectionProperty(type=PsaImportActionListItem)
@@ -260,6 +260,7 @@ class PSA_UL_ImportActionList(UIList):
 class PsaImportSelectAll(bpy.types.Operator):
     bl_idname = 'psa_import.actions_select_all'
     bl_label = 'All'
+    bl_description = 'Select all actions'
 
     @classmethod
     def poll(cls, context):
@@ -278,6 +279,7 @@ class PsaImportSelectAll(bpy.types.Operator):
 class PsaImportDeselectAll(bpy.types.Operator):
     bl_idname = 'psa_import.actions_deselect_all'
     bl_label = 'None'
+    bl_description = 'Deselect all actions'
 
     @classmethod
     def poll(cls, context):
@@ -335,11 +337,12 @@ class PSA_PT_ImportPanel(Panel):
 
 
 class PsaImportSelectFile(Operator):
-    bl_idname = "psa_import.select_file"
-    bl_label = "Select"
+    bl_idname = 'psa_import.select_file'
+    bl_label = 'Select'
     bl_options = {'REGISTER', 'UNDO'}
-    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
-    filter_glob: bpy.props.StringProperty(default="*.psa", options={"HIDDEN"})
+    bl_description = 'Select a PSA file from which to import animations'
+    filepath: bpy.props.StringProperty(subtype='FILE_PATH')
+    filter_glob: bpy.props.StringProperty(default="*.psa", options={'HIDDEN'})
 
     def execute(self, context):
         context.scene.psa_import.psa_file_path = self.filepath
@@ -353,6 +356,7 @@ class PsaImportSelectFile(Operator):
 class PsaImportOperator(Operator):
     bl_idname = 'psa_import.import'
     bl_label = 'Import'
+    bl_description = 'Import the selected animations into the scene as actions'
 
     @classmethod
     def poll(cls, context):

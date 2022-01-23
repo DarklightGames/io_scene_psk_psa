@@ -64,7 +64,7 @@ def is_bone_filter_mode_item_available(context, identifier):
     input_objects = PskBuilder.get_input_objects(context)
     armature_object = input_objects.armature_object
     if identifier == 'BONE_GROUPS':
-        if not armature_object.pose or not armature_object.pose.bone_groups:
+        if not armature_object or not armature_object.pose or not armature_object.pose.bone_groups:
             return False
     # else if... you can set up other conditions if you add more options
     return True
@@ -73,7 +73,7 @@ def is_bone_filter_mode_item_available(context, identifier):
 class PskExportOperator(Operator, ExportHelper):
     bl_idname = 'export.psk'
     bl_label = 'Export'
-    __doc__ = 'PSK Exporter (.psk)'
+    __doc__ = 'Export mesh and armature to PSK'
     filename_ext = '.psk'
     filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
 
@@ -125,7 +125,11 @@ class PskExportOperator(Operator, ExportHelper):
         builder = PskBuilder()
         options = PskBuilderOptions()
         options.bone_group_indices = [x.index for x in property_group.bone_group_list if x.is_selected]
-        psk = builder.build(context, options)
+        try:
+            psk = builder.build(context, options)
+        except RuntimeError as e:
+            self.report({'ERROR_INVALID_CONTEXT'}, str(e))
+            return {'CANCELLED'}
         exporter = PskExporter(psk)
         exporter.export(self.filepath)
         return {'FINISHED'}

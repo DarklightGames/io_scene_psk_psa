@@ -67,7 +67,8 @@ class PskBuilder(object):
         materials = OrderedDict()
 
         if armature_object is None:
-            # Static mesh (no armature)
+            # If the mesh has no armature object, simply assign it a dummy bone at the root to satisfy the requirement
+            # that a PSK file must have at least one bone.
             psk_bone = Psk.Bone()
             psk_bone.name = bytes('static', encoding='utf-8')
             psk_bone.flags = 0
@@ -79,13 +80,16 @@ class PskBuilder(object):
         else:
             bones = list(armature_object.data.bones)
 
-            # If bone groups are specified, get only the bones that are in the specified bone groups and their ancestors.
-            if len(options.bone_group_indices) > 0:
+            # If we are filtering by bone groups, get only the bones that are in the specified bone groups and their
+            # ancestors.
+            if options.bone_filter_mode == 'BONE_GROUPS':
                 bone_indices = get_export_bone_indices_for_bone_groups(armature_object, options.bone_group_indices)
                 bones = [bones[bone_index] for bone_index in bone_indices]
 
             # Ensure that the exported hierarchy has a single root bone.
             root_bones = [x for x in bones if x.parent is None]
+            print('root bones')
+            print(root_bones)
             if len(root_bones) > 1:
                 root_bone_names = [x.name for x in bones]
                 raise RuntimeError('Exported bone hierarchy must have a single root bone.'

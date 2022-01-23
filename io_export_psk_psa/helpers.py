@@ -9,11 +9,12 @@ def populate_bone_group_list(armature_object, bone_group_list):
     item.index = -1
     item.is_selected = True
 
-    for bone_group_index, bone_group in enumerate(armature_object.pose.bone_groups):
-        item = bone_group_list.add()
-        item.name = bone_group.name
-        item.index = bone_group_index
-        item.is_selected = True
+    if armature_object and armature_object.pose:
+        for bone_group_index, bone_group in enumerate(armature_object.pose.bone_groups):
+            item = bone_group_list.add()
+            item.name = bone_group.name
+            item.index = bone_group_index
+            item.is_selected = True
 
 
 def add_bone_groups_to_layout(layout):

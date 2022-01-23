@@ -167,7 +167,7 @@ class PskImporter(object):
 class PskImportOperator(Operator, ImportHelper):
     bl_idname = 'import.psk'
     bl_label = 'Export'
-    __doc__ = 'PSK Importer (.psk)'
+    __doc__ = 'Load a PSK file'
     filename_ext = '.psk'
     filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
     filepath: StringProperty(

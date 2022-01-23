@@ -71,7 +71,7 @@ def is_bone_filter_mode_item_available(context, identifier):
 class PsaExportOperator(Operator, ExportHelper):
     bl_idname = 'export.psa'
     bl_label = 'Export'
-    __doc__ = 'PSA Exporter (.psa)'
+    __doc__ = 'Export actions to PSA'
     filename_ext = '.psa'
     filter_glob: StringProperty(default='*.psa', options={'HIDDEN'})
     filepath: StringProperty(
@@ -174,7 +174,11 @@ class PsaExportOperator(Operator, ExportHelper):
         options.bone_filter_mode = property_group.bone_filter_mode
         options.bone_group_indices = [x.index for x in property_group.bone_group_list if x.is_selected]
         builder = PsaBuilder()
-        psa = builder.build(context, options)
+        try:
+            psa = builder.build(context, options)
+        except RuntimeError as e:
+            self.report({'ERROR_INVALID_CONTEXT'}, str(e))
+            return {'CANCELLED'}
         exporter = PsaExporter(psa)
         exporter.export(self.filepath)
         return {'FINISHED'}
@@ -204,6 +208,7 @@ class PSA_UL_ExportActionList(UIList):
 class PsaExportSelectAll(bpy.types.Operator):
     bl_idname = 'psa_export.actions_select_all'
     bl_label = 'Select All'
+    bl_description = 'Select all actions'
 
     @classmethod
     def poll(cls, context):
@@ -222,6 +227,7 @@ class PsaExportSelectAll(bpy.types.Operator):
 class PsaExportDeselectAll(bpy.types.Operator):
     bl_idname = 'psa_export.actions_deselect_all'
     bl_label = 'Deselect All'
+    bl_description = 'Deselect all actions'
 
     @classmethod
     def poll(cls, context):
