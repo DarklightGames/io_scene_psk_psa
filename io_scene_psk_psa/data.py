@@ -8,6 +8,14 @@ class Vector3(Structure):
         ('z', c_float),
     ]
 
+    def __iter__(self):
+        yield self.x
+        yield self.y
+        yield self.z
+
+    def __repr__(self):
+        return repr(tuple(self))
+
 
 class Quaternion(Structure):
     _fields_ = [
@@ -16,6 +24,15 @@ class Quaternion(Structure):
         ('z', c_float),
         ('w', c_float),
     ]
+
+    def __iter__(self):
+        yield self.w
+        yield self.x
+        yield self.y
+        yield self.z
+
+    def __repr__(self):
+        return repr(tuple(self))
 
 
 class Section(Structure):

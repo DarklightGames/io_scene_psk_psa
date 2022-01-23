@@ -1,18 +1,19 @@
 from .data import *
+from ..helpers import *
 
 
 class PsaBuilderOptions(object):
     def __init__(self):
         self.actions = []
+        self.bone_filter_mode = 'ALL'
+        self.bone_group_indices = []
 
 
-# https://git.cth451.me/cth451/blender-addons/blob/master/io_export_unreal_psk_psa.py
 class PsaBuilder(object):
     def __init__(self):
-        # TODO: add options in here (selected anims, eg.)
         pass
 
-    def build(self, context, options) -> Psa:
+    def build(self, context, options: PsaBuilderOptions) -> Psa:
         object = context.view_layer.objects.active
 
         if object.type != 'ARMATURE':
@@ -32,31 +33,54 @@ class PsaBuilder(object):
         # armature bones.
         bone_names = [x.name for x in bones]
         pose_bones = [(bone_names.index(bone.name), bone) for bone in armature.pose.bones]
+        del bone_names
         pose_bones.sort(key=lambda x: x[0])
         pose_bones = [x[1] for x in pose_bones]
 
-        for bone in bones:
+        bone_indices = list(range(len(bones)))
+
+        # If bone groups are specified, get only the bones that are in that specified bone groups and their ancestors.
+        if options.bone_filter_mode == 'BONE_GROUPS':
+            bone_indices = get_export_bone_indices_for_bone_groups(armature, options.bone_group_indices)
+
+        # Make the bone lists contain only the bones that are going to be exported.
+        bones = [bones[bone_index] for bone_index in bone_indices]
+        pose_bones = [pose_bones[bone_index] for bone_index in bone_indices]
+
+        if len(bones) == 0:
+            # No bones are going to be exported.
+            raise RuntimeError('No bones available for export')
+
+        # Ensure that the exported hierarchy has a single root bone.
+        root_bones = [x for x in bones if x.parent is None]
+        if len(root_bones) > 1:
+            root_bone_names = [x.name for x in bones]
+            raise RuntimeError('Exported bone hierarchy must have a single root bone.'
+                               f'The bone hierarchy marked for export has {len(root_bones)} root bones: {root_bone_names}')
+
+        for pose_bone in bones:
             psa_bone = Psa.Bone()
-            psa_bone.name = bytes(bone.name, encoding='utf-8')
-            psa_bone.children_count = len(bone.children)
+            psa_bone.name = bytes(pose_bone.name, encoding='utf-8')
 
             try:
-                psa_bone.parent_index = bones.index(bone.parent)
+                parent_index = bones.index(pose_bone.parent)
+                psa_bone.parent_index = parent_index
+                psa.bones[parent_index].children_count += 1
             except ValueError:
                 psa_bone.parent_index = -1
 
-            if bone.parent is not None:
-                rotation = bone.matrix.to_quaternion()
+            if pose_bone.parent is not None:
+                rotation = pose_bone.matrix.to_quaternion()
                 rotation.x = -rotation.x
                 rotation.y = -rotation.y
                 rotation.z = -rotation.z
-                quat_parent = bone.parent.matrix.to_quaternion().inverted()
-                parent_head = quat_parent @ bone.parent.head
-                parent_tail = quat_parent @ bone.parent.tail
-                location = (parent_tail - parent_head) + bone.head
+                quat_parent = pose_bone.parent.matrix.to_quaternion().inverted()
+                parent_head = quat_parent @ pose_bone.parent.head
+                parent_tail = quat_parent @ pose_bone.parent.tail
+                location = (parent_tail - parent_head) + pose_bone.head
             else:
-                location = armature.matrix_local @ bone.head
-                rot_matrix = bone.matrix @ armature.matrix_local.to_3x3()
+                location = armature.matrix_local @ pose_bone.head
+                rot_matrix = pose_bone.matrix @ armature.matrix_local.to_3x3()
                 rotation = rot_matrix.to_quaternion()
 
             psa_bone.location.x = location.x
@@ -92,18 +116,18 @@ class PsaBuilder(object):
             for frame in range(frame_count):
                 context.scene.frame_set(frame_min + frame)
 
-                for bone in pose_bones:
+                for pose_bone in pose_bones:
                     key = Psa.Key()
-                    pose_bone_matrix = bone.matrix
+                    pose_bone_matrix = pose_bone.matrix
 
-                    if bone.parent is not None:
-                        pose_bone_parent_matrix = bone.parent.matrix
+                    if pose_bone.parent is not None:
+                        pose_bone_parent_matrix = pose_bone.parent.matrix
                         pose_bone_matrix = pose_bone_parent_matrix.inverted() @ pose_bone_matrix
 
                     location = pose_bone_matrix.to_translation()
                     rotation = pose_bone_matrix.to_quaternion().normalized()
 
-                    if bone.parent is not None:
+                    if pose_bone.parent is not None:
                         rotation.x = -rotation.x
                         rotation.y = -rotation.y
                         rotation.z = -rotation.z
@@ -124,6 +148,6 @@ class PsaBuilder(object):
                 sequence.bone_count = len(pose_bones)
                 sequence.track_time = frame_count
 
-            psa.sequences.append(sequence)
+            psa.sequences[action.name] = sequence
 
         return psa

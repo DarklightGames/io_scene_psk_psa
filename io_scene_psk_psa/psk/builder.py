@@ -2,13 +2,19 @@ import bpy
 import bmesh
 from collections import OrderedDict
 from .data import *
+from ..helpers import *
 
-# https://github.com/bwrsandman/blender-addons/blob/master/io_export_unreal_psk_psa.py
 
 class PskInputObjects(object):
     def __init__(self):
         self.mesh_objects = []
         self.armature_object = None
+
+
+class PskBuilderOptions(object):
+    def __init__(self):
+        self.bone_filter_mode = 'ALL'
+        self.bone_group_indices = []
 
 
 class PskBuilder(object):
@@ -40,7 +46,7 @@ class PskBuilder(object):
             modifiers = [x for x in obj.modifiers if x.type == 'ARMATURE']
             if len(modifiers) == 0:
                 continue
-            elif len(modifiers) == 2:
+            elif len(modifiers) > 1:
                 raise RuntimeError(f'Mesh "{obj.name}" must have only one armature modifier')
             armature_modifier_objects.add(modifiers[0].object)
 
@@ -51,14 +57,18 @@ class PskBuilder(object):
 
         return input_objects
 
-    def build(self, context) -> Psk:
+    def build(self, context, options: PskBuilderOptions) -> Psk:
         input_objects = PskBuilder.get_input_objects(context)
 
+        armature_object = input_objects.armature_object
+
         psk = Psk()
+        bones = []
         materials = OrderedDict()
 
-        if input_objects.armature_object is None:
-            # Static mesh (no armature)
+        if armature_object is None:
+            # If the mesh has no armature object, simply assign it a dummy bone at the root to satisfy the requirement
+            # that a PSK file must have at least one bone.
             psk_bone = Psk.Bone()
             psk_bone.name = bytes('static', encoding='utf-8')
             psk_bone.flags = 0
@@ -68,15 +78,33 @@ class PskBuilder(object):
             psk_bone.rotation = Quaternion(0, 0, 0, 1)
             psk.bones.append(psk_bone)
         else:
-            bones = list(input_objects.armature_object.data.bones)
+            bones = list(armature_object.data.bones)
+
+            # If we are filtering by bone groups, get only the bones that are in the specified bone groups and their
+            # ancestors.
+            if options.bone_filter_mode == 'BONE_GROUPS':
+                bone_indices = get_export_bone_indices_for_bone_groups(armature_object, options.bone_group_indices)
+                bones = [bones[bone_index] for bone_index in bone_indices]
+
+            # Ensure that the exported hierarchy has a single root bone.
+            root_bones = [x for x in bones if x.parent is None]
+            print('root bones')
+            print(root_bones)
+            if len(root_bones) > 1:
+                root_bone_names = [x.name for x in bones]
+                raise RuntimeError('Exported bone hierarchy must have a single root bone.'
+                                   f'The bone hierarchy marked for export has {len(root_bones)} root bones: {root_bone_names}')
+
             for bone in bones:
                 psk_bone = Psk.Bone()
                 psk_bone.name = bytes(bone.name, encoding='utf-8')
                 psk_bone.flags = 0
-                psk_bone.children_count = len(bone.children)
+                psk_bone.children_count = 0
 
                 try:
-                    psk_bone.parent_index = bones.index(bone.parent)
+                    parent_index = bones.index(bone.parent)
+                    psk_bone.parent_index = parent_index
+                    psk.bones[parent_index].children_count += 1
                 except ValueError:
                     psk_bone.parent_index = 0
 
@@ -90,8 +118,8 @@ class PskBuilder(object):
                     parent_tail = quat_parent @ bone.parent.tail
                     location = (parent_tail - parent_head) + bone.head
                 else:
-                    location = input_objects.armature_object.matrix_local @ bone.head
-                    rot_matrix = bone.matrix @ input_objects.armature_object.matrix_local.to_3x3()
+                    location = armature_object.matrix_local @ bone.head
+                    rot_matrix = bone.matrix @ armature_object.matrix_local.to_3x3()
                     rotation = rot_matrix.to_quaternion()
 
                 psk_bone.location.x = location.x
@@ -177,14 +205,34 @@ class PskBuilder(object):
                 psk.faces.append(face)
 
             # WEIGHTS
-            # TODO: bone ~> vg might not be 1:1, provide a nice error message if this is the case
-            if input_objects.armature_object is not None:
-                armature = input_objects.armature_object.data
-                bone_names = [x.name for x in armature.bones]
+            if armature_object is not None:
+                # Because the vertex groups may contain entries for which there is no matching bone in the armature,
+                # we must filter them out and not export any weights for these vertex groups.
+                bone_names = [x.name for x in bones]
                 vertex_group_names = [x.name for x in object.vertex_groups]
-                bone_indices = [bone_names.index(name) for name in vertex_group_names]
+                vertex_group_bone_indices = dict()
+                for vertex_group_index, vertex_group_name in enumerate(vertex_group_names):
+                    try:
+                        vertex_group_bone_indices[vertex_group_index] = bone_names.index(vertex_group_name)
+                    except ValueError:
+                        # The vertex group does not have a matching bone in the list of bones to be exported.
+                        # Check to see if there is an associated bone for this vertex group that exists in the armature.
+                        # If there is, we can traverse the ancestors of that bone to find an alternate bone to use for
+                        # weighting the vertices belonging to this vertex group.
+                        if vertex_group_name in armature_object.data.bones:
+                            bone = armature_object.data.bones[vertex_group_name]
+                            while bone is not None:
+                                try:
+                                    bone_index = bone_names.index(bone.name)
+                                    vertex_group_bone_indices[vertex_group_index] = bone_index
+                                    break
+                                except ValueError:
+                                    bone = bone.parent
                 for vertex_group_index, vertex_group in enumerate(object.vertex_groups):
-                    bone_index = bone_indices[vertex_group_index]
+                    if vertex_group_index not in vertex_group_bone_indices:
+                        continue
+                    bone_index = vertex_group_bone_indices[vertex_group_index]
+                    # TODO: exclude vertex group if it doesn't match to a bone we are exporting
                     for vertex_index in range(len(object.data.vertices)):
                         try:
                             weight = vertex_group.weight(vertex_index)
