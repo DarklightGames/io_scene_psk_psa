@@ -1,7 +1,7 @@
 from typing import List
 
 
-def populate_bone_groups_list(armature_object, bone_group_list):
+def populate_bone_group_list(armature_object, bone_group_list):
     bone_group_list.clear()
 
     item = bone_group_list.add()

@@ -155,7 +155,7 @@ class PsaExportOperator(Operator, ExportHelper):
             return {'CANCELLED'}
 
         # Populate bone groups list.
-        populate_bone_groups_list(self.armature, property_group.bone_group_list)
+        populate_bone_group_list(self.armature, property_group.bone_group_list)
 
         context.window_manager.fileselect_add(self)
 
@@ -235,3 +235,13 @@ class PsaExportDeselectAll(bpy.types.Operator):
         for action in property_group.action_list:
             action.is_selected = False
         return {'FINISHED'}
+
+
+__classes__ = [
+    PsaExportActionListItem,
+    PsaExportPropertyGroup,
+    PsaExportOperator,
+    PSA_UL_ExportActionList,
+    PsaExportSelectAll,
+    PsaExportDeselectAll,
+]

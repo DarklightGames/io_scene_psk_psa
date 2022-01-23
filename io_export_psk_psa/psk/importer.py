@@ -182,3 +182,8 @@ class PskImportOperator(Operator, ImportHelper):
         name = os.path.splitext(os.path.basename(self.filepath))[0]
         PskImporter().import_psk(psk, name, context)
         return {'FINISHED'}
+
+
+__classes__ = [
+    PskImportOperator
+]

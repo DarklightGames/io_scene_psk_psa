@@ -1,6 +1,5 @@
 import bpy
 import os
-from math import inf
 import numpy as np
 from mathutils import Vector, Quaternion, Matrix
 from .data import Psa
@@ -9,17 +8,14 @@ from bpy.types import Operator, Action, UIList, PropertyGroup, Panel, Armature, 
 from bpy_extras.io_utils import ExportHelper, ImportHelper
 from bpy.props import StringProperty, BoolProperty, CollectionProperty, PointerProperty, IntProperty
 from .reader import PsaReader
-import datetime
 
 
 class PsaImporter(object):
     def __init__(self):
         pass
 
-    def import_psa(self, psa_reader: PsaReader, sequence_names: List[AnyStr], context):
-        property_group = context.scene.psa_import
+    def import_psa(self, psa_reader: PsaReader, sequence_names: List[AnyStr], armature_object):
         sequences = map(lambda x: psa_reader.sequences[x], sequence_names)
-        armature_object = property_group.armature_object
         armature_data = armature_object.data
 
         class ImportBone(object):
@@ -107,18 +103,8 @@ class PsaImporter(object):
                     import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
                 import_bone.post_quat = import_bone.orig_quat.conjugated()
 
-        io_time = datetime.timedelta()
-        math_time = datetime.timedelta()
-        keyframe_time = datetime.timedelta()
-        total_time = datetime.timedelta()
-
-        total_datetime_start = datetime.datetime.now()
-
         # Create and populate the data for new sequences.
         for sequence in sequences:
-            # F-curve data buffer for all bones. This is used later on to avoid adding redundant keyframes.
-            next_frame_bones_fcurve_data = [(inf, inf, inf, inf, inf, inf, inf)] * len(import_bones)
-
             # Add the action.
             action = bpy.data.actions.new(name=sequence.name.decode())
 
@@ -142,10 +128,8 @@ class PsaImporter(object):
             sequence_name = sequence.name.decode('windows-1252')
 
             # Read the sequence data matrix from the PSA.
-            start_datetime = datetime.datetime.now()
             sequence_data_matrix = psa_reader.read_sequence_data_matrix(sequence_name)
             keyframe_write_matrix = np.ones(sequence_data_matrix.shape, dtype=np.int8)
-            io_time += datetime.datetime.now() - start_datetime
 
             # The first step is to determine the frames at which each bone will write out a keyframe.
             threshold = 0.001
@@ -173,21 +157,10 @@ class PsaImporter(object):
                         # This bone has writeable keyframes for this frame.
                         key_data = sequence_data_matrix[frame_index, bone_index]
                         # Calculate the local-space key data for the bone.
-                        start_datetime = datetime.datetime.now()
                         fcurve_data = calculate_fcurve_data(import_bone, key_data)
-                        math_time += datetime.datetime.now() - start_datetime
                         for fcurve, should_write, datum in zip(import_bone.fcurves, keyframe_write_matrix[frame_index, bone_index], fcurve_data):
                             if should_write:
-                                start_datetime = datetime.datetime.now()
                                 fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
-                                keyframe_time += datetime.datetime.now() - start_datetime
-
-        total_time = datetime.datetime.now() - total_datetime_start
-
-        print(f'io_time: {io_time}')
-        print(f'math_time: {math_time}')
-        print(f'keyframe_time: {keyframe_time}')
-        print(f'total_time: {total_time}')
 
 
 class PsaImportPsaBoneItem(PropertyGroup):
@@ -209,6 +182,7 @@ class PsaImportActionListItem(PropertyGroup):
 
 
 def on_psa_file_path_updated(property, context):
+    print('PATH UPDATED')
     property_group = context.scene.psa_import
     property_group.action_list.clear()
     property_group.psa_bones.clear()
@@ -242,9 +216,9 @@ def on_armature_object_updated(property, context):
 
 
 class PsaImportPropertyGroup(bpy.types.PropertyGroup):
-    psa_file_path: StringProperty(default='', subtype='FILE_PATH', update=on_psa_file_path_updated)
+    psa_file_path: StringProperty(default='', update=on_psa_file_path_updated)
     psa_bones: CollectionProperty(type=PsaImportPsaBoneItem)
-    armature_object: PointerProperty(name='Object', type=bpy.types.Object, update=on_armature_object_updated)
+    # armature_object: PointerProperty(name='Object', type=bpy.types.Object, update=on_armature_object_updated)
     action_list: CollectionProperty(type=PsaImportActionListItem)
     action_list_index: IntProperty(name='', default=0)
     action_filter_name: StringProperty(default='')
@@ -320,33 +294,60 @@ class PsaImportDeselectAll(bpy.types.Operator):
 
 
 class PSA_PT_ImportPanel(Panel):
-    bl_space_type = 'NLA_EDITOR'
-    bl_region_type = 'UI'
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
     bl_label = 'PSA Import'
-    bl_context = 'object'
+    bl_context = 'data'
     bl_category = 'PSA Import'
+    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
-        return context.view_layer.objects.active is not None
+        return context.object.type == 'ARMATURE'
 
     def draw(self, context):
         layout = self.layout
         property_group = context.scene.psa_import
+
         row = layout.row()
-        row.prop(property_group, 'psa_file_path', text='PSA File')
+        row.prop(property_group, 'psa_file_path', text='')
+        row.enabled = False
+        # row.enabled = property_group.psa_file_path is not ''
         row = layout.row()
-        row.prop_search(property_group, 'armature_object', bpy.data, 'objects')
-        box = layout.box()
-        box.label(text=f'Actions ({len(property_group.action_list)})', icon='ACTION')
-        row = box.row()
-        rows = max(3, min(len(property_group.action_list), 10))
-        row.template_list('PSA_UL_ImportActionList', '', property_group, 'action_list', property_group, 'action_list_index', rows=rows)
-        row = box.row(align=True)
-        row.label(text='Select')
-        row.operator('psa_import.actions_select_all', text='All')
-        row.operator('psa_import.actions_deselect_all', text='None')
+
+        layout.separator()
+
+        row.operator('psa_import.select_file', text='Select PSA File', icon='FILEBROWSER')
+        if len(property_group.action_list) > 0:
+            box = layout.box()
+            box.label(text=f'Actions ({len(property_group.action_list)})', icon='ACTION')
+            row = box.row()
+            rows = max(3, min(len(property_group.action_list), 10))
+            row.template_list('PSA_UL_ImportActionList', '', property_group, 'action_list', property_group, 'action_list_index', rows=rows)
+            row = box.row(align=True)
+            row.label(text='Select')
+            row.operator('psa_import.actions_select_all', text='All')
+            row.operator('psa_import.actions_deselect_all', text='None')
+
+        layout.separator()
+
         layout.operator('psa_import.import', text=f'Import')
+
+
+class PsaImportSelectFile(Operator):
+    bl_idname = "psa_import.select_file"
+    bl_label = "Select"
+    bl_options = {'REGISTER', 'UNDO'}
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    filter_glob: bpy.props.StringProperty(default="*.psa", options={"HIDDEN"})
+
+    def execute(self, context):
+        context.scene.psa_import.psa_file_path = self.filepath
+        return {"FINISHED"}
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {"RUNNING_MODAL"}
 
 
 class PsaImportOperator(Operator):
@@ -356,16 +357,17 @@ class PsaImportOperator(Operator):
     @classmethod
     def poll(cls, context):
         property_group = context.scene.psa_import
+        active_object = context.view_layer.objects.active
         action_list = property_group.action_list
         has_selected_actions = any(map(lambda action: action.is_selected, action_list))
-        armature_object = property_group.armature_object
-        return has_selected_actions and armature_object is not None
+        return has_selected_actions and active_object is not None and active_object.type == 'ARMATURE'
 
     def execute(self, context):
         property_group = context.scene.psa_import
         psa_reader = PsaReader(property_group.psa_file_path)
         sequence_names = [x.action_name for x in property_group.action_list if x.is_selected]
-        PsaImporter().import_psa(psa_reader, sequence_names, context)
+        PsaImporter().import_psa(psa_reader, sequence_names, context.view_layer.objects.active)
+        self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
         return {'FINISHED'}
 
 
@@ -389,3 +391,17 @@ class PsaImportFileSelectOperator(Operator, ImportHelper):
         property_group.psa_file_path = self.filepath
         # Load the sequence names from the selected file
         return {'FINISHED'}
+
+
+__classes__ = [
+    PsaImportPsaBoneItem,
+    PsaImportActionListItem,
+    PsaImportPropertyGroup,
+    PSA_UL_ImportActionList,
+    PsaImportSelectAll,
+    PsaImportDeselectAll,
+    PSA_PT_ImportPanel,
+    PsaImportOperator,
+    PsaImportFileSelectOperator,
+    PsaImportSelectFile,
+]

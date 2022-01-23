@@ -42,33 +42,15 @@ else:
     from .psa import reader as psa_reader
     from .psa import importer as psa_importer
 
+
 import bpy
 from bpy.props import PointerProperty
 
-
-# TODO: have the individual files emit a __classes__ field or something we can update it locally instead of explicitly declaring it here.
-classes = []
-classes.extend(psx_types.__classes__)
-classes.extend(psk_exporter.__classes__)
-classes.extend([
-    psk_importer.PskImportOperator,
-    psa_importer.PsaImportOperator,
-    psa_importer.PsaImportFileSelectOperator,
-    psa_exporter.PSA_UL_ExportActionList,
-    # psa_exporter.PSA_UL_ExportBoneGroupList,
-    psa_importer.PSA_UL_ImportActionList,
-    psa_importer.PsaImportActionListItem,
-    psa_importer.PsaImportPsaBoneItem,
-    psa_importer.PsaImportSelectAll,
-    psa_importer.PsaImportDeselectAll,
-    psa_importer.PSA_PT_ImportPanel,
-    psa_importer.PsaImportPropertyGroup,
-    psa_exporter.PsaExportOperator,
-    psa_exporter.PsaExportSelectAll,
-    psa_exporter.PsaExportDeselectAll,
-    psa_exporter.PsaExportActionListItem,
-    psa_exporter.PsaExportPropertyGroup,
-])
+classes = psx_types.__classes__ + \
+          psk_importer.__classes__ + \
+          psk_exporter.__classes__ + \
+          psa_exporter.__classes__ + \
+          psa_importer.__classes__
 
 
 def psk_export_menu_func(self, context):
@@ -83,17 +65,12 @@ def psa_export_menu_func(self, context):
     self.layout.operator(psa_exporter.PsaExportOperator.bl_idname, text='Unreal PSA (.psa)')
 
 
-def psa_import_menu_func(self, context):
-    self.layout.operator(psa_importer.PsaImportOperator.bl_idname, text='Unreal PSA (.psa)')
-
-
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
     bpy.types.TOPBAR_MT_file_export.append(psk_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.append(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.append(psa_export_menu_func)
-    bpy.types.TOPBAR_MT_file_import.append(psa_import_menu_func)
     bpy.types.Scene.psa_import = PointerProperty(type=psa_importer.PsaImportPropertyGroup)
     bpy.types.Scene.psa_export = PointerProperty(type=psa_exporter.PsaExportPropertyGroup)
     bpy.types.Scene.psk_export = PointerProperty(type=psk_exporter.PskExportPropertyGroup)
@@ -105,7 +82,6 @@ def unregister():
     bpy.types.TOPBAR_MT_file_export.remove(psk_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.remove(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.remove(psa_export_menu_func)
-    bpy.types.TOPBAR_MT_file_import.remove(psa_import_menu_func)
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
 
