@@ -9,10 +9,8 @@ class PsaBuilderOptions(object):
         self.bone_group_indices = []
 
 
-# https://git.cth451.me/cth451/blender-addons/blob/master/io_export_unreal_psk_psa.py
 class PsaBuilder(object):
     def __init__(self):
-        # TODO: add options in here (selected anims, eg.)
         pass
 
     def build(self, context, options: PsaBuilderOptions) -> Psa:
