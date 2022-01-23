@@ -15,15 +15,26 @@ This Blender add-on allows you to export meshes and animations to the [PSK and P
 3. Navigate to File > Export > Unreal PSK (.psk)
 4. Enter the file name and click "Export".
 
+## Importing a PSK
+1. Navigate to File > Import > Unreal PSK (.psk)
+2. Select the PSK file you want to import and click "Import"
+
 ## Exporting a PSA
 1. Select the armature objects you wish to export.
 2. Navigate to File > Export > Unreal PSA (.psa)
 3. Enter the file name and click "Export".
 
+## Importing a PSA
+1. Select the armature object that you wish you import actions to.
+2. Navigate to the Object Data Properties tab of the Properties editor.
+3. Navigate to the PSA Import panel.
+4. Click "Select PSA File".
+5. Select the PSA file that you want to import animations from and click "Select".
+6. In the Actions box, select which animations you want to import.
+7. Click "Import".
+
 # FAQ
-## Can I use this addon to import PSK and PSA files?
-Currently, no.
+## Why are the mesh normals not accurate when importing a PSK extracted from [UE Viewer](https://www.gildor.org/en/projects/umodel)?
+If preserving the mesh normals of models is important for your workflow, it is *not recommended* to export PSK files from UE Viewer. This is because UE Viewer makes no attempt to reconstruct the original [smoothing groups](https://en.wikipedia.org/wiki/Smoothing_group). As a result, the normals of imported PSK files will be incorrect when imported into Blender and will need to be manually fixed.
 
-Presumably you are using this in concert with the [UE Viewer](https://www.gildor.org/en/projects/umodel) program to import extracted meshes. It is *not recommended* to export PSK/PSA from UE Viewer since it [does not preserve smoothing groups](https://github.com/gildor2/UEViewer/issues/235). As a result, the shading of imported models will be incorrect and will need to be manually fixed. Instead, it is recommended to export meshes to the glTF format for import into Blender since it preserves the correct mesh shading.
-
-Regardless, if you are dead set on using a PSK/PSA importer, use [this one](https://github.com/Befzz/blender3d_import_psk_psa).
+As a workaround, it is recommended to export [glTF](https://en.wikipedia.org/wiki/GlTF) meshes out of UE Viewer instead, since the glTF format has support for explicit normals and UE Viewer can correctly preserve the mesh normals on export. Note, however, that the imported glTF armature may have it's bones oriented incorrectly when imported into blender. To mitigate this, you can combine the armature of PSK and the mesh of the glTF for best results.
