@@ -127,11 +127,11 @@ class PskExportOperator(Operator, ExportHelper):
         options.bone_group_indices = [x.index for x in property_group.bone_group_list if x.is_selected]
         try:
             psk = builder.build(context, options)
+            exporter = PskExporter(psk)
+            exporter.export(self.filepath)
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
-        exporter = PskExporter(psk)
-        exporter.export(self.filepath)
         return {'FINISHED'}
 
 
