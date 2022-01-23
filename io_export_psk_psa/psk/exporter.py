@@ -1,9 +1,11 @@
 from .data import *
-from .builder import PskBuilder
+from ..types import BoneGroupListItem
+from ..helpers import populate_bone_group_list
+from .builder import PskBuilder, PskBuilderOptions
 from typing import Type
-from bpy.types import Operator
+from bpy.types import Operator, PropertyGroup
 from bpy_extras.io_utils import ExportHelper
-from bpy.props import StringProperty
+from bpy.props import StringProperty, CollectionProperty, IntProperty, BoolProperty, EnumProperty
 
 MAX_WEDGE_COUNT = 65536
 MAX_POINT_COUNT = 4294967296
@@ -58,6 +60,16 @@ class PskExporter(object):
             self.write_section(fp, b'RAWWEIGHTS', Psk.Weight, self.psk.weights)
 
 
+def is_bone_filter_mode_item_available(context, identifier):
+    input_objects = PskBuilder.get_input_objects(context)
+    armature_object = input_objects.armature_object
+    if identifier == 'BONE_GROUPS':
+        if not armature_object.pose or not armature_object.pose.bone_groups:
+            return False
+    # else if... you can set up other conditions if you add more options
+    return True
+
+
 class PskExportOperator(Operator, ExportHelper):
     bl_idname = 'export.psk'
     bl_label = 'Export'
@@ -73,17 +85,66 @@ class PskExportOperator(Operator, ExportHelper):
 
     def invoke(self, context, event):
         try:
-            PskBuilder.get_input_objects(context)
+            input_objects = PskBuilder.get_input_objects(context)
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
+        property_group = context.scene.psk_export
+
+        # Populate bone groups list.
+        populate_bone_group_list(input_objects.armature_object, property_group.bone_group_list)
+
         context.window_manager.fileselect_add(self)
+
         return {'RUNNING_MODAL'}
 
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        property_group = scene.psk_export
+
+        # BONES
+        box = layout.box()
+        box.label(text='Bones', icon='BONE_DATA')
+        bone_filter_mode_items = property_group.bl_rna.properties['bone_filter_mode'].enum_items_static
+        row = box.row(align=True)
+        for item in bone_filter_mode_items:
+            identifier = item.identifier
+            item_layout = row.row(align=True)
+            item_layout.prop_enum(property_group, 'bone_filter_mode', item.identifier)
+            item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
+
+        if property_group.bone_filter_mode == 'BONE_GROUPS':
+            row = box.row()
+            rows = max(3, min(len(property_group.bone_group_list), 10))
+            row.template_list('PSX_UL_BoneGroupList', '', property_group, 'bone_group_list', property_group, 'bone_group_list_index', rows=rows)
+
     def execute(self, context):
+        property_group = context.scene.psk_export
         builder = PskBuilder()
-        psk = builder.build(context)
+        options = PskBuilderOptions()
+        options.bone_group_indices = [x.index for x in property_group.bone_group_list if x.is_selected]
+        psk = builder.build(context, options)
         exporter = PskExporter(psk)
         exporter.export(self.filepath)
         return {'FINISHED'}
+
+
+class PskExportPropertyGroup(PropertyGroup):
+    bone_filter_mode: EnumProperty(
+        name='Bone Filter',
+        description='',
+        items=(
+            ('ALL', 'All', 'All bones will be exported.'),
+            ('BONE_GROUPS', 'Bone Groups', 'Only bones belonging to the selected bone groups and their ancestors will be exported.')
+        )
+    )
+    bone_group_list: CollectionProperty(type=BoneGroupListItem)
+    bone_group_list_index: IntProperty(default=0)
+
+
+__classes__ = [
+    PskExportOperator,
+    PskExportPropertyGroup
+]

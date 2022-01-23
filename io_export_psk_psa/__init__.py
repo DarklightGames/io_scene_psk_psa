@@ -13,6 +13,9 @@ bl_info = {
 
 if 'bpy' in locals():
     import importlib
+    importlib.reload(psx_data)
+    importlib.reload(psx_helpers)
+    importlib.reload(psx_types)
     importlib.reload(psk_data)
     importlib.reload(psk_builder)
     importlib.reload(psk_exporter)
@@ -25,6 +28,9 @@ if 'bpy' in locals():
     importlib.reload(psa_importer)
 else:
     # if i remove this line, it can be enabled just fine
+    from . import data as psx_data
+    from . import helpers as psx_helpers
+    from . import types as psx_types
     from .psk import data as psk_data
     from .psk import builder as psk_builder
     from .psk import exporter as psk_exporter
@@ -40,15 +46,19 @@ import bpy
 from bpy.props import PointerProperty
 
 
-classes = [
-    psk_exporter.PskExportOperator,
+# TODO: have the individual files emit a __classes__ field or something we can update it locally instead of explicitly declaring it here.
+classes = []
+classes.extend(psx_types.__classes__)
+classes.extend(psk_exporter.__classes__)
+classes.extend([
     psk_importer.PskImportOperator,
     psa_importer.PsaImportOperator,
     psa_importer.PsaImportFileSelectOperator,
     psa_exporter.PSA_UL_ExportActionList,
-    psa_exporter.PSA_UL_ExportBoneGroupList,
+    # psa_exporter.PSA_UL_ExportBoneGroupList,
     psa_importer.PSA_UL_ImportActionList,
     psa_importer.PsaImportActionListItem,
+    psa_importer.PsaImportPsaBoneItem,
     psa_importer.PsaImportSelectAll,
     psa_importer.PsaImportDeselectAll,
     psa_importer.PSA_PT_ImportPanel,
@@ -57,9 +67,8 @@ classes = [
     psa_exporter.PsaExportSelectAll,
     psa_exporter.PsaExportDeselectAll,
     psa_exporter.PsaExportActionListItem,
-    psa_exporter.PsaExportBoneGroupListItem,
     psa_exporter.PsaExportPropertyGroup,
-]
+])
 
 
 def psk_export_menu_func(self, context):
@@ -87,6 +96,7 @@ def register():
     bpy.types.TOPBAR_MT_file_import.append(psa_import_menu_func)
     bpy.types.Scene.psa_import = PointerProperty(type=psa_importer.PsaImportPropertyGroup)
     bpy.types.Scene.psa_export = PointerProperty(type=psa_exporter.PsaExportPropertyGroup)
+    bpy.types.Scene.psk_export = PointerProperty(type=psk_exporter.PskExportPropertyGroup)
 
 
 def unregister():
