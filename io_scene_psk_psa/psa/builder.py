@@ -7,6 +7,7 @@ class PsaBuilderOptions(object):
         self.actions = []
         self.bone_filter_mode = 'ALL'
         self.bone_group_indices = []
+        self.should_use_original_sequence_names = False
 
 
 class PsaBuilder(object):
@@ -106,7 +107,13 @@ class PsaBuilder(object):
             frame_min, frame_max = [int(x) for x in action.frame_range]
 
             sequence = Psa.Sequence()
-            sequence.name = bytes(action.name, encoding='utf-8')
+
+            if options.should_use_original_sequence_names and 'original_sequence_name' in action:
+                sequence_name = action['original_sequence_name']
+            else:
+                sequence_name = action.name
+
+            sequence.name = bytes(sequence_name, encoding='windows-1252')
             sequence.frame_count = frame_max - frame_min + 1
             sequence.frame_start_index = frame_start_index
             sequence.fps = context.scene.render.fps

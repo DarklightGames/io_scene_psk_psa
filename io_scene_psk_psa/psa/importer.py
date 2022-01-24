@@ -116,7 +116,8 @@ class PsaImporter(object):
         actions = []
         for sequence in sequences:
             # Add the action.
-            action_name = options.action_name_prefix + sequence.name.decode('windows-1252')
+            sequence_name = sequence.name.decode('windows-1252')
+            action_name = options.action_name_prefix + sequence_name
             action = bpy.data.actions.new(name=action_name)
             action.use_fake_user = options.should_use_fake_user
 
@@ -135,8 +136,6 @@ class PsaImporter(object):
                     action.fcurves.new(location_data_path, index=1),  # Ly
                     action.fcurves.new(location_data_path, index=2),  # Lz
                 ]
-
-            sequence_name = sequence.name.decode('windows-1252')
 
             # Read the sequence data matrix from the PSA.
             sequence_data_matrix = psa_reader.read_sequence_data_matrix(sequence_name)
@@ -182,6 +181,9 @@ class PsaImporter(object):
                         for fcurve, should_write, datum in zip(import_bone.fcurves, keyframe_write_matrix[frame_index, bone_index], key_data):
                             if should_write:
                                 fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
+
+            # Store the original sequence name for use when exporting this same action using the PSA exporter.
+            action['original_sequence_name'] = sequence_name
 
             actions.append(action)
 

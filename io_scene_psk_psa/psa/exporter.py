@@ -45,6 +45,19 @@ class PsaExportActionListItem(PropertyGroup):
         return self.action.name
 
 
+def update_action_names(context):
+    property_group = context.scene.psa_export
+    for item in property_group.action_list:
+        action = item.action
+        if property_group.should_use_original_sequence_names and 'original_sequence_name' in action:
+            item.action_name = action['original_sequence_name']
+        else:
+            item.action_name = action.name
+
+
+def should_use_original_sequence_names_updated(property, context):
+    update_action_names(context)
+
 class PsaExportPropertyGroup(PropertyGroup):
     action_list: CollectionProperty(type=PsaExportActionListItem)
     action_list_index: IntProperty(default=0)
@@ -58,6 +71,7 @@ class PsaExportPropertyGroup(PropertyGroup):
     )
     bone_group_list: CollectionProperty(type=BoneGroupListItem)
     bone_group_list_index: IntProperty(default=0)
+    should_use_original_sequence_names: BoolProperty(default=False, description='If the action was imported from the PSA Import panel, the original name of the action will be used instead of the action name assigned in Blender', update=should_use_original_sequence_names_updated)
 
 
 def is_bone_filter_mode_item_available(context, identifier):
@@ -97,6 +111,8 @@ class PsaExportOperator(Operator, ExportHelper):
         row.operator('psa_export.actions_select_all', text='All')
         row.operator('psa_export.actions_deselect_all', text='None')
 
+        layout.prop(property_group, 'should_use_original_sequence_names', text='Original Sequence Names')
+
         # BONES
         box = layout.box()
         box.label(text='Bones', icon='BONE_DATA')
@@ -114,7 +130,6 @@ class PsaExportOperator(Operator, ExportHelper):
             row = box.row()
             rows = max(3, min(len(property_group.bone_group_list), 10))
             row.template_list('PSX_UL_BoneGroupList', '', property_group, 'bone_group_list', property_group, 'bone_group_list_index', rows=rows)
-
 
     def is_action_for_armature(self, action):
         if len(action.fcurves) == 0:
@@ -148,8 +163,11 @@ class PsaExportOperator(Operator, ExportHelper):
             item = property_group.action_list.add()
             item.action = action
             item.action_name = action.name
+
             if self.is_action_for_armature(action):
                 item.is_selected = True
+
+        update_action_names(context)
 
         if len(property_group.action_list) == 0:
             # If there are no actions at all, we have nothing to export, so just cancel the operation.
@@ -175,6 +193,7 @@ class PsaExportOperator(Operator, ExportHelper):
         options.actions = actions
         options.bone_filter_mode = property_group.bone_filter_mode
         options.bone_group_indices = [x.index for x in property_group.bone_group_list if x.is_selected]
+        options.should_use_original_sequence_names = property_group.should_use_original_sequence_names
         builder = PsaBuilder()
         try:
             psa = builder.build(context, options)
