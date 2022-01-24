@@ -102,6 +102,7 @@ class PsaExportOperator(Operator, ExportHelper):
         box.label(text='Bones', icon='BONE_DATA')
         bone_filter_mode_items = property_group.bl_rna.properties['bone_filter_mode'].enum_items_static
         row = box.row(align=True)
+
         for item in bone_filter_mode_items:
             identifier = item.identifier
             item_layout = row.row(align=True)
@@ -113,6 +114,7 @@ class PsaExportOperator(Operator, ExportHelper):
             row = box.row()
             rows = max(3, min(len(property_group.bone_group_list), 10))
             row.template_list('PSX_UL_BoneGroupList', '', property_group, 'bone_group_list', property_group, 'bone_group_list_index', rows=rows)
+
 
     def is_action_for_armature(self, action):
         if len(action.fcurves) == 0:
