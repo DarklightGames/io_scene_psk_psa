@@ -90,10 +90,10 @@ class PskExportOperator(Operator, ExportHelper):
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
-        property_group = context.scene.psk_export
+        pg = context.scene.psk_export
 
         # Populate bone groups list.
-        populate_bone_group_list(input_objects.armature_object, property_group.bone_group_list)
+        populate_bone_group_list(input_objects.armature_object, pg.bone_group_list)
 
         context.window_manager.fileselect_add(self)
 
@@ -102,29 +102,29 @@ class PskExportOperator(Operator, ExportHelper):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        property_group = scene.psk_export
+        pg = scene.psk_export
 
         # BONES
         box = layout.box()
         box.label(text='Bones', icon='BONE_DATA')
-        bone_filter_mode_items = property_group.bl_rna.properties['bone_filter_mode'].enum_items_static
+        bone_filter_mode_items = pg.bl_rna.properties['bone_filter_mode'].enum_items_static
         row = box.row(align=True)
         for item in bone_filter_mode_items:
             identifier = item.identifier
             item_layout = row.row(align=True)
-            item_layout.prop_enum(property_group, 'bone_filter_mode', item.identifier)
+            item_layout.prop_enum(pg, 'bone_filter_mode', item.identifier)
             item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
 
-        if property_group.bone_filter_mode == 'BONE_GROUPS':
+        if pg.bone_filter_mode == 'BONE_GROUPS':
             row = box.row()
-            rows = max(3, min(len(property_group.bone_group_list), 10))
-            row.template_list('PSX_UL_BoneGroupList', '', property_group, 'bone_group_list', property_group, 'bone_group_list_index', rows=rows)
+            rows = max(3, min(len(pg.bone_group_list), 10))
+            row.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg, 'bone_group_list_index', rows=rows)
 
     def execute(self, context):
-        property_group = context.scene.psk_export
+        pg = context.scene.psk_export
         builder = PskBuilder()
         options = PskBuilderOptions()
-        options.bone_group_indices = [x.index for x in property_group.bone_group_list if x.is_selected]
+        options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
         try:
             psk = builder.build(context, options)
             exporter = PskExporter(psk)

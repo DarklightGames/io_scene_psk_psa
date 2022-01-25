@@ -188,7 +188,7 @@ class PsaImporter(object):
 
             actions.append(action)
 
-        # If the user specifies, store the new animations as strips on a non-contributing NLA stack.
+        # If the user specifies, store the new animations as strips on a non-contributing NLA track.
         if options.should_stash:
             if armature_object.animation_data is None:
                 armature_object.animation_data_create()
@@ -199,43 +199,29 @@ class PsaImporter(object):
                 nla_track.strips.new(name=action.name, start=0, action=action)
 
 
-class PsaImportPsaBoneItem(PropertyGroup):
-    bone_name: StringProperty()
-
-    @property
-    def name(self):
-        return self.bone_name
-
-
 class PsaImportActionListItem(PropertyGroup):
     action_name: StringProperty()
-    frame_count: IntProperty()
     is_selected: BoolProperty(default=False)
-
-    @property
-    def name(self):
-        return self.action_name
 
 
 def load_psa_file(context):
-    property_group = context.scene.psa_import
-    property_group.sequence_list.clear()
-    property_group.psa_bones.clear()
-    property_group.action_list.clear()
-    property_group.psa_error = ''
+    pg = context.scene.psa_import
+    pg.sequence_list.clear()
+    pg.psa.bones.clear()
+    pg.action_list.clear()
+    pg.psa_error = ''
     try:
         # Read the file and populate the action list.
-        p = os.path.abspath(property_group.psa_file_path)
+        p = os.path.abspath(pg.psa_file_path)
         psa_reader = PsaReader(p)
         for sequence in psa_reader.sequences.values():
-            item = property_group.sequence_list.add()
+            item = pg.sequence_list.add()
             item.action_name = sequence.name.decode('windows-1252')
-            item.frame_count = sequence.frame_count
         for psa_bone in psa_reader.bones:
-            item = property_group.psa_bones.add()
+            item = pg.psa.bones.add()
             item.bone_name = psa_bone.name.decode('windows-1252')
     except Exception as e:
-        property_group.psa_error = str(e)
+        pg.psa_error = str(e)
 
 
 def on_psa_file_path_updated(property, context):
@@ -247,7 +233,6 @@ class PsaBonePropertyGroup(PropertyGroup):
 
 
 class PsaDataPropertyGroup(PropertyGroup):
-    bone_count: IntProperty(default=0)
     bones: CollectionProperty(type=PsaBonePropertyGroup)
     sequence_count: IntProperty(default=0)
 
@@ -255,7 +240,7 @@ class PsaDataPropertyGroup(PropertyGroup):
 class PsaImportPropertyGroup(PropertyGroup):
     psa_file_path: StringProperty(default='', update=on_psa_file_path_updated, name='PSA File Path')
     psa_error: StringProperty(default='')
-    psa_bones: CollectionProperty(type=PsaImportPsaBoneItem)
+    psa: PointerProperty(type=PsaDataPropertyGroup)
     sequence_list: CollectionProperty(type=PsaImportActionListItem)
     sequence_list_index: IntProperty(name='', default=0)
     action_list: CollectionProperty(type=PsaImportActionListItem)
@@ -288,7 +273,6 @@ class PSA_UL_SequenceList(UIList):
     def filter_items(self, context, data, property):
         actions = getattr(data, property)
         flt_flags = []
-        flt_neworder = []
         if self.filter_name:
             flt_flags = bpy.types.UI_UL_list.filter_items_by_name(
                 self.filter_name,
@@ -297,6 +281,7 @@ class PSA_UL_SequenceList(UIList):
                 'action_name',
                 reverse=self.use_filter_invert
             )
+        flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(actions, 'action_name')
         return flt_flags, flt_neworder
 
 
@@ -315,14 +300,14 @@ class PsaImportSequencesSelectAll(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        property_group = context.scene.psa_import
-        sequence_list = property_group.sequence_list
+        pg = context.scene.psa_import
+        sequence_list = pg.sequence_list
         has_unselected_actions = any(map(lambda action: not action.is_selected, sequence_list))
         return len(sequence_list) > 0 and has_unselected_actions
 
     def execute(self, context):
-        property_group = context.scene.psa_import
-        for action in property_group.sequence_list:
+        pg = context.scene.psa_import
+        for action in pg.sequence_list:
             action.is_selected = True
         return {'FINISHED'}
 
@@ -334,14 +319,14 @@ class PsaImportActionsSelectAll(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        property_group = context.scene.psa_import
-        action_list = property_group.action_list
+        pg = context.scene.psa_import
+        action_list = pg.action_list
         has_unselected_actions = any(map(lambda action: not action.is_selected, action_list))
         return len(action_list) > 0 and has_unselected_actions
 
     def execute(self, context):
-        property_group = context.scene.psa_import
-        for action in property_group.action_list:
+        pg = context.scene.psa_import
+        for action in pg.action_list:
             action.is_selected = True
         return {'FINISHED'}
 
@@ -353,14 +338,14 @@ class PsaImportSequencesDeselectAll(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        property_group = context.scene.psa_import
-        sequence_list = property_group.sequence_list
+        pg = context.scene.psa_import
+        sequence_list = pg.sequence_list
         has_selected_sequences = any(map(lambda action: action.is_selected, sequence_list))
         return len(sequence_list) > 0 and has_selected_sequences
 
     def execute(self, context):
-        property_group = context.scene.psa_import
-        for action in property_group.sequence_list:
+        pg = context.scene.psa_import
+        for action in pg.sequence_list:
             action.is_selected = False
         return {'FINISHED'}
 
@@ -372,14 +357,14 @@ class PsaImportActionsDeselectAll(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        property_group = context.scene.psa_import
-        action_list = property_group.action_list
+        pg = context.scene.psa_import
+        action_list = pg.action_list
         has_selected_actions = any(map(lambda action: action.is_selected, action_list))
         return len(action_list) > 0 and has_selected_actions
 
     def execute(self, context):
-        property_group = context.scene.psa_import
-        for action in property_group.action_list:
+        pg = context.scene.psa_import
+        for action in pg.action_list:
             action.is_selected = False
         return {'FINISHED'}
 
@@ -393,20 +378,35 @@ class PSA_PT_ImportPanel_Advanced(Panel):
 
     def draw(self, context):
         layout = self.layout
-        property_group = context.scene.psa_import
+        pg = context.scene.psa_import
 
         col = layout.column(heading="Options")
         col.use_property_split = True
         col.use_property_decorate = False
-        col.prop(property_group, 'should_clean_keys')
+        col.prop(pg, 'should_clean_keys')
         col.separator()
-        col.prop(property_group, 'should_use_fake_user')
-        col.prop(property_group, 'should_stash')
+        col.prop(pg, 'should_use_fake_user')
+        col.prop(pg, 'should_stash')
         col.separator()
-        col.prop(property_group, 'should_use_action_name_prefix')
+        col.prop(pg, 'should_use_action_name_prefix')
 
-        if property_group.should_use_action_name_prefix:
-            col.prop(property_group, 'action_name_prefix')
+        if pg.should_use_action_name_prefix:
+            col.prop(pg, 'action_name_prefix')
+
+
+class PSA_PT_ImportPanel_PsaData(Panel):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_label = 'PSA Info'
+    bl_options = {'DEFAULT_CLOSED'}
+    bl_parent_id = 'PSA_PT_ImportPanel'
+
+    def draw(self, context):
+        layout = self.layout
+        pg = context.scene.psa_import.psa
+
+        layout.label(text=f'{len(pg.bones)} Bones', icon='BONE_DATA')
+        layout.label(text=f'{len(pg.sequence_count)} Sequences', icon='SEQUENCE')
 
 
 class PSA_PT_ImportPanel(Panel):
@@ -423,14 +423,14 @@ class PSA_PT_ImportPanel(Panel):
 
     def draw(self, context):
         layout = self.layout
-        property_group = context.scene.psa_import
+        pg = context.scene.psa_import
 
         row = layout.row(align=True)
-        row.operator('psa_import.select_file', text='', icon='FILEBROWSER')
-        row.prop(property_group, 'psa_file_path', text='')
-        row.operator('psa_import.file_reload', text='', icon='FILE_REFRESH')
+        row.operator(PsaImportSelectFile.bl_idname, text='', icon='FILEBROWSER')
+        row.prop(pg, 'psa_file_path', text='')
+        row.operator(PsaImportFileReload.bl_idname, text='', icon='FILE_REFRESH')
 
-        if property_group.psa_error != '':
+        if pg.psa_error != '':
             row = layout.row()
             row.label(text='File could not be read', icon='ERROR')
 
@@ -439,33 +439,31 @@ class PSA_PT_ImportPanel(Panel):
         box.label(text=f'Sequences', icon='ARMATURE_DATA')
 
         # select
-        rows = max(3, min(len(property_group.sequence_list) + len(property_group.action_list), 10))
+        rows = max(3, min(len(pg.sequence_list) + len(pg.action_list), 10))
 
         row = box.row()
         col = row.column()
 
         row2 = col.row(align=True)
         row2.label(text='Select')
-        row2.operator('psa_import.sequences_select_all', text='All')
-        row2.operator('psa_import.sequences_deselect_all', text='None')
+        row2.operator(PsaImportSequencesSelectAll.bl_idname, text='All')
+        row2.operator(PsaImportSequencesDeselectAll.bl_idname, text='None')
 
         col = col.row()
-        col.template_list('PSA_UL_ImportSequenceList', '', property_group, 'sequence_list', property_group,
-                          'sequence_list_index', rows=rows)
+        col.template_list('PSA_UL_ImportSequenceList', '', pg, 'sequence_list', pg, 'sequence_list_index', rows=rows)
 
         col = row.column(align=True)
-        col.operator('psa_import.push_to_actions', icon='TRIA_RIGHT', text='')
-        col.operator('psa_import.pop_from_actions', icon='TRIA_LEFT', text='')
+        col.operator(PsaImportPushToActions.bl_idname, icon='TRIA_RIGHT', text='')
+        col.operator(PsaImportPopFromActions.bl_idname, icon='TRIA_LEFT', text='')
 
         col = row.column()
         row2 = col.row(align=True)
         row2.label(text='Select')
-        row2.operator('psa_import.actions_select_all', text='All')
-        row2.operator('psa_import.actions_deselect_all', text='None')
-        col.template_list('PSA_UL_ImportActionList', '', property_group, 'action_list', property_group,
-                          'action_list_index', rows=rows)
+        row2.operator(PsaImportActionsSelectAll.bl_idname, text='All')
+        row2.operator(PsaImportActionsDeselectAll.bl_idname, text='None')
+        col.template_list('PSA_UL_ImportActionList', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
         col.separator()
-        col.operator('psa_import.import', text=f'Import')
+        col.operator(PsaImportOperator.bl_idname, text=f'Import')
 
 
 class PsaImportFileReload(Operator):
@@ -503,21 +501,21 @@ class PsaImportOperator(Operator):
 
     @classmethod
     def poll(cls, context):
-        property_group = context.scene.psa_import
+        pg = context.scene.psa_import
         active_object = context.view_layer.objects.active
-        action_list = property_group.action_list
+        action_list = pg.action_list
         return len(action_list) and active_object is not None and active_object.type == 'ARMATURE'
 
     def execute(self, context):
-        property_group = context.scene.psa_import
-        psa_reader = PsaReader(property_group.psa_file_path)
-        sequence_names = [x.action_name for x in property_group.action_list]
+        pg = context.scene.psa_import
+        psa_reader = PsaReader(pg.psa_file_path)
+        sequence_names = [x.action_name for x in pg.action_list]
         options = PsaImportOptions()
         options.sequence_names = sequence_names
-        options.should_clean_keys = property_group.should_clean_keys
-        options.should_use_fake_user = property_group.should_use_fake_user
-        options.should_stash = property_group.should_stash
-        options.action_name_prefix = property_group.action_name_prefix
+        options.should_clean_keys = pg.should_clean_keys
+        options.should_use_fake_user = pg.should_use_fake_user
+        options.should_stash = pg.should_stash
+        options.action_name_prefix = pg.action_name_prefix
         PsaImporter().import_psa(psa_reader, context.view_layer.objects.active, options)
         self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
         return {'FINISHED'}
@@ -529,20 +527,20 @@ class PsaImportPushToActions(Operator):
 
     @classmethod
     def poll(cls, context):
-        property_group = context.scene.psa_import
-        has_sequences_selected = any(map(lambda x: x.is_selected, property_group.sequence_list))
+        pg = context.scene.psa_import
+        has_sequences_selected = any(map(lambda x: x.is_selected, pg.sequence_list))
         return has_sequences_selected
 
     def execute(self, context):
-        property_group = context.scene.psa_import
+        pg = context.scene.psa_import
         indices_to_remove = []
-        for sequence_index, item in enumerate(property_group.sequence_list):
+        for sequence_index, item in enumerate(pg.sequence_list):
             if item.is_selected:
                 indices_to_remove.append(sequence_index)
-                action = property_group.action_list.add()
+                action = pg.action_list.add()
                 action.action_name = item.action_name
         for index in reversed(indices_to_remove):
-            property_group.sequence_list.remove(index)
+            pg.sequence_list.remove(index)
         return {'FINISHED'}
 
 
@@ -552,20 +550,20 @@ class PsaImportPopFromActions(Operator):
 
     @classmethod
     def poll(cls, context):
-        property_group = context.scene.psa_import
-        has_actions_selected = any(map(lambda x: x.is_selected, property_group.action_list))
+        pg = context.scene.psa_import
+        has_actions_selected = any(map(lambda x: x.is_selected, pg.action_list))
         return has_actions_selected
 
     def execute(self, context):
-        property_group = context.scene.psa_import
+        pg = context.scene.psa_import
         indices_to_remove = []
-        for action_index, item in enumerate(property_group.action_list):
+        for action_index, item in enumerate(pg.action_list):
             if item.is_selected:
                 indices_to_remove.append(action_index)
-                sequence = property_group.sequence_list.add()
+                sequence = pg.sequence_list.add()
                 sequence.action_name = item.action_name
         for index in reversed(indices_to_remove):
-            property_group.action_list.remove(index)
+            pg.action_list.remove(index)
         return {'FINISHED'}
 
 
@@ -585,15 +583,15 @@ class PsaImportFileSelectOperator(Operator, ImportHelper):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        property_group = context.scene.psa_import
-        property_group.psa_file_path = self.filepath
-        # Load the sequence names from the selected file
+        pg = context.scene.psa_import
+        pg.psa_file_path = self.filepath
         return {'FINISHED'}
 
 
 classes = (
-    PsaImportPsaBoneItem,
     PsaImportActionListItem,
+    PsaBonePropertyGroup,
+    PsaDataPropertyGroup,
     PsaImportPropertyGroup,
     PSA_UL_SequenceList,
     PSA_UL_ImportSequenceList,
@@ -605,6 +603,7 @@ classes = (
     PsaImportFileReload,
     PSA_PT_ImportPanel,
     PSA_PT_ImportPanel_Advanced,
+    PSA_PT_ImportPanel_PsaData,
     PsaImportOperator,
     PsaImportFileSelectOperator,
     PsaImportSelectFile,

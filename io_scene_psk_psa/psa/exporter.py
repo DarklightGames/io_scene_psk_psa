@@ -47,10 +47,10 @@ class PsaExportActionListItem(PropertyGroup):
 
 
 def update_action_names(context):
-    property_group = context.scene.psa_export
-    for item in property_group.action_list:
+    pg = context.scene.psa_export
+    for item in pg.action_list:
         action = item.action
-        item.action_name = get_psa_sequence_name(action, property_group.should_use_original_sequence_names)
+        item.action_name = get_psa_sequence_name(action, pg.should_use_original_sequence_names)
 
 
 def should_use_original_sequence_names_updated(property, context):
@@ -98,26 +98,25 @@ class PsaExportOperator(Operator, ExportHelper):
 
     def draw(self, context):
         layout = self.layout
-        property_group = context.scene.psa_export
+        pg = context.scene.psa_export
 
         # ACTIONS
         layout.label(text='Actions', icon='ACTION')
         row = layout.row(align=True)
         row.label(text='Select')
-        row.operator('psa_export.actions_select_all', text='All')
-        row.operator('psa_export.actions_deselect_all', text='None')
+        row.operator(PsaExportSelectAll.bl_idname, text='All')
+        row.operator(PsaExportDeselectAll.bl_idname, text='None')
         row = layout.row()
-        rows = max(3, min(len(property_group.action_list), 10))
-        row.template_list('PSA_UL_ExportActionList', '', property_group, 'action_list', property_group,
-                          'action_list_index', rows=rows)
+        rows = max(3, min(len(pg.action_list), 10))
+        row.template_list('PSA_UL_ExportActionList', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
 
         col = layout.column(heading="Options")
         col.use_property_split = True
         col.use_property_decorate = False
-        col.prop(property_group, 'should_use_original_sequence_names')
+        col.prop(pg, 'should_use_original_sequence_names')
 
         # Determine if there is going to be a naming conflict and display an error, if so.
-        selected_actions = [x for x in property_group.action_list if x.is_selected]
+        selected_actions = [x for x in pg.action_list if x.is_selected]
         action_names = [x.action_name for x in selected_actions]
         action_name_counts = Counter(action_names)
         for action_name, count in action_name_counts.items():
@@ -130,18 +129,18 @@ class PsaExportOperator(Operator, ExportHelper):
         # BONES
         box = layout.row()
         box.label(text='Bones', icon='BONE_DATA')
-        bone_filter_mode_items = property_group.bl_rna.properties['bone_filter_mode'].enum_items_static
+        bone_filter_mode_items = pg.bl_rna.properties['bone_filter_mode'].enum_items_static
         row = box.row(align=True)
 
         for item in bone_filter_mode_items:
             identifier = item.identifier
             item_layout = row.row(align=True)
-            item_layout.prop_enum(property_group, 'bone_filter_mode', item.identifier)
+            item_layout.prop_enum(pg, 'bone_filter_mode', item.identifier)
             item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
 
-        if property_group.bone_filter_mode == 'BONE_GROUPS':
-            rows = max(3, min(len(property_group.bone_group_list), 10))
-            layout.template_list('PSX_UL_BoneGroupList', '', property_group, 'bone_group_list', property_group,
+        if pg.bone_filter_mode == 'BONE_GROUPS':
+            rows = max(3, min(len(pg.bone_group_list), 10))
+            layout.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg,
                               'bone_group_list_index', rows=rows)
 
     def is_action_for_armature(self, action):
@@ -158,7 +157,7 @@ class PsaExportOperator(Operator, ExportHelper):
         return False
 
     def invoke(self, context, event):
-        property_group = context.scene.psa_export
+        pg = context.scene.psa_export
 
         if context.view_layer.objects.active is None:
             self.report({'ERROR_INVALID_CONTEXT'}, 'An armature must be selected')
@@ -171,32 +170,32 @@ class PsaExportOperator(Operator, ExportHelper):
         self.armature = context.view_layer.objects.active
 
         # Populate actions list.
-        property_group.action_list.clear()
+        pg.action_list.clear()
         for action in bpy.data.actions:
             if not self.is_action_for_armature(action):
                 continue
-            item = property_group.action_list.add()
+            item = pg.action_list.add()
             item.action = action
             item.action_name = action.name
             item.is_selected = True
 
         update_action_names(context)
 
-        if len(property_group.action_list) == 0:
+        if len(pg.action_list) == 0:
             # If there are no actions at all, we have nothing to export, so just cancel the operation.
             self.report({'ERROR_INVALID_CONTEXT'}, 'There are no actions to export.')
             return {'CANCELLED'}
 
         # Populate bone groups list.
-        populate_bone_group_list(self.armature, property_group.bone_group_list)
+        populate_bone_group_list(self.armature, pg.bone_group_list)
 
         context.window_manager.fileselect_add(self)
 
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        property_group = context.scene.psa_export
-        actions = [x.action for x in property_group.action_list if x.is_selected]
+        pg = context.scene.psa_export
+        actions = [x.action for x in pg.action_list if x.is_selected]
 
         if len(actions) == 0:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No actions were selected for export.')
@@ -204,9 +203,9 @@ class PsaExportOperator(Operator, ExportHelper):
 
         options = PsaBuilderOptions()
         options.actions = actions
-        options.bone_filter_mode = property_group.bone_filter_mode
-        options.bone_group_indices = [x.index for x in property_group.bone_group_list if x.is_selected]
-        options.should_use_original_sequence_names = property_group.should_use_original_sequence_names
+        options.bone_filter_mode = pg.bone_filter_mode
+        options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
+        options.should_use_original_sequence_names = pg.should_use_original_sequence_names
         builder = PsaBuilder()
         try:
             psa = builder.build(context, options)
@@ -246,14 +245,14 @@ class PsaExportSelectAll(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        property_group = context.scene.psa_export
-        action_list = property_group.action_list
+        pg = context.scene.psa_export
+        action_list = pg.action_list
         has_unselected_actions = any(map(lambda action: not action.is_selected, action_list))
         return len(action_list) > 0 and has_unselected_actions
 
     def execute(self, context):
-        property_group = context.scene.psa_export
-        for action in property_group.action_list:
+        pg = context.scene.psa_export
+        for action in pg.action_list:
             action.is_selected = True
         return {'FINISHED'}
 
@@ -265,14 +264,14 @@ class PsaExportDeselectAll(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        property_group = context.scene.psa_export
-        action_list = property_group.action_list
+        pg = context.scene.psa_export
+        action_list = pg.action_list
         has_selected_actions = any(map(lambda action: action.is_selected, action_list))
         return len(action_list) > 0 and has_selected_actions
 
     def execute(self, context):
-        property_group = context.scene.psa_export
-        for action in property_group.action_list:
+        pg = context.scene.psa_export
+        for action in pg.action_list:
             action.is_selected = False
         return {'FINISHED'}
 
