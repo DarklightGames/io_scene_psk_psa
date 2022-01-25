@@ -148,7 +148,7 @@ class PskExportPropertyGroup(PropertyGroup):
     bone_group_list_index: IntProperty(default=0)
 
 
-__classes__ = [
+classes = (
     PskExportOperator,
     PskExportPropertyGroup
-]
+)

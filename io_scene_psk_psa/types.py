@@ -19,7 +19,7 @@ class BoneGroupListItem(PropertyGroup):
         return self.name
 
 
-__classes__ = [
+classes = (
     BoneGroupListItem,
-    PSX_UL_BoneGroupList
-]
+    PSX_UL_BoneGroupList,
+)

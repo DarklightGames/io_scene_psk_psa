@@ -108,10 +108,7 @@ class PsaBuilder(object):
 
             sequence = Psa.Sequence()
 
-            if options.should_use_original_sequence_names and 'original_sequence_name' in action:
-                sequence_name = action['original_sequence_name']
-            else:
-                sequence_name = action.name
+            sequence_name = get_psa_sequence_name(action, options.should_use_original_sequence_names)
 
             sequence.name = bytes(sequence_name, encoding='windows-1252')
             sequence.frame_count = frame_max - frame_min + 1

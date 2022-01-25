@@ -1,5 +1,5 @@
 import bpy
-from bpy.types import Operator, PropertyGroup, Action, UIList, BoneGroup
+from bpy.types import Operator, PropertyGroup, Action, UIList, BoneGroup, Panel
 from bpy.props import CollectionProperty, IntProperty, PointerProperty, StringProperty, BoolProperty, EnumProperty
 from bpy_extras.io_utils import ExportHelper
 from typing import Type
@@ -7,6 +7,7 @@ from .builder import PsaBuilder, PsaBuilderOptions
 from .data import *
 from ..types import BoneGroupListItem
 from ..helpers import *
+from collections import Counter
 import re
 
 
@@ -49,14 +50,12 @@ def update_action_names(context):
     property_group = context.scene.psa_export
     for item in property_group.action_list:
         action = item.action
-        if property_group.should_use_original_sequence_names and 'original_sequence_name' in action:
-            item.action_name = action['original_sequence_name']
-        else:
-            item.action_name = action.name
+        item.action_name = get_psa_sequence_name(action, property_group.should_use_original_sequence_names)
 
 
 def should_use_original_sequence_names_updated(property, context):
     update_action_names(context)
+
 
 class PsaExportPropertyGroup(PropertyGroup):
     action_list: CollectionProperty(type=PsaExportActionListItem)
@@ -71,11 +70,11 @@ class PsaExportPropertyGroup(PropertyGroup):
     )
     bone_group_list: CollectionProperty(type=BoneGroupListItem)
     bone_group_list_index: IntProperty(default=0)
-    should_use_original_sequence_names: BoolProperty(default=False, description='If the action was imported from the PSA Import panel, the original name of the action will be used instead of the action name assigned in Blender', update=should_use_original_sequence_names_updated)
+    should_use_original_sequence_names: BoolProperty(default=False, name='Original Names', description='If the action was imported from the PSA Import panel, the original name of the sequence will be used instead of the Blender action name', update=should_use_original_sequence_names_updated)
 
 
 def is_bone_filter_mode_item_available(context, identifier):
-    if identifier == "BONE_GROUPS":
+    if identifier == 'BONE_GROUPS':
         obj = context.active_object
         if not obj.pose or not obj.pose.bone_groups:
             return False
@@ -83,7 +82,7 @@ def is_bone_filter_mode_item_available(context, identifier):
 
 
 class PsaExportOperator(Operator, ExportHelper):
-    bl_idname = 'export.psa'
+    bl_idname = 'psa_export.operator'
     bl_label = 'Export'
     __doc__ = 'Export actions to PSA'
     filename_ext = '.psa'
@@ -102,19 +101,34 @@ class PsaExportOperator(Operator, ExportHelper):
         property_group = context.scene.psa_export
 
         # ACTIONS
-        box = layout.box()
-        box.label(text='Actions', icon='ACTION')
-        row = box.row()
-        row.template_list('PSA_UL_ExportActionList', 'asd', property_group, 'action_list', property_group, 'action_list_index', rows=10)
-        row = box.row(align=True)
+        layout.label(text='Actions', icon='ACTION')
+        row = layout.row(align=True)
         row.label(text='Select')
         row.operator('psa_export.actions_select_all', text='All')
         row.operator('psa_export.actions_deselect_all', text='None')
+        row = layout.row()
+        rows = max(3, min(len(property_group.action_list), 10))
+        row.template_list('PSA_UL_ExportActionList', '', property_group, 'action_list', property_group,
+                          'action_list_index', rows=rows)
 
-        layout.prop(property_group, 'should_use_original_sequence_names', text='Original Sequence Names')
+        col = layout.column(heading="Options")
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(property_group, 'should_use_original_sequence_names')
+
+        # Determine if there is going to be a naming conflict and display an error, if so.
+        selected_actions = [x for x in property_group.action_list if x.is_selected]
+        action_names = [x.action_name for x in selected_actions]
+        action_name_counts = Counter(action_names)
+        for action_name, count in action_name_counts.items():
+            if count > 1:
+                layout.label(text=f'Duplicate action: {action_name}', icon='ERROR')
+                break
+
+        layout.separator()
 
         # BONES
-        box = layout.box()
+        box = layout.row()
         box.label(text='Bones', icon='BONE_DATA')
         bone_filter_mode_items = property_group.bl_rna.properties['bone_filter_mode'].enum_items_static
         row = box.row(align=True)
@@ -126,10 +140,9 @@ class PsaExportOperator(Operator, ExportHelper):
             item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
 
         if property_group.bone_filter_mode == 'BONE_GROUPS':
-            box = layout.box()
-            row = box.row()
             rows = max(3, min(len(property_group.bone_group_list), 10))
-            row.template_list('PSX_UL_BoneGroupList', '', property_group, 'bone_group_list', property_group, 'bone_group_list_index', rows=rows)
+            layout.template_list('PSX_UL_BoneGroupList', '', property_group, 'bone_group_list', property_group,
+                              'bone_group_list_index', rows=rows)
 
     def is_action_for_armature(self, action):
         if len(action.fcurves) == 0:
@@ -160,12 +173,12 @@ class PsaExportOperator(Operator, ExportHelper):
         # Populate actions list.
         property_group.action_list.clear()
         for action in bpy.data.actions:
+            if not self.is_action_for_armature(action):
+                continue
             item = property_group.action_list.add()
             item.action = action
             item.action_name = action.name
-
-            if self.is_action_for_armature(action):
-                item.is_selected = True
+            item.is_selected = True
 
         update_action_names(context)
 
@@ -264,11 +277,11 @@ class PsaExportDeselectAll(bpy.types.Operator):
         return {'FINISHED'}
 
 
-__classes__ = [
+classes = (
     PsaExportActionListItem,
     PsaExportPropertyGroup,
     PsaExportOperator,
     PSA_UL_ExportActionList,
     PsaExportSelectAll,
     PsaExportDeselectAll,
-]
+)

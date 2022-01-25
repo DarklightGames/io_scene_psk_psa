@@ -13,6 +13,7 @@ bl_info = {
 
 if 'bpy' in locals():
     import importlib
+
     importlib.reload(psx_data)
     importlib.reload(psx_helpers)
     importlib.reload(psx_types)
@@ -42,15 +43,14 @@ else:
     from .psa import reader as psa_reader
     from .psa import importer as psa_importer
 
-
 import bpy
 from bpy.props import PointerProperty
 
-classes = psx_types.__classes__ + \
-          psk_importer.__classes__ + \
-          psk_exporter.__classes__ + \
-          psa_exporter.__classes__ + \
-          psa_importer.__classes__
+classes = (psx_types.classes +
+           psk_importer.classes +
+           psk_exporter.classes +
+           psa_exporter.classes +
+           psa_importer.classes)
 
 
 def psk_export_menu_func(self, context):

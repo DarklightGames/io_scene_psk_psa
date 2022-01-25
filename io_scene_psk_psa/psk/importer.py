@@ -184,6 +184,6 @@ class PskImportOperator(Operator, ImportHelper):
         return {'FINISHED'}
 
 
-__classes__ = [
-    PskImportOperator
-]
+classes = (
+    PskImportOperator,
+)

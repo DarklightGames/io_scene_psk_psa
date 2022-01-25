@@ -17,8 +17,11 @@ def populate_bone_group_list(armature_object, bone_group_list):
             item.is_selected = True
 
 
-def add_bone_groups_to_layout(layout):
-    pass
+def get_psa_sequence_name(action, should_use_original_sequence_name):
+    if should_use_original_sequence_name and 'original_sequence_name' in action:
+        return action['original_sequence_name']
+    else:
+        return action.name
 
 
 def get_export_bone_indices_for_bone_groups(armature_object, bone_group_indices: List[int]) -> List[int]:
