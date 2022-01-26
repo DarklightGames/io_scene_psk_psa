@@ -58,7 +58,7 @@ def psk_export_menu_func(self, context):
 
 
 def psk_import_menu_func(self, context):
-    self.layout.operator(psk_importer.PskImportOperator.bl_idname, text='Unreal PSK (.psk)')
+    self.layout.operator(psk_importer.PskImportOperator.bl_idname, text='Unreal PSK (.psk/.pskx)')
 
 
 def psa_export_menu_func(self, context):

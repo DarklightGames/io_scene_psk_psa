@@ -120,7 +120,6 @@ class PskImporter(object):
                 bm_face.material_index = face.material_index
             except ValueError:
                 degenerate_face_indices.add(face_index)
-                pass
 
         if len(degenerate_face_indices) > 0:
             print(f'WARNING: Discarded {len(degenerate_face_indices)} degenerate face(s).')
@@ -129,7 +128,7 @@ class PskImporter(object):
 
         # TEXTURE COORDINATES
         data_index = 0
-        uv_layer = mesh_data.uv_layers.new()
+        uv_layer = mesh_data.uv_layers.new(name='VTXW0000')
         for face_index, face in enumerate(psk.faces):
             if face_index in degenerate_face_indices:
                 continue
@@ -138,10 +137,55 @@ class PskImporter(object):
                 uv_layer.data[data_index].uv = wedge.u, 1.0 - wedge.v
                 data_index += 1
 
+        # EXTRA UVS
+        if psk.has_extra_uvs:
+            extra_uv_channel_count = int(len(psk.extra_uvs) / len(psk.wedges))
+            wedge_index_offset = 0
+            for extra_uv_index in range(extra_uv_channel_count):
+                data_index = 0
+                uv_layer = mesh_data.uv_layers.new(name=f'EXTRAUV{extra_uv_index}')
+                for face_index, face in enumerate(psk.faces):
+                    if face_index in degenerate_face_indices:
+                        continue
+                    for wedge_index in reversed(face.wedge_indices):
+                        u, v = psk.extra_uvs[wedge_index_offset + wedge_index]
+                        uv_layer.data[data_index].uv = u, 1.0 - v
+                        data_index += 1
+                wedge_index_offset += len(psk.wedges)
+
+        # VERTEX COLORS
+        if psk.has_vertex_colors:
+            vertex_color_data = mesh_data.vertex_colors.new(name='VERTEXCOLOR')
+            vertex_colors = [None] * len(psk.points)
+            ambiguous_vertex_color_point_indices = []
+            for wedge_index, wedge in enumerate(psk.wedges):
+                point_index = wedge.point_index
+                psk_vertex_color = psk.vertex_colors[wedge_index]
+                if vertex_colors[point_index] is not None and vertex_colors[point_index] != psk_vertex_color:
+                    ambiguous_vertex_color_point_indices.append(point_index)
+                vertex_colors[point_index] = psk_vertex_color
+
+            for loop_index, loop in enumerate(mesh_data.loops):
+                vertex_color = vertex_colors[loop.vertex_index]
+                if vertex_color is not None:
+                    vertex_color_data.data[loop_index].color = vertex_color.normalized()
+                else:
+                    vertex_color_data.data[loop_index].color = 1.0, 1.0, 1.0, 1.0
+
+            if len(ambiguous_vertex_color_point_indices) > 0:
+                print(f'WARNING: {len(ambiguous_vertex_color_point_indices)} vertex(es) with ambiguous vertex colors.')
+
+        # # VERTEX NORMALS
+        if psk.has_vertex_normals:
+            mesh_data.polygons.foreach_set("use_smooth", [True] * len(mesh_data.polygons))
+            normals = []
+            for vertex_normal in psk.vertex_normals:
+                normals.append(tuple(vertex_normal))
+            mesh_data.normals_split_custom_set_from_vertices(normals)
+            mesh_data.use_auto_smooth = True
+
         bm.normal_update()
         bm.free()
-
-        # VERTEX WEIGHTS
 
         # Get a list of all bones that have weights associated with them.
         vertex_group_bone_indices = set(map(lambda weight: weight.bone_index, psk.weights))
@@ -169,7 +213,7 @@ class PskImportOperator(Operator, ImportHelper):
     bl_label = 'Export'
     __doc__ = 'Load a PSK file'
     filename_ext = '.psk'
-    filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
+    filter_glob: StringProperty(default='*.psk;*.pskx', options={'HIDDEN'})
     filepath: StringProperty(
         name='File Path',
         description='File path used for exporting the PSK file',
