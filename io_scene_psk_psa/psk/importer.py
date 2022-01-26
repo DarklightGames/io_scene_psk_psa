@@ -175,7 +175,7 @@ class PskImporter(object):
             if len(ambiguous_vertex_color_point_indices) > 0:
                 print(f'WARNING: {len(ambiguous_vertex_color_point_indices)} vertex(es) with ambiguous vertex colors.')
 
-        # # VERTEX NORMALS
+        # VERTEX NORMALS
         if psk.has_vertex_normals:
             mesh_data.polygons.foreach_set("use_smooth", [True] * len(mesh_data.polygons))
             normals = []
