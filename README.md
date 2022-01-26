@@ -1,4 +1,4 @@
-This Blender add-on allows you to import and export meshes and animations to the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats).
+This Blender add-on allows you to export and import meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats).
 
 # Installation
 1. Download the zip file for the latest version from the [releases](https://github.com/DarklightGames/io_export_psk_psa/releases) page.
