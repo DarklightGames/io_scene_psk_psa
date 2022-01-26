@@ -86,11 +86,11 @@ class Psk(object):
 
     @property
     def has_vertex_colors(self):
-        return len(self.vertex_colors)
+        return len(self.vertex_colors) > 0
 
     @property
     def has_vertex_normals(self):
-        return len(self.vertex_normals)
+        return len(self.vertex_normals) > 0
 
     def __init__(self):
         self.points: List[Vector3] = []
