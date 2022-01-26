@@ -16,7 +16,6 @@ class PsaImportOptions(object):
         self.should_use_fake_user = False
         self.should_stash = False
         self.sequence_names = []
-        self.action_name_prefix = ''
 
 
 class PsaImporter(object):
@@ -116,8 +115,7 @@ class PsaImporter(object):
         actions = []
         for sequence in sequences:
             # Add the action.
-            action_name = options.action_name_prefix + sequence.name.decode('windows-1252')
-            action = bpy.data.actions.new(name=action_name)
+            action = bpy.data.actions.new(name=sequence.name.decode())
             action.use_fake_user = options.should_use_fake_user
 
             # Create f-curves for the rotation and location of each bone.
@@ -244,7 +242,6 @@ class PsaImportPropertyGroup(bpy.types.PropertyGroup):
     should_clean_keys: BoolProperty(default=True, name='Clean Keyframes', description='Exclude unnecessary keyframes from being written to the actions.')
     should_use_fake_user: BoolProperty(default=True, name='Fake User', description='Assign each imported action a fake user so that the data block is saved even it has no users.')
     should_stash: BoolProperty(default=False, name='Stash', description='Stash each imported action as a strip on a new non-contributing NLA track')
-    action_name_prefix: StringProperty(default='', name='Action Name Prefix')
 
 
 class PSA_UL_ImportActionList(UIList):
@@ -352,13 +349,13 @@ class PSA_PT_ImportPanel(Panel):
             row.operator('psa_import.actions_select_all', text='All')
             row.operator('psa_import.actions_deselect_all', text='None')
 
-        col = layout.column(heading="Options")
-        col.use_property_split = True
-        col.use_property_decorate = False
-        col.prop(property_group, 'should_clean_keys')
-        col.prop(property_group, 'should_use_fake_user')
-        col.prop(property_group, 'should_stash')
-        col.prop(property_group, 'action_name_prefix')
+        row = layout.row()
+        row.prop(property_group, 'should_clean_keys')
+
+        # DATA
+        row = layout.row()
+        row.prop(property_group, 'should_use_fake_user')
+        row.prop(property_group, 'should_stash')
 
         layout.operator('psa_import.import', text=f'Import')
 
@@ -402,7 +399,6 @@ class PsaImportOperator(Operator):
         options.should_clean_keys = property_group.should_clean_keys
         options.should_use_fake_user = property_group.should_use_fake_user
         options.should_stash = property_group.should_stash
-        options.action_name_prefix = property_group.action_name_prefix
         PsaImporter().import_psa(psa_reader, context.view_layer.objects.active, options)
         self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
         return {'FINISHED'}
