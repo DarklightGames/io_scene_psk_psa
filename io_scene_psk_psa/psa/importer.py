@@ -235,7 +235,7 @@ def on_psa_file_path_updated(property, context):
         pass
 
 
-class PsaImportPropertyGroup(bpy.types.PropertyGroup):
+class PsaImportPropertyGroup(PropertyGroup):
     psa_file_path: StringProperty(default='', update=on_psa_file_path_updated, name='PSA File Path')
     psa_bones: CollectionProperty(type=PsaImportPsaBoneItem)
     action_list: CollectionProperty(type=PsaImportActionListItem)
