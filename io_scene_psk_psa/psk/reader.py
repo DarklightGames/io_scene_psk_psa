@@ -41,6 +41,14 @@ class PskReader(object):
                     PskReader.read_types(fp, Psk.Bone, section, psk.bones)
                 elif section.name == b'RAWWEIGHTS':
                     PskReader.read_types(fp, Psk.Weight, section, psk.weights)
+                elif section.name == b'FACE3200':
+                    PskReader.read_types(fp, Psk.Face32, section, psk.faces)
+                elif section.name == b'VERTEXCOLOR':
+                    PskReader.read_types(fp, Color, section, psk.vertex_colors)
+                elif section.name.startswith(b'EXTRAUVS'):
+                    PskReader.read_types(fp, Vector2, section, psk.extra_uvs)
+                elif section.name == b'VTXNORMS':
+                    PskReader.read_types(fp, Vector3, section, psk.vertex_normals)
                 else:
-                    raise RuntimeError(f'Unrecognized section "{section.name}"')
+                    raise RuntimeError(f'Unrecognized section "{section.name} at position {15:fp.tell()}"')
         return psk

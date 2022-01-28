@@ -41,6 +41,15 @@ class Psk(object):
             ('smoothing_groups', c_int32)
         ]
 
+    class Face32(Structure):
+        _pack_ = 1
+        _fields_ = [
+            ('wedge_indices', c_uint32 * 3),
+            ('material_index', c_uint8),
+            ('aux_material_index', c_uint8),
+            ('smoothing_groups', c_int32)
+        ]
+
     class Material(Structure):
         _fields_ = [
             ('name', c_char * 64),
@@ -71,6 +80,18 @@ class Psk(object):
             ('bone_index', c_int32),
         ]
 
+    @property
+    def has_extra_uvs(self):
+        return len(self.extra_uvs) > 0
+
+    @property
+    def has_vertex_colors(self):
+        return len(self.vertex_colors) > 0
+
+    @property
+    def has_vertex_normals(self):
+        return len(self.vertex_normals) > 0
+
     def __init__(self):
         self.points: List[Vector3] = []
         self.wedges: List[Psk.Wedge] = []
@@ -78,3 +99,6 @@ class Psk(object):
         self.materials: List[Psk.Material] = []
         self.weights: List[Psk.Weight] = []
         self.bones: List[Psk.Bone] = []
+        self.extra_uvs: List[Vector2] = []
+        self.vertex_colors: List[Color] = []
+        self.vertex_normals: List[Vector3] = []

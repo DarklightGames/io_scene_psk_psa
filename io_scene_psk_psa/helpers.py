@@ -1,6 +1,13 @@
 from typing import List
 
 
+def rgb_to_srgb(c):
+    if c > 0.0031308:
+        return 1.055 * (pow(c, (1.0 / 2.4))) - 0.055
+    else:
+        return 12.92 * c
+
+
 def populate_bone_group_list(armature_object, bone_group_list):
     bone_group_list.clear()
 

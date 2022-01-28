@@ -58,7 +58,7 @@ def psk_export_menu_func(self, context):
 
 
 def psk_import_menu_func(self, context):
-    self.layout.operator(psk_importer.PskImportOperator.bl_idname, text='Unreal PSK (.psk)')
+    self.layout.operator(psk_importer.PskImportOperator.bl_idname, text='Unreal PSK (.psk/.pskx)')
 
 
 def psa_export_menu_func(self, context):
@@ -72,6 +72,7 @@ def register():
     bpy.types.TOPBAR_MT_file_import.append(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.append(psa_export_menu_func)
     bpy.types.Scene.psa_import = PointerProperty(type=psa_importer.PsaImportPropertyGroup)
+    bpy.types.Scene.psk_import = PointerProperty(type=psk_importer.PskImportPropertyGroup)
     bpy.types.Scene.psa_export = PointerProperty(type=psa_exporter.PsaExportPropertyGroup)
     bpy.types.Scene.psk_export = PointerProperty(type=psk_exporter.PskExportPropertyGroup)
 
