@@ -228,18 +228,18 @@ class PskImporter(object):
 
 
 class PskImportPropertyGroup(PropertyGroup):
-    should_import_vertex_colors: BoolProperty(default=True, name='Vertex Colors')
+    should_import_vertex_colors: BoolProperty(default=True, name='Vertex Colors', description='Import vertex colors from PSKX files, if available')
     vertex_color_space: EnumProperty(
         name='Vertex Color Space',
-        description='',
+        description='The source vertex color space',
         default='SRGBA',
         items=(
             ('LINEAR', 'Linear', ''),
             ('SRGBA', 'sRGBA', ''),
         )
     )
-    should_import_vertex_normals: BoolProperty(default=True, name='Vertex Normals')
-    should_import_extra_uvs: BoolProperty(default=True, name='Extra UVs')
+    should_import_vertex_normals: BoolProperty(default=True, name='Vertex Normals', description='Import vertex normals from PSKX files, if available')
+    should_import_extra_uvs: BoolProperty(default=True, name='Extra UVs', description='Import extra UV maps from PSKX files, if available')
 
 
 class PskImportOperator(Operator, ImportHelper):
