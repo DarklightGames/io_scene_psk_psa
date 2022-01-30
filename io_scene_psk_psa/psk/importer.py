@@ -1,23 +1,35 @@
 import os
 import bpy
 import bmesh
+import numpy as np
+from math import inf
 from typing import Optional
 from .data import Psk
+from ..helpers import rgb_to_srgb
 from mathutils import Quaternion, Vector, Matrix
 from .reader import PskReader
-from bpy.props import StringProperty
-from bpy.types import Operator
+from bpy.props import StringProperty, EnumProperty, BoolProperty
+from bpy.types import Operator, PropertyGroup
 from bpy_extras.io_utils import ImportHelper
+
+
+class PskImportOptions(object):
+    def __init__(self):
+        self.name = ''
+        self.should_import_vertex_colors = True
+        self.vertex_color_space = 'sRGB'
+        self.should_import_vertex_normals = True
+        self.should_import_extra_uvs = True
 
 
 class PskImporter(object):
     def __init__(self):
         pass
 
-    def import_psk(self, psk: Psk, name: str, context):
+    def import_psk(self, psk: Psk, context, options: PskImportOptions):
         # ARMATURE
-        armature_data = bpy.data.armatures.new(name)
-        armature_object = bpy.data.objects.new(name, armature_data)
+        armature_data = bpy.data.armatures.new(options.name)
+        armature_object = bpy.data.objects.new(options.name, armature_data)
         armature_object.show_in_front = True
 
         context.scene.collection.objects.link(armature_object)
@@ -95,8 +107,8 @@ class PskImporter(object):
             edit_bone['post_quat'] = import_bone.local_rotation.conjugated()
 
         # MESH
-        mesh_data = bpy.data.meshes.new(name)
-        mesh_object = bpy.data.objects.new(name, mesh_data)
+        mesh_data = bpy.data.meshes.new(options.name)
+        mesh_object = bpy.data.objects.new(options.name, mesh_data)
 
         # MATERIALS
         for material in psk.materials:
@@ -120,7 +132,6 @@ class PskImporter(object):
                 bm_face.material_index = face.material_index
             except ValueError:
                 degenerate_face_indices.add(face_index)
-                pass
 
         if len(degenerate_face_indices) > 0:
             print(f'WARNING: Discarded {len(degenerate_face_indices)} degenerate face(s).')
@@ -129,7 +140,7 @@ class PskImporter(object):
 
         # TEXTURE COORDINATES
         data_index = 0
-        uv_layer = mesh_data.uv_layers.new()
+        uv_layer = mesh_data.uv_layers.new(name='VTXW0000')
         for face_index, face in enumerate(psk.faces):
             if face_index in degenerate_face_indices:
                 continue
@@ -138,10 +149,62 @@ class PskImporter(object):
                 uv_layer.data[data_index].uv = wedge.u, 1.0 - wedge.v
                 data_index += 1
 
+        # EXTRA UVS
+        if psk.has_extra_uvs and options.should_import_extra_uvs:
+            extra_uv_channel_count = int(len(psk.extra_uvs) / len(psk.wedges))
+            wedge_index_offset = 0
+            for extra_uv_index in range(extra_uv_channel_count):
+                data_index = 0
+                uv_layer = mesh_data.uv_layers.new(name=f'EXTRAUV{extra_uv_index}')
+                for face_index, face in enumerate(psk.faces):
+                    if face_index in degenerate_face_indices:
+                        continue
+                    for wedge_index in reversed(face.wedge_indices):
+                        u, v = psk.extra_uvs[wedge_index_offset + wedge_index]
+                        uv_layer.data[data_index].uv = u, 1.0 - v
+                        data_index += 1
+                wedge_index_offset += len(psk.wedges)
+
+        # VERTEX COLORS
+        if psk.has_vertex_colors and options.should_import_vertex_colors:
+            size = (len(psk.points), 4)
+            vertex_colors = np.full(size, inf)
+            vertex_color_data = mesh_data.vertex_colors.new(name='VERTEXCOLOR')
+            ambiguous_vertex_color_point_indices = []
+
+            for wedge_index, wedge in enumerate(psk.wedges):
+                point_index = wedge.point_index
+                psk_vertex_color = psk.vertex_colors[wedge_index].normalized()
+                if vertex_colors[point_index, 0] != inf and tuple(vertex_colors[point_index]) != psk_vertex_color:
+                    ambiguous_vertex_color_point_indices.append(point_index)
+                else:
+                    vertex_colors[point_index] = psk_vertex_color
+
+            if options.vertex_color_space == 'SRGBA':
+                for i in range(vertex_colors.shape[0]):
+                    vertex_colors[i, :3] = tuple(map(lambda x: rgb_to_srgb(x), vertex_colors[i, :3]))
+
+            for loop_index, loop in enumerate(mesh_data.loops):
+                vertex_color = vertex_colors[loop.vertex_index]
+                if vertex_color is not None:
+                    vertex_color_data.data[loop_index].color = vertex_color
+                else:
+                    vertex_color_data.data[loop_index].color = 1.0, 1.0, 1.0, 1.0
+
+            if len(ambiguous_vertex_color_point_indices) > 0:
+                print(f'WARNING: {len(ambiguous_vertex_color_point_indices)} vertex(es) with ambiguous vertex colors.')
+
+        # VERTEX NORMALS
+        if psk.has_vertex_normals and options.should_import_vertex_normals:
+            mesh_data.polygons.foreach_set("use_smooth", [True] * len(mesh_data.polygons))
+            normals = []
+            for vertex_normal in psk.vertex_normals:
+                normals.append(tuple(vertex_normal))
+            mesh_data.normals_split_custom_set_from_vertices(normals)
+            mesh_data.use_auto_smooth = True
+
         bm.normal_update()
         bm.free()
-
-        # VERTEX WEIGHTS
 
         # Get a list of all bones that have weights associated with them.
         vertex_group_bone_indices = set(map(lambda weight: weight.bone_index, psk.weights))
@@ -164,12 +227,27 @@ class PskImporter(object):
             pass
 
 
+class PskImportPropertyGroup(PropertyGroup):
+    should_import_vertex_colors: BoolProperty(default=True, name='Vertex Colors', description='Import vertex colors from PSKX files, if available')
+    vertex_color_space: EnumProperty(
+        name='Vertex Color Space',
+        description='The source vertex color space',
+        default='SRGBA',
+        items=(
+            ('LINEAR', 'Linear', ''),
+            ('SRGBA', 'sRGBA', ''),
+        )
+    )
+    should_import_vertex_normals: BoolProperty(default=True, name='Vertex Normals', description='Import vertex normals from PSKX files, if available')
+    should_import_extra_uvs: BoolProperty(default=True, name='Extra UVs', description='Import extra UV maps from PSKX files, if available')
+
+
 class PskImportOperator(Operator, ImportHelper):
     bl_idname = 'import.psk'
     bl_label = 'Export'
     __doc__ = 'Load a PSK file'
     filename_ext = '.psk'
-    filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
+    filter_glob: StringProperty(default='*.psk;*.pskx', options={'HIDDEN'})
     filepath: StringProperty(
         name='File Path',
         description='File path used for exporting the PSK file',
@@ -177,13 +255,29 @@ class PskImportOperator(Operator, ImportHelper):
         default='')
 
     def execute(self, context):
+        pg = context.scene.psk_import
         reader = PskReader()
         psk = reader.read(self.filepath)
-        name = os.path.splitext(os.path.basename(self.filepath))[0]
-        PskImporter().import_psk(psk, name, context)
+        options = PskImportOptions()
+        options.name = os.path.splitext(os.path.basename(self.filepath))[0]
+        options.vertex_color_space = pg.vertex_color_space
+        PskImporter().import_psk(psk, context, options)
         return {'FINISHED'}
+
+    def draw(self, context):
+        pg = context.scene.psk_import
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+        layout.prop(pg, 'should_import_vertex_normals')
+        layout.prop(pg, 'should_import_extra_uvs')
+        layout.prop(pg, 'should_import_vertex_colors')
+        if pg.should_import_vertex_colors:
+            layout.prop(pg, 'vertex_color_space')
+
 
 
 classes = (
     PskImportOperator,
+    PskImportPropertyGroup,
 )
