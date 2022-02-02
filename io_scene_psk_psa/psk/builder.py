@@ -91,7 +91,7 @@ class PskBuilder(object):
             print('root bones')
             print(root_bones)
             if len(root_bones) > 1:
-                root_bone_names = [x.name for x in bones]
+                root_bone_names = [x.name for x in root_bones]
                 raise RuntimeError('Exported bone hierarchy must have a single root bone.'
                                    f'The bone hierarchy marked for export has {len(root_bones)} root bones: {root_bone_names}')
 
