@@ -110,7 +110,6 @@ class PsaExportOperator(Operator, ExportHelper):
             item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
 
         if property_group.bone_filter_mode == 'BONE_GROUPS':
-            box = layout.box()
             row = box.row()
             rows = max(3, min(len(property_group.bone_group_list), 10))
             row.template_list('PSX_UL_BoneGroupList', '', property_group, 'bone_group_list', property_group, 'bone_group_list_index', rows=rows)

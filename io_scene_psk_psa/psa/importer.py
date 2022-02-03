@@ -249,10 +249,10 @@ class PSA_UL_ImportActionList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         row = layout.row(align=True)
         split = row.split(align=True, factor=0.75)
-        action_col = split.row(align=True)
-        action_col.alignment = 'LEFT'
-        action_col.prop(item, 'is_selected', icon_only=True)
-        action_col.label(text=item.action_name)
+        column = split.row(align=True)
+        column.alignment = 'LEFT'
+        column.prop(item, 'is_selected', icon_only=True)
+        column.label(text=item.action_name)
 
     def draw_filter(self, context, layout):
         row = layout.row()
