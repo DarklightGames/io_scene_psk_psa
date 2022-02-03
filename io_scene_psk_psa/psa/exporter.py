@@ -140,8 +140,7 @@ class PsaExportOperator(Operator, ExportHelper):
 
         if pg.bone_filter_mode == 'BONE_GROUPS':
             rows = max(3, min(len(pg.bone_group_list), 10))
-            layout.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg,
-                              'bone_group_list_index', rows=rows)
+            layout.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg, 'bone_group_list_index', rows=rows)
 
     def is_action_for_armature(self, action):
         if len(action.fcurves) == 0:

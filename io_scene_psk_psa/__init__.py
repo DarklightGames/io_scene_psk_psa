@@ -78,8 +78,10 @@ def register():
 
 
 def unregister():
-    del bpy.types.Scene.psa_export
     del bpy.types.Scene.psa_import
+    del bpy.types.Scene.psk_import
+    del bpy.types.Scene.psa_export
+    del bpy.types.Scene.psk_export
     bpy.types.TOPBAR_MT_file_export.remove(psk_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.remove(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.remove(psa_export_menu_func)
