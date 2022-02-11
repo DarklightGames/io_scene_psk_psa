@@ -293,10 +293,11 @@ class PSA_UL_ImportActionList(PSA_UL_SequenceList, UIList):
     pass
 
 
-class PsaImportSequencesSelectAll(bpy.types.Operator):
+class PsaImportSequencesSelectAll(Operator):
     bl_idname = 'psa_import.sequences_select_all'
     bl_label = 'All'
     bl_description = 'Select all sequences'
+    bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
@@ -312,10 +313,11 @@ class PsaImportSequencesSelectAll(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class PsaImportActionsSelectAll(bpy.types.Operator):
+class PsaImportActionsSelectAll(Operator):
     bl_idname = 'psa_import.actions_select_all'
     bl_label = 'All'
     bl_description = 'Select all actions'
+    bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
@@ -331,10 +333,11 @@ class PsaImportActionsSelectAll(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class PsaImportSequencesDeselectAll(bpy.types.Operator):
+class PsaImportSequencesDeselectAll(Operator):
     bl_idname = 'psa_import.sequences_deselect_all'
     bl_label = 'None'
     bl_description = 'Deselect all sequences'
+    bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
@@ -350,10 +353,11 @@ class PsaImportSequencesDeselectAll(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class PsaImportActionsDeselectAll(bpy.types.Operator):
+class PsaImportActionsDeselectAll(Operator):
     bl_idname = 'psa_import.actions_deselect_all'
     bl_label = 'None'
     bl_description = 'Deselect all actions'
+    bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
@@ -406,7 +410,7 @@ class PSA_PT_ImportPanel_PsaData(Panel):
         pg = context.scene.psa_import.psa
 
         layout.label(text=f'{len(pg.bones)} Bones', icon='BONE_DATA')
-        layout.label(text=f'{len(pg.sequence_count)} Sequences', icon='SEQUENCE')
+        layout.label(text=f'{pg.sequence_count} Sequences', icon='SEQUENCE')
 
 
 class PSA_PT_ImportPanel(Panel):
@@ -469,7 +473,7 @@ class PSA_PT_ImportPanel(Panel):
 class PsaImportFileReload(Operator):
     bl_idname = 'psa_import.file_reload'
     bl_label = 'Refresh'
-    bl_options = {'REGISTER'}
+    bl_options = {'INTERNAL'}
     bl_description = 'Refresh the PSA file'
 
     def execute(self, context):
@@ -480,7 +484,7 @@ class PsaImportFileReload(Operator):
 class PsaImportSelectFile(Operator):
     bl_idname = 'psa_import.select_file'
     bl_label = 'Select'
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'INTERNAL'}
     bl_description = 'Select a PSA file from which to import animations'
     filepath: bpy.props.StringProperty(subtype='FILE_PATH')
     filter_glob: bpy.props.StringProperty(default="*.psa", options={'HIDDEN'})
@@ -498,6 +502,7 @@ class PsaImportOperator(Operator):
     bl_idname = 'psa_import.import'
     bl_label = 'Import'
     bl_description = 'Import the selected animations into the scene as actions'
+    bl_options = {'INTERNAL', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -524,6 +529,7 @@ class PsaImportOperator(Operator):
 class PsaImportPushToActions(Operator):
     bl_idname = 'psa_import.push_to_actions'
     bl_label = 'Push to Actions'
+    bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
@@ -547,6 +553,7 @@ class PsaImportPushToActions(Operator):
 class PsaImportPopFromActions(Operator):
     bl_idname = 'psa_import.pop_from_actions'
     bl_label = 'Pop From Actions'
+    bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
@@ -570,6 +577,7 @@ class PsaImportPopFromActions(Operator):
 class PsaImportFileSelectOperator(Operator, ImportHelper):
     bl_idname = 'psa_import.file_select'
     bl_label = 'File Select'
+    bl_options = {'INTERNAL'}
     filename_ext = '.psa'
     filter_glob: StringProperty(default='*.psa', options={'HIDDEN'})
     filepath: StringProperty(

@@ -1,5 +1,5 @@
 import bpy
-from bpy.types import Operator, PropertyGroup, Action, UIList, BoneGroup, Panel
+from bpy.types import Operator, PropertyGroup, Action, UIList, BoneGroup, Panel, TimelineMarker
 from bpy.props import CollectionProperty, IntProperty, PointerProperty, StringProperty, BoolProperty, EnumProperty
 from bpy_extras.io_utils import ExportHelper
 from typing import Type
@@ -46,6 +46,16 @@ class PsaExportActionListItem(PropertyGroup):
         return self.action.name
 
 
+class PsaExportTimelineMarkerListItem(PropertyGroup):
+    marker_index: IntProperty()
+    marker_name: StringProperty()
+    is_selected: BoolProperty(default=True)
+
+    @property
+    def name(self):
+        return self.marker_name
+
+
 def update_action_names(context):
     pg = context.scene.psa_export
     for item in pg.action_list:
@@ -58,18 +68,28 @@ def should_use_original_sequence_names_updated(property, context):
 
 
 class PsaExportPropertyGroup(PropertyGroup):
+    sequence_source: EnumProperty(
+        name='Source',
+        description='',
+        items=(
+            ('ACTIONS', 'Actions', 'Sequences will be exported using actions'),
+            ('TIMELINE_MARKERS', 'Timeline Markers', 'Sequences will be exported using timeline markers'),
+        )
+    )
     action_list: CollectionProperty(type=PsaExportActionListItem)
     action_list_index: IntProperty(default=0)
+    marker_list: CollectionProperty(type=PsaExportTimelineMarkerListItem)
+    marker_list_index: IntProperty(default=0)
     bone_filter_mode: EnumProperty(
         name='Bone Filter',
         description='',
         items=(
             ('ALL', 'All', 'All bones will be exported.'),
-            ('BONE_GROUPS', 'Bone Groups', 'Only bones belonging to the selected bone groups and their ancestors will be exported.')
+            ('BONE_GROUPS', 'Bone Groups', 'Only bones belonging to the selected bone groups and their ancestors will be exported.'),
         )
     )
     bone_group_list: CollectionProperty(type=BoneGroupListItem)
-    bone_group_list_index: IntProperty(default=0)
+    bone_group_list_index: IntProperty(default=0, name='', description='')
     should_use_original_sequence_names: BoolProperty(default=False, name='Original Names', description='If the action was imported from the PSA Import panel, the original name of the sequence will be used instead of the Blender action name', update=should_use_original_sequence_names_updated)
 
 
@@ -84,6 +104,7 @@ def is_bone_filter_mode_item_available(context, identifier):
 class PsaExportOperator(Operator, ExportHelper):
     bl_idname = 'psa_export.operator'
     bl_label = 'Export'
+    bl_options = {'INTERNAL', 'UNDO'}
     __doc__ = 'Export actions to PSA'
     filename_ext = '.psa'
     filter_glob: StringProperty(default='*.psa', options={'HIDDEN'})
@@ -100,24 +121,34 @@ class PsaExportOperator(Operator, ExportHelper):
         layout = self.layout
         pg = context.scene.psa_export
 
-        # ACTIONS
-        layout.label(text='Actions', icon='ACTION')
-        row = layout.row(align=True)
-        row.label(text='Select')
-        row.operator(PsaExportSelectAll.bl_idname, text='All')
-        row.operator(PsaExportDeselectAll.bl_idname, text='None')
-        row = layout.row()
-        rows = max(3, min(len(pg.action_list), 10))
-        row.template_list('PSA_UL_ExportActionList', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
+        # SOURCE
+        layout.prop(pg, 'sequence_source', text='Source')
 
-        col = layout.column(heading="Options")
-        col.use_property_split = True
-        col.use_property_decorate = False
-        col.prop(pg, 'should_use_original_sequence_names')
+        # ACTIONS
+        if pg.sequence_source == 'ACTIONS':
+            layout.label(text='Actions', icon='ACTION')
+            row = layout.row(align=True)
+            row.label(text='Select')
+            row.operator(PsaExportSelectAll.bl_idname, text='All')
+            row.operator(PsaExportDeselectAll.bl_idname, text='None')
+            row = layout.row()
+            rows = max(3, min(len(pg.action_list), 10))
+            row.template_list('PSA_UL_ExportActionList', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
+
+            col = layout.column(heading="Options")
+            col.use_property_split = True
+            col.use_property_decorate = False
+            col.prop(pg, 'should_use_original_sequence_names')
+        elif pg.sequence_source == 'TIMELINE_MARKERS':
+            layout.label(text='Markers', icon='MARKER')
+
+            row = layout.row()
+            rows = max(3, min(len(pg.marker_list), 10))
+            row.template_list('PSA_UL_ExportTimelineMarkerList', '', pg, 'marker_list', pg, 'marker_list_index', rows=rows)
 
         # Determine if there is going to be a naming conflict and display an error, if so.
-        selected_actions = [x for x in pg.action_list if x.is_selected]
-        action_names = [x.action_name for x in selected_actions]
+        selected_items = [x for x in pg.action_list if x.is_selected]
+        action_names = [x.action_name for x in selected_items]
         action_name_counts = Counter(action_names)
         for action_name, count in action_name_counts.items():
             if count > 1:
@@ -180,9 +211,15 @@ class PsaExportOperator(Operator, ExportHelper):
 
         update_action_names(context)
 
-        if len(pg.action_list) == 0:
+        # Populate timeline markers list.
+        pg.marker_list.clear()
+        for marker in context.scene.timeline_markers:
+            item = pg.marker_list.add()
+            item.marker_name = marker.name
+
+        if len(pg.action_list) == 0 and len(pg.marker_names) == 0:
             # If there are no actions at all, we have nothing to export, so just cancel the operation.
-            self.report({'ERROR_INVALID_CONTEXT'}, 'There are no actions to export.')
+            self.report({'ERROR_INVALID_CONTEXT'}, 'There are no actions or timeline markers to export.')
             return {'CANCELLED'}
 
         # Populate bone groups list.
@@ -194,26 +231,49 @@ class PsaExportOperator(Operator, ExportHelper):
 
     def execute(self, context):
         pg = context.scene.psa_export
-        actions = [x.action for x in pg.action_list if x.is_selected]
 
-        if len(actions) == 0:
-            self.report({'ERROR_INVALID_CONTEXT'}, 'No actions were selected for export.')
-            return {'CANCELLED'}
+        actions = [x.action for x in pg.action_list if x.is_selected]
+        marker_names = [x.marker_name for x in pg.marker_list if x.is_selected]
 
         options = PsaBuilderOptions()
+        options.sequence_source = pg.sequence_source
         options.actions = actions
+        options.marker_names = marker_names
         options.bone_filter_mode = pg.bone_filter_mode
         options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
         options.should_use_original_sequence_names = pg.should_use_original_sequence_names
         builder = PsaBuilder()
+
         try:
             psa = builder.build(context, options)
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
+
         exporter = PsaExporter(psa)
         exporter.export(self.filepath)
         return {'FINISHED'}
+
+
+class PSA_UL_ExportTimelineMarkerList(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        layout.alignment = 'LEFT'
+        layout.prop(item, 'is_selected', icon_only=True)
+        layout.label(text=item.marker_name)
+
+    def filter_items(self, context, data, property):
+        actions = getattr(data, property)
+        flt_flags = []
+        flt_neworder = []
+        if self.filter_name:
+            flt_flags = bpy.types.UI_UL_list.filter_items_by_name(
+                self.filter_name,
+                self.bitflag_filter_item,
+                actions,
+                'marker_name',
+                reverse=self.use_filter_invert
+            )
+        return flt_flags, flt_neworder
 
 
 class PSA_UL_ExportActionList(UIList):
@@ -237,17 +297,18 @@ class PSA_UL_ExportActionList(UIList):
         return flt_flags, flt_neworder
 
 
-class PsaExportSelectAll(bpy.types.Operator):
+class PsaExportSelectAll(Operator):
     bl_idname = 'psa_export.actions_select_all'
     bl_label = 'Select All'
     bl_description = 'Select all actions'
+    bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
         pg = context.scene.psa_export
-        action_list = pg.action_list
-        has_unselected_actions = any(map(lambda action: not action.is_selected, action_list))
-        return len(action_list) > 0 and has_unselected_actions
+        item_list = pg.action_list
+        has_unselected_actions = any(map(lambda action: not action.is_selected, item_list))
+        return len(item_list) > 0 and has_unselected_actions
 
     def execute(self, context):
         pg = context.scene.psa_export
@@ -256,17 +317,18 @@ class PsaExportSelectAll(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class PsaExportDeselectAll(bpy.types.Operator):
+class PsaExportDeselectAll(Operator):
     bl_idname = 'psa_export.actions_deselect_all'
     bl_label = 'Deselect All'
     bl_description = 'Deselect all actions'
+    bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
         pg = context.scene.psa_export
-        action_list = pg.action_list
-        has_selected_actions = any(map(lambda action: action.is_selected, action_list))
-        return len(action_list) > 0 and has_selected_actions
+        item_list = pg.action_list
+        has_selected_actions = any(map(lambda action: action.is_selected, item_list))
+        return len(item_list) > 0 and has_selected_actions
 
     def execute(self, context):
         pg = context.scene.psa_export
@@ -277,9 +339,11 @@ class PsaExportDeselectAll(bpy.types.Operator):
 
 classes = (
     PsaExportActionListItem,
+    PsaExportTimelineMarkerListItem,
     PsaExportPropertyGroup,
     PsaExportOperator,
     PSA_UL_ExportActionList,
+    PSA_UL_ExportTimelineMarkerList,
     PsaExportSelectAll,
     PsaExportDeselectAll,
 )

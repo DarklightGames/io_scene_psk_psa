@@ -245,6 +245,7 @@ class PskImportPropertyGroup(PropertyGroup):
 class PskImportOperator(Operator, ImportHelper):
     bl_idname = 'import.psk'
     bl_label = 'Export'
+    bl_options = {'INTERNAL', 'UNDO'}
     __doc__ = 'Load a PSK file'
     filename_ext = '.psk'
     filter_glob: StringProperty(default='*.psk;*.pskx', options={'HIDDEN'})
@@ -274,7 +275,6 @@ class PskImportOperator(Operator, ImportHelper):
         layout.prop(pg, 'should_import_vertex_colors')
         if pg.should_import_vertex_colors:
             layout.prop(pg, 'vertex_color_space')
-
 
 
 classes = (

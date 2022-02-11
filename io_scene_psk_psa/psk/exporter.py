@@ -73,6 +73,7 @@ def is_bone_filter_mode_item_available(context, identifier):
 class PskExportOperator(Operator, ExportHelper):
     bl_idname = 'export.psk'
     bl_label = 'Export'
+    bl_options = {'INTERNAL', 'UNDO'}
     __doc__ = 'Export mesh and armature to PSK'
     filename_ext = '.psk'
     filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})

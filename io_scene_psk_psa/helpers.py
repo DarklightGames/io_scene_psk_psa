@@ -1,4 +1,6 @@
+from bpy.types import NlaStrip
 from typing import List
+from collections import Counter
 
 
 def rgb_to_srgb(c):
@@ -8,19 +10,45 @@ def rgb_to_srgb(c):
         return 12.92 * c
 
 
+def get_nla_strips_ending_at_frame(object, frame) -> List[NlaStrip]:
+    if object is None or object.animation_data is None:
+        return []
+    strips = []
+    for nla_track in object.animation_data.nla_tracks:
+        for strip in nla_track.strips:
+            if strip.frame_end == frame:
+                strips.append(strip)
+    return strips
+
+
+def get_nla_strips_in_timeframe(object, frame_min, frame_max) -> List[NlaStrip]:
+    if object is None or object.animation_data is None:
+        return []
+    strips = []
+    for nla_track in object.animation_data.nla_tracks:
+        for strip in nla_track.strips:
+            if strip.frame_end >= frame_min and strip.frame_start <= frame_max:
+                strips.append(strip)
+    return strips
+
+
 def populate_bone_group_list(armature_object, bone_group_list):
     bone_group_list.clear()
 
-    item = bone_group_list.add()
-    item.name = '(unassigned)'
-    item.index = -1
-    item.is_selected = True
-
     if armature_object and armature_object.pose:
+        bone_group_counts = Counter(map(lambda x: x.bone_group, armature_object.pose.bones))
+
+        item = bone_group_list.add()
+        item.name = 'Unassigned'
+        item.index = -1
+        item.count = 0 if None not in bone_group_counts else bone_group_counts[None]
+        item.is_selected = True
+
         for bone_group_index, bone_group in enumerate(armature_object.pose.bone_groups):
             item = bone_group_list.add()
             item.name = bone_group.name
             item.index = bone_group_index
+            item.count = 0 if bone_group not in bone_group_counts else bone_group_counts[bone_group]
             item.is_selected = True
 
 

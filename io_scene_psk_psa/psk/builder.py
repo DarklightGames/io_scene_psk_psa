@@ -70,7 +70,7 @@ class PskBuilder(object):
             # If the mesh has no armature object, simply assign it a dummy bone at the root to satisfy the requirement
             # that a PSK file must have at least one bone.
             psk_bone = Psk.Bone()
-            psk_bone.name = bytes('static', encoding='utf-8')
+            psk_bone.name = bytes('static', encoding='windows-1252')
             psk_bone.flags = 0
             psk_bone.children_count = 0
             psk_bone.parent_index = 0
@@ -88,8 +88,6 @@ class PskBuilder(object):
 
             # Ensure that the exported hierarchy has a single root bone.
             root_bones = [x for x in bones if x.parent is None]
-            print('root bones')
-            print(root_bones)
             if len(root_bones) > 1:
                 root_bone_names = [x.name for x in root_bones]
                 raise RuntimeError('Exported bone hierarchy must have a single root bone.'
@@ -97,7 +95,7 @@ class PskBuilder(object):
 
             for bone in bones:
                 psk_bone = Psk.Bone()
-                psk_bone.name = bytes(bone.name, encoding='utf-8')
+                psk_bone.name = bytes(bone.name, encoding='windows-1252')
                 psk_bone.flags = 0
                 psk_bone.children_count = 0
 
@@ -133,9 +131,9 @@ class PskBuilder(object):
 
                 psk.bones.append(psk_bone)
 
-        vertex_offset = 0
-
         for object in input_objects.mesh_objects:
+            vertex_offset = len(psk.points)
+
             # VERTICES
             for vertex in object.data.vertices:
                 point = Vector3()
@@ -153,8 +151,10 @@ class PskBuilder(object):
                 if m is None:
                     raise RuntimeError('Material cannot be empty (index ' + str(i) + ')')
                 if m.name in materials:
+                    # Material already evaluated, just get its index.
                     material_index = list(materials.keys()).index(m.name)
                 else:
+                    # New material.
                     material = Psk.Material()
                     material.name = bytes(m.name, encoding='utf-8')
                     material.texture_index = len(psk.materials)
@@ -230,9 +230,9 @@ class PskBuilder(object):
                                     bone = bone.parent
                 for vertex_group_index, vertex_group in enumerate(object.vertex_groups):
                     if vertex_group_index not in vertex_group_bone_indices:
+                        # Vertex group has no associated bone, skip it.
                         continue
                     bone_index = vertex_group_bone_indices[vertex_group_index]
-                    # TODO: exclude vertex group if it doesn't match to a bone we are exporting
                     for vertex_index in range(len(object.data.vertices)):
                         try:
                             weight = vertex_group.weight(vertex_index)
@@ -245,7 +245,5 @@ class PskBuilder(object):
                         w.point_index = vertex_offset + vertex_index
                         w.weight = weight
                         psk.weights.append(w)
-
-            vertex_offset = len(psk.points)
 
         return psk
