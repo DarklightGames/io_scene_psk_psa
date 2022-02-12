@@ -125,6 +125,7 @@ class PskExportOperator(Operator, ExportHelper):
         pg = context.scene.psk_export
         builder = PskBuilder()
         options = PskBuilderOptions()
+        options.bone_filter_mode = pg.bone_filter_mode
         options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
         try:
             psk = builder.build(context, options)

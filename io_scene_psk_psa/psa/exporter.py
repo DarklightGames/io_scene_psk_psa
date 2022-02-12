@@ -129,8 +129,8 @@ class PsaExportOperator(Operator, ExportHelper):
             layout.label(text='Actions', icon='ACTION')
             row = layout.row(align=True)
             row.label(text='Select')
-            row.operator(PsaExportSelectAll.bl_idname, text='All')
-            row.operator(PsaExportDeselectAll.bl_idname, text='None')
+            row.operator(PsaExportActionsSelectAll.bl_idname, text='All')
+            row.operator(PsaExportActionsDeselectAll.bl_idname, text='None')
             row = layout.row()
             rows = max(3, min(len(pg.action_list), 10))
             row.template_list('PSA_UL_ExportActionList', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
@@ -172,6 +172,10 @@ class PsaExportOperator(Operator, ExportHelper):
         if pg.bone_filter_mode == 'BONE_GROUPS':
             rows = max(3, min(len(pg.bone_group_list), 10))
             layout.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg, 'bone_group_list_index', rows=rows)
+            row = layout.row(align=True)
+            row.label(text='Select')
+            row.operator(PsaExportBoneGroupsSelectAll.bl_idname, text='All')
+            row.operator(PsaExportBoneGroupsDeselectAll.bl_idname, text='None')
 
     def is_action_for_armature(self, action):
         if len(action.fcurves) == 0:
@@ -297,7 +301,7 @@ class PSA_UL_ExportActionList(UIList):
         return flt_flags, flt_neworder
 
 
-class PsaExportSelectAll(Operator):
+class PsaExportActionsSelectAll(Operator):
     bl_idname = 'psa_export.actions_select_all'
     bl_label = 'Select All'
     bl_description = 'Select all actions'
@@ -307,17 +311,17 @@ class PsaExportSelectAll(Operator):
     def poll(cls, context):
         pg = context.scene.psa_export
         item_list = pg.action_list
-        has_unselected_actions = any(map(lambda action: not action.is_selected, item_list))
-        return len(item_list) > 0 and has_unselected_actions
+        has_unselected_items = any(map(lambda item: not item.is_selected, item_list))
+        return len(item_list) > 0 and has_unselected_items
 
     def execute(self, context):
         pg = context.scene.psa_export
-        for action in pg.action_list:
-            action.is_selected = True
+        for item in pg.action_list:
+            item.is_selected = True
         return {'FINISHED'}
 
 
-class PsaExportDeselectAll(Operator):
+class PsaExportActionsDeselectAll(Operator):
     bl_idname = 'psa_export.actions_deselect_all'
     bl_label = 'Deselect All'
     bl_description = 'Deselect all actions'
@@ -327,12 +331,52 @@ class PsaExportDeselectAll(Operator):
     def poll(cls, context):
         pg = context.scene.psa_export
         item_list = pg.action_list
+        has_selected_items = any(map(lambda item: item.is_selected, item_list))
+        return len(item_list) > 0 and has_selected_items
+
+    def execute(self, context):
+        pg = context.scene.psa_export
+        for item in pg.action_list:
+            item.is_selected = False
+        return {'FINISHED'}
+
+
+class PsaExportBoneGroupsSelectAll(Operator):
+    bl_idname = 'psa_export.bone_groups_select_all'
+    bl_label = 'Select All'
+    bl_description = 'Select all bone groups'
+    bl_options = {'INTERNAL'}
+
+    @classmethod
+    def poll(cls, context):
+        pg = context.scene.psa_export
+        item_list = pg.bone_group_list
+        has_unselected_items = any(map(lambda action: not action.is_selected, item_list))
+        return len(item_list) > 0 and has_unselected_items
+
+    def execute(self, context):
+        pg = context.scene.psa_export
+        for item in pg.bone_group_list:
+            item.is_selected = True
+        return {'FINISHED'}
+
+
+class PsaExportBoneGroupsDeselectAll(Operator):
+    bl_idname = 'psa_export.bone_groups_deselect_all'
+    bl_label = 'Deselect All'
+    bl_description = 'Deselect all bone groups'
+    bl_options = {'INTERNAL'}
+
+    @classmethod
+    def poll(cls, context):
+        pg = context.scene.psa_export
+        item_list = pg.bone_group_list
         has_selected_actions = any(map(lambda action: action.is_selected, item_list))
         return len(item_list) > 0 and has_selected_actions
 
     def execute(self, context):
         pg = context.scene.psa_export
-        for action in pg.action_list:
+        for action in pg.bone_group_list:
             action.is_selected = False
         return {'FINISHED'}
 
@@ -344,6 +388,8 @@ classes = (
     PsaExportOperator,
     PSA_UL_ExportActionList,
     PSA_UL_ExportTimelineMarkerList,
-    PsaExportSelectAll,
-    PsaExportDeselectAll,
+    PsaExportActionsSelectAll,
+    PsaExportActionsDeselectAll,
+    PsaExportBoneGroupsSelectAll,
+    PsaExportBoneGroupsDeselectAll,
 )

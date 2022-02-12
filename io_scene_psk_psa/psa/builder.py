@@ -44,55 +44,45 @@ class PsaBuilder(object):
         # armature bones.
         bone_names = [x.name for x in bones]
         pose_bones = [(bone_names.index(bone.name), bone) for bone in armature.pose.bones]
-        del bone_names
         pose_bones.sort(key=lambda x: x[0])
         pose_bones = [x[1] for x in pose_bones]
 
-        bone_indices = list(range(len(bones)))
-
-        # If bone groups are specified, get only the bones that are in that specified bone groups and their ancestors.
-        if options.bone_filter_mode == 'BONE_GROUPS':
-            bone_indices = get_export_bone_indices_for_bone_groups(armature, options.bone_group_indices)
+        # Get a list of all the bone indices and instigator bones for the bone filter settings.
+        bone_names = get_export_bone_names(armature, options.bone_filter_mode, options.bone_group_indices)
+        bone_indices = [bone_names.index(x) for x in bone_names]
 
         # Make the bone lists contain only the bones that are going to be exported.
         bones = [bones[bone_index] for bone_index in bone_indices]
         pose_bones = [pose_bones[bone_index] for bone_index in bone_indices]
 
+        # No bones are going to be exported.
         if len(bones) == 0:
-            # No bones are going to be exported.
             raise RuntimeError('No bones available for export')
 
-        # Ensure that the exported hierarchy has a single root bone.
-        root_bones = [x for x in bones if x.parent is None]
-        if len(root_bones) > 1:
-            root_bone_names = [x.name for x in root_bones]
-            raise RuntimeError('Exported bone hierarchy must have a single root bone.'
-                               f'The bone hierarchy marked for export has {len(root_bones)} root bones: {root_bone_names}')
-
         # Build list of PSA bones.
-        for pose_bone in bones:
+        for bone in bones:
             psa_bone = Psa.Bone()
-            psa_bone.name = bytes(pose_bone.name, encoding='utf-8')
+            psa_bone.name = bytes(bone.name, encoding='utf-8')
 
             try:
-                parent_index = bones.index(pose_bone.parent)
+                parent_index = bones.index(bone.parent)
                 psa_bone.parent_index = parent_index
                 psa.bones[parent_index].children_count += 1
             except ValueError:
                 psa_bone.parent_index = -1
 
-            if pose_bone.parent is not None:
-                rotation = pose_bone.matrix.to_quaternion()
+            if bone.parent is not None:
+                rotation = bone.matrix.to_quaternion()
                 rotation.x = -rotation.x
                 rotation.y = -rotation.y
                 rotation.z = -rotation.z
-                quat_parent = pose_bone.parent.matrix.to_quaternion().inverted()
-                parent_head = quat_parent @ pose_bone.parent.head
-                parent_tail = quat_parent @ pose_bone.parent.tail
-                location = (parent_tail - parent_head) + pose_bone.head
+                quat_parent = bone.parent.matrix.to_quaternion().inverted()
+                parent_head = quat_parent @ bone.parent.head
+                parent_tail = quat_parent @ bone.parent.tail
+                location = (parent_tail - parent_head) + bone.head
             else:
-                location = armature.matrix_local @ pose_bone.head
-                rot_matrix = pose_bone.matrix @ armature.matrix_local.to_3x3()
+                location = armature.matrix_local @ bone.head
+                rot_matrix = bone.matrix @ armature.matrix_local.to_3x3()
                 rotation = rot_matrix.to_quaternion()
 
             psa_bone.location.x = location.x
@@ -195,8 +185,8 @@ class PsaBuilder(object):
 
                     psa.keys.append(key)
 
-                export_sequence.bone_count = len(pose_bones)
-                export_sequence.track_time = frame_count
+                psa_sequence.bone_count = len(pose_bones)
+                psa_sequence.track_time = frame_count
 
             # Restore the mute state of the NLA strips we muted beforehand.
             for nla_strip, mute in nla_strip_mute_statuses.items():

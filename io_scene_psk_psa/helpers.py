@@ -1,5 +1,5 @@
 from bpy.types import NlaStrip
-from typing import List
+from typing import List, Tuple, Optional
 from collections import Counter
 
 
@@ -59,13 +59,14 @@ def get_psa_sequence_name(action, should_use_original_sequence_name):
         return action.name
 
 
-def get_export_bone_indices_for_bone_groups(armature_object, bone_group_indices: List[int]) -> List[int]:
+def get_export_bone_names(armature_object, bone_filter_mode, bone_group_indices: List[int]) -> List[str]:
     """
-    Returns a sorted list of bone indices that should be exported for the given bone groups.
+    Returns a sorted list of bone indices that should be exported for the given bone filter mode and bone groups.
 
     Note that the ancestors of bones within the bone groups will also be present in the returned list.
 
     :param armature_object: Blender object with type 'ARMATURE'
+    :param bone_filter_mode: One of ['ALL', 'BONE_GROUPS']
     :param bone_group_indices: List of bone group indices to be exported.
     :return: A sorted list of bone indices that should be exported.
     """
@@ -76,24 +77,58 @@ def get_export_bone_indices_for_bone_groups(armature_object, bone_group_indices:
     pose_bones = armature_object.pose.bones
     bone_names = [x.name for x in bones]
 
-    # Get a list of the bone indices that are explicitly part of the bone groups we are including.
+    # Get a list of the bone indices that we are explicitly including.
     bone_index_stack = []
     is_exporting_none_bone_groups = -1 in bone_group_indices
     for bone_index, pose_bone in enumerate(pose_bones):
-        if (pose_bone.bone_group is None and is_exporting_none_bone_groups) or \
+        if bone_filter_mode == 'ALL' or \
+                (pose_bone.bone_group is None and is_exporting_none_bone_groups) or \
                 (pose_bone.bone_group is not None and pose_bone.bone_group_index in bone_group_indices):
-            bone_index_stack.append(bone_index)
+            bone_index_stack.append((bone_index, None))
 
     # For each bone that is explicitly being added, recursively walk up the hierarchy and ensure that all of
     # those ancestor bone indices are also in the list.
-    bone_indices = set()
+    bone_indices = dict()
     while len(bone_index_stack) > 0:
-        bone_index = bone_index_stack.pop()
+        bone_index, instigator_bone_index = bone_index_stack.pop()
         bone = bones[bone_index]
         if bone.parent is not None:
             parent_bone_index = bone_names.index(bone.parent.name)
             if parent_bone_index not in bone_indices:
-                bone_index_stack.append(parent_bone_index)
-        bone_indices.add(bone_index)
+                bone_index_stack.append((parent_bone_index, bone_index))
+        bone_indices[bone_index] = instigator_bone_index
 
-    return list(sorted(list(bone_indices)))
+    # Sort the bone index list in-place.
+    bone_indices = [(x[0], x[1]) for x in bone_indices.items()]
+    bone_indices.sort(key=lambda x: x[0])
+
+    # Split out the bone indices and the instigator bone names into separate lists.
+    # We use the bone names for the return values because the bone name is a more universal way of referencing them.
+    # For example, users of this function may modify bone lists, which would invalidate the indices and require a
+    # index mapping scheme to resolve it. Using strings is more comfy and results in less code downstream.
+    instigator_bone_names = [bones[x[1]].name if x[1] is not None else None for x in bone_indices]
+    bone_names = [bones[x[0]].name for x in bone_indices]
+
+    # Ensure that the hierarchy we are sending back has a single root bone.
+    bone_indices = [x[0] for x in bone_indices]
+    root_bones = [bones[bone_index] for bone_index in bone_indices if bones[bone_index].parent is None]
+    if len(root_bones) > 1:
+        # There is more than one root bone.
+        # Print out why each root bone was included by linking it to one of the explicitly included bones.
+        root_bone_names = [bone.name for bone in root_bones]
+        for root_bone_name in root_bone_names:
+            bone_name = root_bone_name
+            while True:
+                # Traverse the instigator chain until the end to find the true instigator bone.
+                # TODO: in future, it would be preferential to have a readout of *all* instigator bones.
+                instigator_bone_name = instigator_bone_names[bone_names.index(bone_name)]
+                if instigator_bone_name is None:
+                    print(f'Root bone "{root_bone_name}" was included because {bone_name} was marked for export')
+                    break
+                bone_name = instigator_bone_name
+
+        raise RuntimeError('Exported bone hierarchy must have a single root bone.\n'
+                           f'The bone hierarchy marked for export has {len(root_bones)} root bones: {root_bone_names}.\n'
+                           f'Additional debugging information has been written to the console.')
+
+    return bone_names

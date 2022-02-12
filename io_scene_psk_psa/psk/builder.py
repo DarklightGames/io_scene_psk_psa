@@ -78,20 +78,8 @@ class PskBuilder(object):
             psk_bone.rotation = Quaternion(0, 0, 0, 1)
             psk.bones.append(psk_bone)
         else:
-            bones = list(armature_object.data.bones)
-
-            # If we are filtering by bone groups, get only the bones that are in the specified bone groups and their
-            # ancestors.
-            if options.bone_filter_mode == 'BONE_GROUPS':
-                bone_indices = get_export_bone_indices_for_bone_groups(armature_object, options.bone_group_indices)
-                bones = [bones[bone_index] for bone_index in bone_indices]
-
-            # Ensure that the exported hierarchy has a single root bone.
-            root_bones = [x for x in bones if x.parent is None]
-            if len(root_bones) > 1:
-                root_bone_names = [x.name for x in root_bones]
-                raise RuntimeError('Exported bone hierarchy must have a single root bone.'
-                                   f'The bone hierarchy marked for export has {len(root_bones)} root bones: {root_bone_names}')
+            bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_group_indices)
+            bones = [armature_object.data.bones[bone_name] for bone_name in bone_names]
 
             for bone in bones:
                 psk_bone = Psk.Bone()
