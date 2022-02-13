@@ -119,6 +119,7 @@ class PsaBuilder(object):
             pass
         elif options.sequence_source == 'TIMELINE_MARKERS':
             sequence_frame_ranges = self.get_timeline_marker_sequence_frame_ranges(armature, context, options)
+
             for name, (frame_min, frame_max) in sequence_frame_ranges.items():
                 export_sequence = ExportSequence()
                 export_sequence.action = None
@@ -142,9 +143,10 @@ class PsaBuilder(object):
 
             frame_min = export_sequence.frame_min
             frame_max = export_sequence.frame_max
+            frame_count = frame_max - frame_min + 1
 
             psa_sequence.name = bytes(export_sequence.name, encoding='windows-1252')
-            psa_sequence.frame_count = frame_max - frame_min + 1
+            psa_sequence.frame_count = frame_count
             psa_sequence.frame_start_index = frame_start_index
             psa_sequence.fps = context.scene.render.fps
 

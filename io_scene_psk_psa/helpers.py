@@ -27,7 +27,9 @@ def get_nla_strips_in_timeframe(object, frame_min, frame_max) -> List[NlaStrip]:
     strips = []
     for nla_track in object.animation_data.nla_tracks:
         for strip in nla_track.strips:
-            if strip.frame_start >= frame_min and strip.frame_end <= frame_max:
+            if (strip.frame_start < frame_min and strip.frame_end > frame_max) or \
+                    (frame_min <= strip.frame_start < frame_max) or \
+                    (frame_min < strip.frame_end <= frame_max):
                 strips.append(strip)
     return strips
 
