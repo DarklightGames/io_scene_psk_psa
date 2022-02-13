@@ -103,7 +103,6 @@ class PsaBuilder(object):
                 self.frame_min = 0
                 self.frame_max = 0
                 self.action = None
-                self.nla_strips_to_be_muted = []
 
         export_sequences = []
 
@@ -126,7 +125,6 @@ class PsaBuilder(object):
                 export_sequence.name = name
                 export_sequence.frame_min = frame_min
                 export_sequence.frame_max = frame_max
-                export_sequence.nla_strips_to_be_muted = get_nla_strips_ending_at_frame(armature, frame_min)
                 export_sequences.append(export_sequence)
         else:
             raise ValueError(f'Unhandled sequence source: {options.sequence_source}')
@@ -151,11 +149,6 @@ class PsaBuilder(object):
             psa_sequence.fps = context.scene.render.fps
 
             frame_count = frame_max - frame_min + 1
-
-            # Store the mute state of the NLA strips we need to mute so we can restore the state after we are done.
-            nla_strip_mute_statuses = {x: x.mute for x in export_sequence.nla_strips_to_be_muted}
-            for nla_strip in export_sequence.nla_strips_to_be_muted:
-                nla_strip.mute = True
 
             for frame in range(frame_count):
                 context.scene.frame_set(frame_min + frame)
@@ -189,10 +182,6 @@ class PsaBuilder(object):
 
                 psa_sequence.bone_count = len(pose_bones)
                 psa_sequence.track_time = frame_count
-
-            # Restore the mute state of the NLA strips we muted beforehand.
-            for nla_strip, mute in nla_strip_mute_statuses.items():
-                nla_strip.mute = mute
 
             frame_start_index += frame_count
 
