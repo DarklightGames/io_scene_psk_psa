@@ -12,6 +12,8 @@ class PsaBuilderOptions(object):
         self.bone_group_indices = []
         self.should_use_original_sequence_names = False
         self.should_trim_timeline_marker_sequences = True
+        self.sequence_name_prefix = ''
+        self.sequence_name_suffix = ''
 
 
 class PsaBuilder(object):
@@ -129,10 +131,14 @@ class PsaBuilder(object):
         else:
             raise ValueError(f'Unhandled sequence source: {options.sequence_source}')
 
-        frame_start_index = 0
+        # Add prefixes and suffices to the names of the export sequences and strip whitespace.
+        for export_sequence in export_sequences:
+            export_sequence.name = f'{options.sequence_name_prefix}{export_sequence.name}{options.sequence_name_suffix}'.strip()
 
         # Now build the PSA sequences.
         # We actually alter the timeline frame and simply record the resultant pose bone matrices.
+        frame_start_index = 0
+
         for export_sequence in export_sequences:
             armature.animation_data.action = export_sequence.action
             context.view_layer.update()

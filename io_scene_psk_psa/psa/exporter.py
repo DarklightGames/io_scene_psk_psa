@@ -91,6 +91,9 @@ class PsaExportPropertyGroup(PropertyGroup):
     bone_group_list: CollectionProperty(type=BoneGroupListItem)
     bone_group_list_index: IntProperty(default=0, name='', description='')
     should_use_original_sequence_names: BoolProperty(default=False, name='Original Names', description='If the action was imported from the PSA Import panel, the original name of the sequence will be used instead of the Blender action name', update=should_use_original_sequence_names_updated)
+    should_trim_timeline_marker_sequences: BoolProperty(default=True, name='Trim Sequences', description='Frames without NLA track information at the boundaries of timeline markers will be excluded from the exported sequences')
+    sequence_name_prefix: StringProperty(name='Prefix')
+    sequence_name_suffix: StringProperty(name='Suffix')
 
 
 def is_bone_filter_mode_item_available(context, identifier):
@@ -122,29 +125,36 @@ class PsaExportOperator(Operator, ExportHelper):
         pg = context.scene.psa_export
 
         # SOURCE
-        layout.prop(pg, 'sequence_source', text='Source')
+        layout.prop(pg, 'sequence_source', text='Source', icon='ACTION' if pg.sequence_source == 'ACTIONS' else 'MARKER')
+
+        # SELECT ALL/NONE
+        row = layout.row(align=True)
+        row.label(text='Select')
+        row.operator(PsaExportActionsSelectAll.bl_idname, text='All', icon='CHECKBOX_HLT')
+        row.operator(PsaExportActionsDeselectAll.bl_idname, text='None', icon='CHECKBOX_DEHLT')
 
         # ACTIONS
         if pg.sequence_source == 'ACTIONS':
-            layout.label(text='Actions', icon='ACTION')
-            row = layout.row(align=True)
-            row.label(text='Select')
-            row.operator(PsaExportActionsSelectAll.bl_idname, text='All')
-            row.operator(PsaExportActionsDeselectAll.bl_idname, text='None')
-            row = layout.row()
             rows = max(3, min(len(pg.action_list), 10))
-            row.template_list('PSA_UL_ExportActionList', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
+            layout.template_list('PSA_UL_ExportActionList', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
 
-            col = layout.column(heading="Options")
+            col = layout.column()
             col.use_property_split = True
             col.use_property_decorate = False
             col.prop(pg, 'should_use_original_sequence_names')
-        elif pg.sequence_source == 'TIMELINE_MARKERS':
-            layout.label(text='Markers', icon='MARKER')
+            col.prop(pg, 'sequence_name_prefix')
+            col.prop(pg, 'sequence_name_suffix')
 
-            row = layout.row()
+        elif pg.sequence_source == 'TIMELINE_MARKERS':
             rows = max(3, min(len(pg.marker_list), 10))
-            row.template_list('PSA_UL_ExportTimelineMarkerList', '', pg, 'marker_list', pg, 'marker_list_index', rows=rows)
+            layout.template_list('PSA_UL_ExportTimelineMarkerList', '', pg, 'marker_list', pg, 'marker_list_index', rows=rows)
+
+            col = layout.column()
+            col.use_property_split = True
+            col.use_property_decorate = False
+            col.prop(pg, 'should_trim_timeline_marker_sequences')
+            col.prop(pg, 'sequence_name_prefix')
+            col.prop(pg, 'sequence_name_suffix')
 
         # Determine if there is going to be a naming conflict and display an error, if so.
         selected_items = [x for x in pg.action_list if x.is_selected]
@@ -158,24 +168,16 @@ class PsaExportOperator(Operator, ExportHelper):
         layout.separator()
 
         # BONES
-        box = layout.row()
-        box.label(text='Bones', icon='BONE_DATA')
-        bone_filter_mode_items = pg.bl_rna.properties['bone_filter_mode'].enum_items_static
-        row = box.row(align=True)
-
-        for item in bone_filter_mode_items:
-            identifier = item.identifier
-            item_layout = row.row(align=True)
-            item_layout.prop_enum(pg, 'bone_filter_mode', item.identifier)
-            item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
+        row = layout.row(align=True)
+        row.prop(pg, 'bone_filter_mode', text='Bones')
 
         if pg.bone_filter_mode == 'BONE_GROUPS':
-            rows = max(3, min(len(pg.bone_group_list), 10))
-            layout.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg, 'bone_group_list_index', rows=rows)
             row = layout.row(align=True)
             row.label(text='Select')
-            row.operator(PsaExportBoneGroupsSelectAll.bl_idname, text='All')
-            row.operator(PsaExportBoneGroupsDeselectAll.bl_idname, text='None')
+            row.operator(PsaExportBoneGroupsSelectAll.bl_idname, text='All', icon='CHECKBOX_HLT')
+            row.operator(PsaExportBoneGroupsDeselectAll.bl_idname, text='None', icon='CHECKBOX_DEHLT')
+            rows = max(3, min(len(pg.bone_group_list), 10))
+            layout.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg, 'bone_group_list_index', rows=rows)
 
     def is_action_for_armature(self, action):
         if len(action.fcurves) == 0:
@@ -246,6 +248,10 @@ class PsaExportOperator(Operator, ExportHelper):
         options.bone_filter_mode = pg.bone_filter_mode
         options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
         options.should_use_original_sequence_names = pg.should_use_original_sequence_names
+        options.should_trim_timeline_marker_sequences = pg.should_trim_timeline_marker_sequences
+        options.sequence_name_prefix = pg.sequence_name_prefix
+        options.sequence_name_suffix = pg.sequence_name_suffix
+
         builder = PsaBuilder()
 
         try:
@@ -261,9 +267,7 @@ class PsaExportOperator(Operator, ExportHelper):
 
 class PSA_UL_ExportTimelineMarkerList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        layout.alignment = 'LEFT'
-        layout.prop(item, 'is_selected', icon_only=True)
-        layout.label(text=item.marker_name)
+        layout.prop(item, 'is_selected', icon_only=True, text=item.marker_name)
 
     def filter_items(self, context, data, property):
         actions = getattr(data, property)
@@ -282,9 +286,7 @@ class PSA_UL_ExportTimelineMarkerList(UIList):
 
 class PSA_UL_ExportActionList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        layout.alignment = 'LEFT'
-        layout.prop(item, 'is_selected', icon_only=True)
-        layout.label(text=item.action_name)
+        layout.prop(item, 'is_selected', icon_only=True, text=item.action_name)
 
     def filter_items(self, context, data, property):
         actions = getattr(data, property)
@@ -302,41 +304,57 @@ class PSA_UL_ExportActionList(UIList):
 
 
 class PsaExportActionsSelectAll(Operator):
-    bl_idname = 'psa_export.actions_select_all'
+    bl_idname = 'psa_export.sequences_select_all'
     bl_label = 'Select All'
-    bl_description = 'Select all actions'
+    bl_description = 'Select all sequences'
     bl_options = {'INTERNAL'}
 
     @classmethod
-    def poll(cls, context):
+    def get_item_list(cls, context):
         pg = context.scene.psa_export
-        item_list = pg.action_list
+        if pg.sequence_source == 'ACTIONS':
+            return pg.action_list
+        elif pg.sequence_source == 'TIMELINE_MARKERS':
+            return pg.marker_list
+        return None
+
+    @classmethod
+    def poll(cls, context):
+        item_list = cls.get_item_list(context)
         has_unselected_items = any(map(lambda item: not item.is_selected, item_list))
         return len(item_list) > 0 and has_unselected_items
 
     def execute(self, context):
-        pg = context.scene.psa_export
-        for item in pg.action_list:
+        item_list = self.get_item_list(context)
+        for item in item_list:
             item.is_selected = True
         return {'FINISHED'}
 
 
 class PsaExportActionsDeselectAll(Operator):
-    bl_idname = 'psa_export.actions_deselect_all'
+    bl_idname = 'psa_export.sequences_deselect_all'
     bl_label = 'Deselect All'
-    bl_description = 'Deselect all actions'
+    bl_description = 'Deselect all sequences'
     bl_options = {'INTERNAL'}
 
     @classmethod
-    def poll(cls, context):
+    def get_item_list(cls, context):
         pg = context.scene.psa_export
-        item_list = pg.action_list
+        if pg.sequence_source == 'ACTIONS':
+            return pg.action_list
+        elif pg.sequence_source == 'TIMELINE_MARKERS':
+            return pg.marker_list
+        return None
+
+    @classmethod
+    def poll(cls, context):
+        item_list = cls.get_item_list(context)
         has_selected_items = any(map(lambda item: item.is_selected, item_list))
         return len(item_list) > 0 and has_selected_items
 
     def execute(self, context):
-        pg = context.scene.psa_export
-        for item in pg.action_list:
+        item_list = self.get_item_list(context)
+        for item in item_list:
             item.is_selected = False
         return {'FINISHED'}
 

@@ -153,7 +153,7 @@ class PsaImporter(object):
                     sequence_data_matrix[frame_index, bone_index] = calculate_fcurve_data(import_bone, key_data)
 
             # Clean the keyframe data. This is accomplished by writing zeroes to the write matrix when there is an
-            # insufficiently large change in the data from frame-to-frame.
+            # insufficiently large change in the data from the last written frame.
             if options.should_clean_keys:
                 threshold = 0.001
                 for bone_index, import_bone in enumerate(import_bones):
