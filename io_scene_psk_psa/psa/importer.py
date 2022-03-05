@@ -200,8 +200,8 @@ class PsaImporter(object):
 
 
 class PsaImportActionListItem(PropertyGroup):
-    action_name: StringProperty()
-    is_selected: BoolProperty(default=False)
+    action_name: StringProperty(options=set())
+    is_selected: BoolProperty(default=False, options=set())
 
 
 def load_psa_file(context):
@@ -229,7 +229,7 @@ def on_psa_file_path_updated(property, context):
 
 
 class PsaBonePropertyGroup(PropertyGroup):
-    bone_name: StringProperty()
+    bone_name: StringProperty(options=set())
 
 
 class PsaDataPropertyGroup(PropertyGroup):
@@ -238,18 +238,18 @@ class PsaDataPropertyGroup(PropertyGroup):
 
 
 class PsaImportPropertyGroup(PropertyGroup):
-    psa_file_path: StringProperty(default='', update=on_psa_file_path_updated, name='PSA File Path')
+    psa_file_path: StringProperty(default='', options=set(), update=on_psa_file_path_updated, name='PSA File Path')
     psa_error: StringProperty(default='')
     psa: PointerProperty(type=PsaDataPropertyGroup)
     sequence_list: CollectionProperty(type=PsaImportActionListItem)
     sequence_list_index: IntProperty(name='', default=0)
     action_list: CollectionProperty(type=PsaImportActionListItem)
     action_list_index: IntProperty(name='', default=0)
-    should_clean_keys: BoolProperty(default=True, name='Clean Keyframes', description='Exclude unnecessary keyframes from being written to the actions.')
-    should_use_fake_user: BoolProperty(default=True, name='Fake User', description='Assign each imported action a fake user so that the data block is saved even it has no users.')
-    should_stash: BoolProperty(default=False, name='Stash', description='Stash each imported action as a strip on a new non-contributing NLA track')
-    should_use_action_name_prefix: BoolProperty(default=False, name='Prefix Action Name')
-    action_name_prefix: StringProperty(default='', name='Prefix')
+    should_clean_keys: BoolProperty(default=True, name='Clean Keyframes', description='Exclude unnecessary keyframes from being written to the actions.', options=set())
+    should_use_fake_user: BoolProperty(default=True, name='Fake User', description='Assign each imported action a fake user so that the data block is saved even it has no users.', options=set())
+    should_stash: BoolProperty(default=False, name='Stash', description='Stash each imported action as a strip on a new non-contributing NLA track', options=set())
+    should_use_action_name_prefix: BoolProperty(default=False, name='Prefix Action Name', options=set())
+    action_name_prefix: StringProperty(default='', name='Prefix', options=set())
 
 
 class PSA_UL_SequenceList(UIList):

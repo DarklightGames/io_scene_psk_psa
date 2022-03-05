@@ -140,6 +140,7 @@ class PskExportOperator(Operator, ExportHelper):
 class PskExportPropertyGroup(PropertyGroup):
     bone_filter_mode: EnumProperty(
         name='Bone Filter',
+        options=set(),
         description='',
         items=(
             ('ALL', 'All', 'All bones will be exported.'),

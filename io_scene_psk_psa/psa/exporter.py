@@ -70,6 +70,7 @@ def should_use_original_sequence_names_updated(property, context):
 class PsaExportPropertyGroup(PropertyGroup):
     sequence_source: EnumProperty(
         name='Source',
+        options=set(),
         description='',
         items=(
             ('ACTIONS', 'Actions', 'Sequences will be exported using actions'),
@@ -82,18 +83,33 @@ class PsaExportPropertyGroup(PropertyGroup):
     marker_list_index: IntProperty(default=0)
     bone_filter_mode: EnumProperty(
         name='Bone Filter',
+        options=set(),
         description='',
         items=(
             ('ALL', 'All', 'All bones will be exported.'),
-            ('BONE_GROUPS', 'Bone Groups', 'Only bones belonging to the selected bone groups and their ancestors will be exported.'),
+            ('BONE_GROUPS', 'Bone Groups', 'Only bones belonging to the selected bone groups and their ancestors will '
+                                           'be exported.'),
         )
     )
     bone_group_list: CollectionProperty(type=BoneGroupListItem)
     bone_group_list_index: IntProperty(default=0, name='', description='')
-    should_use_original_sequence_names: BoolProperty(default=False, name='Original Names', description='If the action was imported from the PSA Import panel, the original name of the sequence will be used instead of the Blender action name', update=should_use_original_sequence_names_updated)
-    should_trim_timeline_marker_sequences: BoolProperty(default=True, name='Trim Sequences', description='Frames without NLA track information at the boundaries of timeline markers will be excluded from the exported sequences')
-    sequence_name_prefix: StringProperty(name='Prefix')
-    sequence_name_suffix: StringProperty(name='Suffix')
+    should_use_original_sequence_names: BoolProperty(
+        default=False,
+        name='Original Names',
+        options=set(),
+        update=should_use_original_sequence_names_updated,
+        description='If the action was imported from the PSA Import panel, the original name of the sequence will be '
+                    'used instead of the Blender action name',
+    )
+    should_trim_timeline_marker_sequences: BoolProperty(
+        default=True,
+        name='Trim Sequences',
+        options=set(),
+        description='Frames without NLA track information at the boundaries of timeline markers will be excluded from '
+                    'the exported sequences '
+    )
+    sequence_name_prefix: StringProperty(name='Prefix', options=set())
+    sequence_name_suffix: StringProperty(name='Suffix', options=set())
 
 
 def is_bone_filter_mode_item_available(context, identifier):
