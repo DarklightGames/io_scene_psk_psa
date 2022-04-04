@@ -70,12 +70,12 @@ class PskBuilder(object):
             # If the mesh has no armature object, simply assign it a dummy bone at the root to satisfy the requirement
             # that a PSK file must have at least one bone.
             psk_bone = Psk.Bone()
-            psk_bone.name = bytes('static', encoding='windows-1252')
+            psk_bone.name = bytes('root', encoding='windows-1252')
             psk_bone.flags = 0
             psk_bone.children_count = 0
             psk_bone.parent_index = 0
-            psk_bone.location = Vector3(0, 0, 0)
-            psk_bone.rotation = Quaternion(0, 0, 0, 1)
+            psk_bone.location = Vector3.zero()
+            psk_bone.rotation = Quaternion.identity()
             psk.bones.append(psk_bone)
         else:
             bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_group_indices)

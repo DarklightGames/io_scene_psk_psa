@@ -38,22 +38,14 @@ class PsaExporter(object):
 
 class PsaExportActionListItem(PropertyGroup):
     action: PointerProperty(type=Action)
-    action_name: StringProperty()
+    name: StringProperty()
     is_selected: BoolProperty(default=False)
-
-    @property
-    def name(self):
-        return self.action.name
 
 
 class PsaExportTimelineMarkerListItem(PropertyGroup):
     marker_index: IntProperty()
-    marker_name: StringProperty()
+    name: StringProperty()
     is_selected: BoolProperty(default=True)
-
-    @property
-    def name(self):
-        return self.marker_name
 
 
 def update_action_names(context):
@@ -110,6 +102,10 @@ class PsaExportPropertyGroup(PropertyGroup):
     )
     sequence_name_prefix: StringProperty(name='Prefix', options=set())
     sequence_name_suffix: StringProperty(name='Suffix', options=set())
+    sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
+    sequence_use_filter_invert: BoolProperty(default=False, options=set())
+    sequence_filter_asset: BoolProperty(default=False, name='Show assets', description='Show actions that belong to an asset library', options=set())
+    sequence_use_filter_sort_reverse: BoolProperty(default=True, options=set())
 
 
 def is_bone_filter_mode_item_available(context, identifier):
@@ -152,6 +148,7 @@ class PsaExportOperator(Operator, ExportHelper):
         # ACTIONS
         if pg.sequence_source == 'ACTIONS':
             rows = max(3, min(len(pg.action_list), 10))
+
             layout.template_list('PSA_UL_ExportActionList', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
 
             col = layout.column()
@@ -174,7 +171,7 @@ class PsaExportOperator(Operator, ExportHelper):
 
         # Determine if there is going to be a naming conflict and display an error, if so.
         selected_items = [x for x in pg.action_list if x.is_selected]
-        action_names = [x.action_name for x in selected_items]
+        action_names = [x.name for x in selected_items]
         action_name_counts = Counter(action_names)
         for action_name, count in action_name_counts.items():
             if count > 1:
@@ -194,6 +191,9 @@ class PsaExportOperator(Operator, ExportHelper):
             row.operator(PsaExportBoneGroupsDeselectAll.bl_idname, text='None', icon='CHECKBOX_DEHLT')
             rows = max(3, min(len(pg.bone_group_list), 10))
             layout.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg, 'bone_group_list_index', rows=rows)
+
+    def should_action_be_selected_by_default(self, action):
+        return action is not None and action.asset_data is None
 
     def is_action_for_armature(self, action):
         if len(action.fcurves) == 0:
@@ -228,8 +228,8 @@ class PsaExportOperator(Operator, ExportHelper):
                 continue
             item = pg.action_list.add()
             item.action = action
-            item.action_name = action.name
-            item.is_selected = True
+            item.name = action.name
+            item.is_selected = self.should_action_be_selected_by_default(action)
 
         update_action_names(context)
 
@@ -237,7 +237,7 @@ class PsaExportOperator(Operator, ExportHelper):
         pg.marker_list.clear()
         for marker in context.scene.timeline_markers:
             item = pg.marker_list.add()
-            item.marker_name = marker.name
+            item.name = marker.name
 
         if len(pg.action_list) == 0 and len(pg.marker_names) == 0:
             # If there are no actions at all, we have nothing to export, so just cancel the operation.
@@ -255,7 +255,7 @@ class PsaExportOperator(Operator, ExportHelper):
         pg = context.scene.psa_export
 
         actions = [x.action for x in pg.action_list if x.is_selected]
-        marker_names = [x.marker_name for x in pg.marker_list if x.is_selected]
+        marker_names = [x.name for x in pg.marker_list if x.is_selected]
 
         options = PsaBuilderOptions()
         options.sequence_source = pg.sequence_source
@@ -283,39 +283,75 @@ class PsaExportOperator(Operator, ExportHelper):
 
 class PSA_UL_ExportTimelineMarkerList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        layout.prop(item, 'is_selected', icon_only=True, text=item.marker_name)
+        layout.prop(item, 'is_selected', icon_only=True, text=item.name)
 
     def filter_items(self, context, data, property):
-        actions = getattr(data, property)
-        flt_flags = []
-        flt_neworder = []
-        if self.filter_name:
-            flt_flags = bpy.types.UI_UL_list.filter_items_by_name(
-                self.filter_name,
-                self.bitflag_filter_item,
-                actions,
-                'marker_name',
-                reverse=self.use_filter_invert
-            )
+        pg = context.scene.psa_export
+        sequences = getattr(data, property)
+        flt_flags = filter_sequences(pg, sequences)
+        flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(sequences, 'name')
         return flt_flags, flt_neworder
 
 
+def filter_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[int]:
+    bitflag_filter_item = 1 << 30
+    flt_flags = [bitflag_filter_item] * len(sequences)
+
+    if pg.sequence_filter_name is not None:
+        # Filter name is non-empty.
+        import fnmatch
+        for i, sequence in enumerate(sequences):
+            if not fnmatch.fnmatch(sequence.name, f'*{pg.sequence_filter_name}*'):
+                flt_flags[i] &= ~bitflag_filter_item
+
+    if not pg.sequence_filter_asset:
+        for i, sequence in enumerate(sequences):
+            if hasattr(sequence, 'action') and sequence.action.asset_data is not None:
+                flt_flags[i] &= ~bitflag_filter_item
+
+    if pg.sequence_use_filter_invert:
+        # Invert filter flags for all items.
+        for i, sequence in enumerate(sequences):
+            flt_flags[i] ^= ~bitflag_filter_item
+
+    return flt_flags
+
+
+def get_visible_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[PsaExportActionListItem]:
+    visible_sequences = []
+    for i, flag in enumerate(filter_sequences(pg, sequences)):
+        if bool(flag & (1 << 30)):
+            visible_sequences.append(sequences[i])
+    return visible_sequences
+
+
 class PSA_UL_ExportActionList(UIList):
+
+    def __init__(self):
+        super(PSA_UL_ExportActionList, self).__init__()
+        # Show the filtering options by default.
+        self.use_filter_show = True
+
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        layout.prop(item, 'is_selected', icon_only=True, text=item.action_name)
+        layout.prop(item, 'is_selected', icon_only=True, text=item.name)
+        if item.action.asset_data is not None:
+            layout.label(text='', icon='ASSET_MANAGER')
+
+    def draw_filter(self, context, layout):
+        pg = context.scene.psa_export
+        row = layout.row()
+        subrow = row.row(align=True)
+        subrow.prop(pg, 'sequence_filter_name', text="")
+        subrow.prop(pg, 'sequence_use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
+        subrow = row.row(align=True)
+        subrow.prop(pg, 'sequence_filter_asset', icon_only=True, icon='ASSET_MANAGER')
+        # subrow.prop(pg, 'sequence_use_filter_sort_reverse', text='', icon='SORT_ASC')
 
     def filter_items(self, context, data, property):
+        pg = context.scene.psa_export
         actions = getattr(data, property)
-        flt_flags = []
-        flt_neworder = []
-        if self.filter_name:
-            flt_flags = bpy.types.UI_UL_list.filter_items_by_name(
-                self.filter_name,
-                self.bitflag_filter_item,
-                actions,
-                'action_name',
-                reverse=self.use_filter_invert
-            )
+        flt_flags = filter_sequences(pg, actions)
+        flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(actions, 'name')
         return flt_flags, flt_neworder
 
 
@@ -336,14 +372,17 @@ class PsaExportActionsSelectAll(Operator):
 
     @classmethod
     def poll(cls, context):
+        pg = context.scene.psa_export
         item_list = cls.get_item_list(context)
-        has_unselected_items = any(map(lambda item: not item.is_selected, item_list))
-        return len(item_list) > 0 and has_unselected_items
+        visible_sequences = get_visible_sequences(pg, item_list)
+        has_unselected_sequences = any(map(lambda item: not item.is_selected, visible_sequences))
+        return has_unselected_sequences
 
     def execute(self, context):
-        item_list = self.get_item_list(context)
-        for item in item_list:
-            item.is_selected = True
+        pg = context.scene.psa_export
+        sequences = self.get_item_list(context)
+        for sequence in get_visible_sequences(pg, sequences):
+            sequence.is_selected = True
         return {'FINISHED'}
 
 
@@ -369,9 +408,10 @@ class PsaExportActionsDeselectAll(Operator):
         return len(item_list) > 0 and has_selected_items
 
     def execute(self, context):
+        pg = context.scene.psa_export
         item_list = self.get_item_list(context)
-        for item in item_list:
-            item.is_selected = False
+        for sequence in get_visible_sequences(pg, item_list):
+            sequence.is_selected = False
         return {'FINISHED'}
 
 

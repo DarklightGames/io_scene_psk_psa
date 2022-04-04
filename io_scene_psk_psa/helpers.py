@@ -1,6 +1,25 @@
 from bpy.types import NlaStrip
 from typing import List, Tuple, Optional
 from collections import Counter
+import datetime
+
+
+class Timer:
+    def __enter__(self):
+        self.start = datetime.datetime.now()
+        self.interval = None
+        return self
+
+    def __exit__(self, *args):
+        self.end = datetime.datetime.now()
+        self.interval = self.end - self.start
+
+    @property
+    def duration(self):
+        if self.interval is not None:
+            return self.interval
+        else:
+            return datetime.datetime.now() - self.start
 
 
 def rgb_to_srgb(c):

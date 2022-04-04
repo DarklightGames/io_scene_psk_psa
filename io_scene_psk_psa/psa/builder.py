@@ -16,17 +16,25 @@ class PsaBuilderOptions(object):
         self.sequence_name_suffix = ''
 
 
+class PsaBuilderPerformance:
+    def __init__(self):
+        self.frame_set_duration = datetime.timedelta()
+        self.key_build_duration = datetime.timedelta()
+        self.key_add_duration = datetime.timedelta()
+
+
 class PsaBuilder(object):
     def __init__(self):
         pass
 
     def build(self, context, options: PsaBuilderOptions) -> Psa:
-        object = context.view_layer.objects.active
+        performance = PsaBuilderPerformance()
+        active_object = context.view_layer.objects.active
 
-        if object.type != 'ARMATURE':
+        if active_object.type != 'ARMATURE':
             raise RuntimeError('Selected object must be an Armature')
 
-        armature = object
+        armature = active_object
 
         if armature.animation_data is None:
             raise RuntimeError('No animation data for armature')
@@ -99,12 +107,16 @@ class PsaBuilder(object):
             psa.bones.append(psa_bone)
 
         # Populate the export sequence list.
-        class ExportSequence:
+        class NlaState:
             def __init__(self):
-                self.name = ''
                 self.frame_min = 0
                 self.frame_max = 0
                 self.action = None
+
+        class ExportSequence:
+            def __init__(self):
+                self.name = ''
+                self.nla_state = NlaState()
 
         export_sequences = []
 
@@ -113,9 +125,11 @@ class PsaBuilder(object):
                 if len(action.fcurves) == 0:
                     continue
                 export_sequence = ExportSequence()
-                export_sequence.action = action
+                export_sequence.nla_state.action = action
                 export_sequence.name = get_psa_sequence_name(action, options.should_use_original_sequence_names)
-                export_sequence.frame_min, export_sequence.frame_max = [int(x) for x in action.frame_range]
+                frame_min, frame_max = [int(x) for x in action.frame_range]
+                export_sequence.nla_state.frame_min = frame_min
+                export_sequence.nla_state.frame_max = frame_max
                 export_sequences.append(export_sequence)
             pass
         elif options.sequence_source == 'TIMELINE_MARKERS':
@@ -123,10 +137,10 @@ class PsaBuilder(object):
 
             for name, (frame_min, frame_max) in sequence_frame_ranges.items():
                 export_sequence = ExportSequence()
-                export_sequence.action = None
                 export_sequence.name = name
-                export_sequence.frame_min = frame_min
-                export_sequence.frame_max = frame_max
+                export_sequence.nla_state.action = None
+                export_sequence.nla_state.frame_min = frame_min
+                export_sequence.nla_state.frame_max = frame_max
                 export_sequences.append(export_sequence)
         else:
             raise ValueError(f'Unhandled sequence source: {options.sequence_source}')
@@ -140,13 +154,13 @@ class PsaBuilder(object):
         frame_start_index = 0
 
         for export_sequence in export_sequences:
-            armature.animation_data.action = export_sequence.action
+            armature.animation_data.action = export_sequence.nla_state.action
             context.view_layer.update()
 
             psa_sequence = Psa.Sequence()
 
-            frame_min = export_sequence.frame_min
-            frame_max = export_sequence.frame_max
+            frame_min = export_sequence.nla_state.frame_min
+            frame_max = export_sequence.nla_state.frame_max
             frame_count = frame_max - frame_min + 1
 
             psa_sequence.name = bytes(export_sequence.name, encoding='windows-1252')
@@ -157,34 +171,40 @@ class PsaBuilder(object):
             frame_count = frame_max - frame_min + 1
 
             for frame in range(frame_count):
-                context.scene.frame_set(frame_min + frame)
+                with Timer() as t:
+                    context.scene.frame_set(frame_min + frame)
+                performance.frame_set_duration += t.duration
 
                 for pose_bone in pose_bones:
-                    key = Psa.Key()
-                    pose_bone_matrix = pose_bone.matrix
+                    with Timer() as t:
+                        key = Psa.Key()
+                        pose_bone_matrix = pose_bone.matrix
 
-                    if pose_bone.parent is not None:
-                        pose_bone_parent_matrix = pose_bone.parent.matrix
-                        pose_bone_matrix = pose_bone_parent_matrix.inverted() @ pose_bone_matrix
+                        if pose_bone.parent is not None:
+                            pose_bone_parent_matrix = pose_bone.parent.matrix
+                            pose_bone_matrix = pose_bone_parent_matrix.inverted() @ pose_bone_matrix
 
-                    location = pose_bone_matrix.to_translation()
-                    rotation = pose_bone_matrix.to_quaternion().normalized()
+                        location = pose_bone_matrix.to_translation()
+                        rotation = pose_bone_matrix.to_quaternion().normalized()
 
-                    if pose_bone.parent is not None:
-                        rotation.x = -rotation.x
-                        rotation.y = -rotation.y
-                        rotation.z = -rotation.z
+                        if pose_bone.parent is not None:
+                            rotation.x = -rotation.x
+                            rotation.y = -rotation.y
+                            rotation.z = -rotation.z
 
-                    key.location.x = location.x
-                    key.location.y = location.y
-                    key.location.z = location.z
-                    key.rotation.x = rotation.x
-                    key.rotation.y = rotation.y
-                    key.rotation.z = rotation.z
-                    key.rotation.w = rotation.w
-                    key.time = 1.0 / psa_sequence.fps
+                        key.location.x = location.x
+                        key.location.y = location.y
+                        key.location.z = location.z
+                        key.rotation.x = rotation.x
+                        key.rotation.y = rotation.y
+                        key.rotation.z = rotation.z
+                        key.rotation.w = rotation.w
+                        key.time = 1.0 / psa_sequence.fps
+                    performance.key_build_duration += t.duration
 
-                    psa.keys.append(key)
+                    with Timer() as t:
+                        psa.keys.append(key)
+                    performance.key_add_duration += t.duration
 
                 psa_sequence.bone_count = len(pose_bones)
                 psa_sequence.track_time = frame_count
@@ -192,6 +212,10 @@ class PsaBuilder(object):
             frame_start_index += frame_count
 
             psa.sequences[export_sequence.name] = psa_sequence
+
+        print(f'frame set duration: {performance.frame_set_duration}')
+        print(f'key build duration: {performance.key_build_duration}')
+        print(f'key add duration: {performance.key_add_duration}')
 
         return psa
 
@@ -214,8 +238,8 @@ class PsaBuilder(object):
                 frame_max = sorted_timeline_markers[next_marker_index].frame
                 if options.should_trim_timeline_marker_sequences:
                     nla_strips = get_nla_strips_in_timeframe(object, marker.frame, frame_max)
-                    frame_max = min(frame_max, max(map(lambda x: x.frame_end, nla_strips)))
-                    frame_min = max(frame_min, min(map(lambda x: x.frame_start, nla_strips)))
+                    frame_max = min(frame_max, max(map(lambda nla_strip: nla_strip.frame_end, nla_strips)))
+                    frame_min = max(frame_min, min(map(lambda nla_strip: nla_strip.frame_start, nla_strips)))
             else:
                 # There is no next marker.
                 # Find the final frame of all the NLA strips and use that as the last frame of this sequence.
