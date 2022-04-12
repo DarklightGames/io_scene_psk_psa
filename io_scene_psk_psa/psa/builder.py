@@ -58,8 +58,8 @@ class PsaBuilder(object):
         pose_bones = [x[1] for x in pose_bones]
 
         # Get a list of all the bone indices and instigator bones for the bone filter settings.
-        bone_names = get_export_bone_names(armature, options.bone_filter_mode, options.bone_group_indices)
-        bone_indices = [bone_names.index(x) for x in bone_names]
+        export_bone_names = get_export_bone_names(armature, options.bone_filter_mode, options.bone_group_indices)
+        bone_indices = [bone_names.index(x) for x in export_bone_names]
 
         # Make the bone lists contain only the bones that are going to be exported.
         bones = [bones[bone_index] for bone_index in bone_indices]
