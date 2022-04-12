@@ -403,7 +403,7 @@ class PSA_PT_ImportPanel(Panel):
         box.label(text=f'Sequences', icon='ARMATURE_DATA')
 
         # select
-        rows = max(3, max(len(pg.sequence_list), 10))
+        rows = max(3, min(len(pg.sequence_list), 10))
 
         row = box.row()
         col = row.column()
