@@ -239,7 +239,7 @@ class PsaExportOperator(Operator, ExportHelper):
             item = pg.marker_list.add()
             item.name = marker.name
 
-        if len(pg.action_list) == 0 and len(pg.marker_names) == 0:
+        if len(pg.action_list) == 0 and len(pg.marker_list) == 0:
             # If there are no actions at all, we have nothing to export, so just cancel the operation.
             self.report({'ERROR_INVALID_CONTEXT'}, 'There are no actions or timeline markers to export.')
             return {'CANCELLED'}
