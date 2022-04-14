@@ -244,6 +244,8 @@ class PsaBuilder(object):
                 # There is no next marker.
                 # Find the final frame of all the NLA strips and use that as the last frame of this sequence.
                 for nla_track in object.animation_data.nla_tracks:
+                    if nla_track.mute:
+                        continue
                     for strip in nla_track.strips:
                         frame_max = max(frame_max, strip.frame_end)
 
