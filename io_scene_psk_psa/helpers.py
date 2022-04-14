@@ -45,6 +45,8 @@ def get_nla_strips_in_timeframe(object, frame_min, frame_max) -> List[NlaStrip]:
         return []
     strips = []
     for nla_track in object.animation_data.nla_tracks:
+        if nla_track.mute:
+            continue
         for strip in nla_track.strips:
             if (strip.frame_start < frame_min and strip.frame_end > frame_max) or \
                     (frame_min <= strip.frame_start < frame_max) or \
