@@ -1,6 +1,6 @@
 import bpy
 from bpy.types import Operator, PropertyGroup, Action, UIList, BoneGroup, Panel, TimelineMarker
-from bpy.props import CollectionProperty, IntProperty, PointerProperty, StringProperty, BoolProperty, EnumProperty
+from bpy.props import CollectionProperty, IntProperty, FloatProperty, PointerProperty, StringProperty, BoolProperty, EnumProperty
 from bpy_extras.io_utils import ExportHelper
 from typing import Type
 from .builder import PsaBuilder, PsaBuilderOptions
@@ -9,6 +9,7 @@ from ..types import BoneGroupListItem
 from ..helpers import *
 from collections import Counter
 import re
+import sys
 
 
 class PsaExporter(object):
@@ -65,10 +66,21 @@ class PsaExportPropertyGroup(PropertyGroup):
         options=set(),
         description='',
         items=(
-            ('ACTIONS', 'Actions', 'Sequences will be exported using actions'),
-            ('TIMELINE_MARKERS', 'Timeline Markers', 'Sequences will be exported using timeline markers'),
+            ('ACTIONS', 'Actions', 'Sequences will be exported using actions', 'ACTION', 0),
+            ('TIMELINE_MARKERS', 'Timeline Markers', 'Sequences will be exported using timeline markers', 'MARKER_HLT', 1),
         )
     )
+    fps_source: EnumProperty(
+        name='FPS Source',
+        options=set(),
+        description='',
+        items=(
+            ('SCENE', 'Scene', '', 'SCENE_DATA', 0),
+            ('ACTION_METADATA', 'Action Metadata', 'The frame rate will be determined by action\'s "psa_fps" custom property, if it exists. If the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used. If no metadata is available, the scene\'s frame rate will be used.', 'PROPERTIES', 1),
+            ('CUSTOM', 'Custom', '', 2)
+        )
+    )
+    fps_custom: FloatProperty(default=30.0, min=sys.float_info.epsilon, soft_min=1.0, options=set(), step=100, soft_max=60.0)
     action_list: CollectionProperty(type=PsaExportActionListItem)
     action_list_index: IntProperty(default=0)
     marker_list: CollectionProperty(type=PsaExportTimelineMarkerListItem)
@@ -136,8 +148,13 @@ class PsaExportOperator(Operator, ExportHelper):
         layout = self.layout
         pg = context.scene.psa_export
 
+        # FPS
+        layout.prop(pg, 'fps_source', text='FPS')
+        if pg.fps_source == 'CUSTOM':
+            layout.prop(pg, 'fps_custom', text='Custom')
+
         # SOURCE
-        layout.prop(pg, 'sequence_source', text='Source', icon='ACTION' if pg.sequence_source == 'ACTIONS' else 'MARKER')
+        layout.prop(pg, 'sequence_source', text='Source')
 
         # SELECT ALL/NONE
         row = layout.row(align=True)
@@ -258,6 +275,8 @@ class PsaExportOperator(Operator, ExportHelper):
         marker_names = [x.name for x in pg.marker_list if x.is_selected]
 
         options = PsaBuilderOptions()
+        options.fps_source = pg.fps_source
+        options.fps_custom = pg.fps_custom
         options.sequence_source = pg.sequence_source
         options.actions = actions
         options.marker_names = marker_names

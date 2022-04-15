@@ -19,7 +19,7 @@ class PsaReader(object):
         return self.psa.bones
 
     @property
-    def sequences(self):
+    def sequences(self) -> OrderedDict[Psa.Sequence]:
         return self.psa.sequences
 
     @staticmethod

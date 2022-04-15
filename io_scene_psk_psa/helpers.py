@@ -76,8 +76,8 @@ def populate_bone_group_list(armature_object, bone_group_list):
 
 
 def get_psa_sequence_name(action, should_use_original_sequence_name):
-    if should_use_original_sequence_name and 'original_sequence_name' in action:
-        return action['original_sequence_name']
+    if should_use_original_sequence_name and 'psa_sequence_name' in action:
+        return action['psa_sequence_name']
     else:
         return action.name
 

@@ -1,10 +1,13 @@
 from .data import *
 from ..helpers import *
-from typing import Dict
+from typing import Dict, Iterable
+from bpy.types import Action
 
 
 class PsaBuilderOptions(object):
     def __init__(self):
+        self.fps_source = 'SCENE'
+        self.fps_custom = 30.0
         self.sequence_source = 'ACTIONS'
         self.actions = []
         self.marker_names = []
@@ -117,8 +120,29 @@ class PsaBuilder(object):
             def __init__(self):
                 self.name = ''
                 self.nla_state = NlaState()
+                self.fps = 30.0
 
         export_sequences = []
+
+        def get_sequence_fps(context, options: PsaBuilderOptions, actions: Iterable[Action]) -> float:
+            if options.fps_source == 'SCENE':
+                return context.scene.render.fps
+            if options.fps_source == 'CUSTOM':
+                return options.fps_custom
+            elif options.fps_source == 'ACTION_METADATA':
+                # Get the minimum value of action metadata FPS values.
+                psa_fps_list = []
+                for action in filter(lambda x: 'psa_fps' in x, actions):
+                    psa_fps = action['psa_fps']
+                    if type(psa_fps) == int or type(psa_fps) == float:
+                        psa_fps_list.append(psa_fps)
+                if len(psa_fps_list) > 0:
+                    return min(psa_fps_list)
+                else:
+                    # No valid action metadata to use, fallback to scene FPS
+                    return context.scene.render.fps
+            else:
+                raise RuntimeError(f'Invalid FPS source "{options.fps_source}"')
 
         if options.sequence_source == 'ACTIONS':
             for action in options.actions:
@@ -130,6 +154,7 @@ class PsaBuilder(object):
                 frame_min, frame_max = [int(x) for x in action.frame_range]
                 export_sequence.nla_state.frame_min = frame_min
                 export_sequence.nla_state.frame_max = frame_max
+                export_sequence.fps = get_sequence_fps(context, options, [action])
                 export_sequences.append(export_sequence)
             pass
         elif options.sequence_source == 'TIMELINE_MARKERS':
@@ -141,6 +166,8 @@ class PsaBuilder(object):
                 export_sequence.nla_state.action = None
                 export_sequence.nla_state.frame_min = frame_min
                 export_sequence.nla_state.frame_max = frame_max
+                nla_strips_actions = set(map(lambda x: x.action, get_nla_strips_in_timeframe(active_object, frame_min, frame_max)))
+                export_sequence.fps = get_sequence_fps(context, options, nla_strips_actions)
                 export_sequences.append(export_sequence)
         else:
             raise ValueError(f'Unhandled sequence source: {options.sequence_source}')
@@ -166,7 +193,7 @@ class PsaBuilder(object):
             psa_sequence.name = bytes(export_sequence.name, encoding='windows-1252')
             psa_sequence.frame_count = frame_count
             psa_sequence.frame_start_index = frame_start_index
-            psa_sequence.fps = context.scene.render.fps
+            psa_sequence.fps = export_sequence.fps
 
             frame_count = frame_max - frame_min + 1
 
@@ -212,10 +239,6 @@ class PsaBuilder(object):
             frame_start_index += frame_count
 
             psa.sequences[export_sequence.name] = psa_sequence
-
-        print(f'frame set duration: {performance.frame_set_duration}')
-        print(f'key build duration: {performance.key_build_duration}')
-        print(f'key add duration: {performance.key_add_duration}')
 
         return psa
 
