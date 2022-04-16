@@ -199,9 +199,9 @@ class PsaImporter(object):
                 action['psa_sequence_name'] = sequence_name
                 action['psa_fps'] = sequence.fps
 
-            actions.append(action)
+            action.use_fake_user = options.should_use_fake_user
 
-        action.use_fake_user = options.should_use_fake_user
+            actions.append(action)
 
         # If the user specifies, store the new animations as strips on a non-contributing NLA track.
         if options.should_stash:
