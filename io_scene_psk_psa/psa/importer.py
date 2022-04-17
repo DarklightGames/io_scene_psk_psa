@@ -267,6 +267,7 @@ class PsaImportPropertyGroup(PropertyGroup):
     action_name_prefix: StringProperty(default='', name='Prefix', options=set())
     sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
     sequence_use_filter_invert: BoolProperty(default=False, options=set())
+    select_text: PointerProperty(type=bpy.types.Text)
 
 
 def filter_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[int]:
@@ -329,6 +330,39 @@ class PSA_UL_ImportSequenceList(PSA_UL_SequenceList, UIList):
 
 class PSA_UL_ImportActionList(PSA_UL_SequenceList, UIList):
     pass
+
+
+class PsaImportSequencesFromText(Operator):
+    bl_idname = 'psa_import.sequences_select_from_text'
+    bl_label = 'Select By Text List'
+    bl_description = 'Select sequences by name from text list'
+    bl_options = {'INTERNAL', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        pg = context.scene.psa_import
+        return len(pg.sequence_list) > 0
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=256)
+
+    def draw(self, context):
+        layout = self.layout
+        pg = context.scene.psa_import
+        layout.label(icon='INFO', text='Each sequence name should be on a new line.')
+        layout.prop(pg, 'select_text', text='')
+
+    def execute(self, context):
+        pg = context.scene.psa_import
+        contents = pg.select_text.as_string()
+        count = 0
+        for line in contents.split('\n'):
+            for sequence in pg.sequence_list:
+                if sequence.action_name == line:
+                    sequence.is_selected = True
+                    count += 1
+        self.report({'INFO'}, f'Selected {count} sequence(s)')
+        return {'FINISHED'}
 
 
 class PsaImportSequencesSelectAll(Operator):
@@ -439,7 +473,7 @@ class PSA_PT_ImportPanel(Panel):
 
         box = layout.box()
 
-        box.label(text=f'Sequences', icon='ARMATURE_DATA')
+        box.label(text=f'Sequences ({len(pg.sequence_list)})', icon='ARMATURE_DATA')
 
         # select
         rows = max(3, min(len(pg.sequence_list), 10))
@@ -449,6 +483,7 @@ class PSA_PT_ImportPanel(Panel):
 
         row2 = col.row(align=True)
         row2.label(text='Select')
+        row2.operator(PsaImportSequencesFromText.bl_idname, text='', icon='TEXT')
         row2.operator(PsaImportSequencesSelectAll.bl_idname, text='All', icon='CHECKBOX_HLT')
         row2.operator(PsaImportSequencesDeselectAll.bl_idname, text='None', icon='CHECKBOX_DEHLT')
 
@@ -573,6 +608,7 @@ classes = (
     PSA_UL_ImportActionList,
     PsaImportSequencesSelectAll,
     PsaImportSequencesDeselectAll,
+    PsaImportSequencesFromText,
     PsaImportFileReload,
     PSA_PT_ImportPanel,
     PSA_PT_ImportPanel_Advanced,
