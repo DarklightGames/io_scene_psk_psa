@@ -268,6 +268,7 @@ class PsaImportPropertyGroup(PropertyGroup):
     should_write_metadata: BoolProperty(default=True, name='Metadata', options=set(), description='Additional data will be written to the custom properties of the Action (e.g., frame rate)')
     action_name_prefix: StringProperty(default='', name='Prefix', options=set())
     sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
+    sequence_filter_is_selected: BoolProperty(default=False, options=set(), name='Only Show Selected', description='Only show selected sequences')
     sequence_use_filter_invert: BoolProperty(default=False, options=set())
     sequence_use_filter_regex: BoolProperty(default=False, name='Regular Expression', description='Filter using regular expressions', options=set())
     select_text: PointerProperty(type=bpy.types.Text)
@@ -280,7 +281,7 @@ def filter_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_c
     if pg.sequence_filter_name is not None:
         # Filter name is non-empty.
         if pg.sequence_use_filter_regex:
-            # Use regular expression
+            # Use regular expression. If regex pattern doesn't compile, just ignore it.
             try:
                 regex = re.compile(pg.sequence_filter_name)
                 for i, sequence in enumerate(sequences):
@@ -289,9 +290,15 @@ def filter_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_c
             except re.error:
                 pass
         else:
+            # User regular matching
             for i, sequence in enumerate(sequences):
                 if not fnmatch.fnmatch(sequence.action_name, f'*{pg.sequence_filter_name}*'):
                     flt_flags[i] &= ~bitflag_filter_item
+
+    if pg.sequence_filter_is_selected:
+        for i, sequence in enumerate(sequences):
+            if not sequence.is_selected:
+                flt_flags[i] &= ~bitflag_filter_item
 
     if pg.sequence_use_filter_invert:
         # Invert filter flags for all items.
@@ -302,9 +309,10 @@ def filter_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_c
 
 
 def get_visible_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[PsaImportActionListItem]:
+    bitflag_filter_item = 1 << 30
     visible_sequences = []
     for i, flag in enumerate(filter_sequences(pg, sequences)):
-        if bool(flag & (1 << 30)):
+        if bool(flag & bitflag_filter_item):
             visible_sequences.append(sequences[i])
     return visible_sequences
 
@@ -326,13 +334,12 @@ class PSA_UL_SequenceList(UIList):
         subrow.prop(pg, 'sequence_filter_name', text="")
         subrow.prop(pg, 'sequence_use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
         subrow.prop(pg, 'sequence_use_filter_regex', text="", icon='SORTBYEXT')
+        subrow.prop(pg, 'sequence_filter_is_selected', text="", icon='CHECKBOX_HLT')
 
     def filter_items(self, context, data, property):
         pg = context.scene.psa_import
         sequences = getattr(data, property)
-        flt_flags = []
-        if pg.sequence_filter_name:
-            flt_flags = filter_sequences(pg, sequences)
+        flt_flags = filter_sequences(pg, sequences)
         flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(sequences, 'action_name')
         return flt_flags, flt_neworder
 
