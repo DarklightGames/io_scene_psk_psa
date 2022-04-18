@@ -30,6 +30,26 @@ class PsaBuilder(object):
     def __init__(self):
         pass
 
+    def get_sequence_fps(self, context, options: PsaBuilderOptions, actions: Iterable[Action]) -> float:
+        if options.fps_source == 'SCENE':
+            return context.scene.render.fps
+        if options.fps_source == 'CUSTOM':
+            return options.fps_custom
+        elif options.fps_source == 'ACTION_METADATA':
+            # Get the minimum value of action metadata FPS values.
+            psa_fps_list = []
+            for action in filter(lambda x: 'psa_fps' in x, actions):
+                psa_fps = action['psa_fps']
+                if type(psa_fps) == int or type(psa_fps) == float:
+                    psa_fps_list.append(psa_fps)
+            if len(psa_fps_list) > 0:
+                return min(psa_fps_list)
+            else:
+                # No valid action metadata to use, fallback to scene FPS
+                return context.scene.render.fps
+        else:
+            raise RuntimeError(f'Invalid FPS source "{options.fps_source}"')
+
     def build(self, context, options: PsaBuilderOptions) -> Psa:
         performance = PsaBuilderPerformance()
         active_object = context.view_layer.objects.active
@@ -124,26 +144,6 @@ class PsaBuilder(object):
 
         export_sequences = []
 
-        def get_sequence_fps(context, options: PsaBuilderOptions, actions: Iterable[Action]) -> float:
-            if options.fps_source == 'SCENE':
-                return context.scene.render.fps
-            if options.fps_source == 'CUSTOM':
-                return options.fps_custom
-            elif options.fps_source == 'ACTION_METADATA':
-                # Get the minimum value of action metadata FPS values.
-                psa_fps_list = []
-                for action in filter(lambda x: 'psa_fps' in x, actions):
-                    psa_fps = action['psa_fps']
-                    if type(psa_fps) == int or type(psa_fps) == float:
-                        psa_fps_list.append(psa_fps)
-                if len(psa_fps_list) > 0:
-                    return min(psa_fps_list)
-                else:
-                    # No valid action metadata to use, fallback to scene FPS
-                    return context.scene.render.fps
-            else:
-                raise RuntimeError(f'Invalid FPS source "{options.fps_source}"')
-
         if options.sequence_source == 'ACTIONS':
             for action in options.actions:
                 if len(action.fcurves) == 0:
@@ -154,7 +154,7 @@ class PsaBuilder(object):
                 frame_min, frame_max = [int(x) for x in action.frame_range]
                 export_sequence.nla_state.frame_min = frame_min
                 export_sequence.nla_state.frame_max = frame_max
-                export_sequence.fps = get_sequence_fps(context, options, [action])
+                export_sequence.fps = self.get_sequence_fps(context, options, [action])
                 export_sequences.append(export_sequence)
             pass
         elif options.sequence_source == 'TIMELINE_MARKERS':
@@ -167,7 +167,7 @@ class PsaBuilder(object):
                 export_sequence.nla_state.frame_min = frame_min
                 export_sequence.nla_state.frame_max = frame_max
                 nla_strips_actions = set(map(lambda x: x.action, get_nla_strips_in_timeframe(active_object, frame_min, frame_max)))
-                export_sequence.fps = get_sequence_fps(context, options, nla_strips_actions)
+                export_sequence.fps = self.get_sequence_fps(context, options, nla_strips_actions)
                 export_sequences.append(export_sequence)
         else:
             raise ValueError(f'Unhandled sequence source: {options.sequence_source}')

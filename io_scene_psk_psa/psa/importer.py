@@ -1,6 +1,8 @@
 import bpy
 import os
 import numpy as np
+import re
+import fnmatch
 from mathutils import Vector, Quaternion, Matrix
 from .data import Psa
 from typing import List, AnyStr, Optional
@@ -267,6 +269,7 @@ class PsaImportPropertyGroup(PropertyGroup):
     action_name_prefix: StringProperty(default='', name='Prefix', options=set())
     sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
     sequence_use_filter_invert: BoolProperty(default=False, options=set())
+    sequence_use_filter_regex: BoolProperty(default=False, name='Regular Expression', description='Filter using regular expressions', options=set())
     select_text: PointerProperty(type=bpy.types.Text)
 
 
@@ -276,15 +279,24 @@ def filter_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_c
 
     if pg.sequence_filter_name is not None:
         # Filter name is non-empty.
-        import fnmatch
-        for i, sequence in enumerate(sequences):
-            if not fnmatch.fnmatch(sequence.action_name, f'*{pg.sequence_filter_name}*'):
-                flt_flags[i] &= ~bitflag_filter_item
+        if pg.sequence_use_filter_regex:
+            # Use regular expression
+            try:
+                regex = re.compile(pg.sequence_filter_name)
+                for i, sequence in enumerate(sequences):
+                    if not regex.match(sequence.action_name):
+                        flt_flags[i] &= ~bitflag_filter_item
+            except re.error:
+                pass
+        else:
+            for i, sequence in enumerate(sequences):
+                if not fnmatch.fnmatch(sequence.action_name, f'*{pg.sequence_filter_name}*'):
+                    flt_flags[i] &= ~bitflag_filter_item
 
     if pg.sequence_use_filter_invert:
         # Invert filter flags for all items.
         for i, sequence in enumerate(sequences):
-            flt_flags[i] ^= ~bitflag_filter_item
+            flt_flags[i] ^= bitflag_filter_item
 
     return flt_flags
 
@@ -313,6 +325,7 @@ class PSA_UL_SequenceList(UIList):
         subrow = row.row(align=True)
         subrow.prop(pg, 'sequence_filter_name', text="")
         subrow.prop(pg, 'sequence_use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
+        subrow.prop(pg, 'sequence_use_filter_regex', text="", icon='SORTBYEXT')
 
     def filter_items(self, context, data, property):
         pg = context.scene.psa_import
@@ -368,7 +381,7 @@ class PsaImportSequencesFromText(Operator):
 class PsaImportSequencesSelectAll(Operator):
     bl_idname = 'psa_import.sequences_select_all'
     bl_label = 'All'
-    bl_description = 'Select all sequences'
+    bl_description = 'Select all visible sequences'
     bl_options = {'INTERNAL'}
 
     @classmethod
@@ -389,7 +402,7 @@ class PsaImportSequencesSelectAll(Operator):
 class PsaImportSequencesDeselectAll(Operator):
     bl_idname = 'psa_import.sequences_deselect_all'
     bl_label = 'None'
-    bl_description = 'Deselect all sequences'
+    bl_description = 'Deselect all visible sequences'
     bl_options = {'INTERNAL'}
 
     @classmethod

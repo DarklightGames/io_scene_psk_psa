@@ -10,6 +10,7 @@ from ..helpers import *
 from collections import Counter
 import re
 import sys
+import fnmatch
 
 
 class PsaExporter(object):
@@ -318,7 +319,6 @@ def filter_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_c
 
     if pg.sequence_filter_name is not None:
         # Filter name is non-empty.
-        import fnmatch
         for i, sequence in enumerate(sequences):
             if not fnmatch.fnmatch(sequence.name, f'*{pg.sequence_filter_name}*'):
                 flt_flags[i] &= ~bitflag_filter_item
@@ -331,7 +331,7 @@ def filter_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_c
     if pg.sequence_use_filter_invert:
         # Invert filter flags for all items.
         for i, sequence in enumerate(sequences):
-            flt_flags[i] ^= ~bitflag_filter_item
+            flt_flags[i] ^= bitflag_filter_item
 
     return flt_flags
 
@@ -377,7 +377,7 @@ class PSA_UL_ExportActionList(UIList):
 class PsaExportActionsSelectAll(Operator):
     bl_idname = 'psa_export.sequences_select_all'
     bl_label = 'Select All'
-    bl_description = 'Select all sequences'
+    bl_description = 'Select all visible sequences'
     bl_options = {'INTERNAL'}
 
     @classmethod
@@ -408,7 +408,7 @@ class PsaExportActionsSelectAll(Operator):
 class PsaExportActionsDeselectAll(Operator):
     bl_idname = 'psa_export.sequences_deselect_all'
     bl_label = 'Deselect All'
-    bl_description = 'Deselect all sequences'
+    bl_description = 'Deselect all visible sequences'
     bl_options = {'INTERNAL'}
 
     @classmethod
