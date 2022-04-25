@@ -1,6 +1,5 @@
-import bpy
-import bmesh
 from collections import OrderedDict
+
 from .data import *
 from ..helpers import *
 

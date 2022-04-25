@@ -1,16 +1,19 @@
 import os
-import bpy
-import bmesh
-import numpy as np
+import sys
 from math import inf
 from typing import Optional
-from .data import Psk
-from ..helpers import rgb_to_srgb
-from mathutils import Quaternion, Vector, Matrix
-from .reader import PskReader
-from bpy.props import StringProperty, EnumProperty, BoolProperty
+
+import bmesh
+import bpy
+import numpy as np
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, StringProperty
 from bpy.types import Operator, PropertyGroup
 from bpy_extras.io_utils import ImportHelper
+from mathutils import Quaternion, Vector, Matrix
+
+from .data import Psk
+from .reader import PskReader
+from ..helpers import rgb_to_srgb
 
 
 class PskImportOptions(object):
@@ -20,6 +23,7 @@ class PskImportOptions(object):
         self.vertex_color_space = 'sRGB'
         self.should_import_vertex_normals = True
         self.should_import_extra_uvs = True
+        self.bone_length = 1.0
 
 
 class PskImporter(object):
@@ -60,7 +64,6 @@ class PskImporter(object):
                 self.post_quat: Quaternion = Quaternion()
 
         import_bones = []
-        new_bone_size = 8.0
 
         for bone_index, psk_bone in enumerate(psk.bones):
             import_bone = ImportBone(bone_index, psk_bone)
@@ -93,7 +96,7 @@ class PskImporter(object):
             else:
                 import_bone.local_rotation.conjugate()
 
-            edit_bone.tail = Vector((0.0, new_bone_size, 0.0))
+            edit_bone.tail = Vector((0.0, options.bone_length, 0.0))
             edit_bone_matrix = import_bone.local_rotation.conjugated()
             edit_bone_matrix.rotate(import_bone.world_matrix)
             edit_bone_matrix = edit_bone_matrix.to_matrix().to_4x4()
@@ -209,7 +212,8 @@ class PskImporter(object):
         # Get a list of all bones that have weights associated with them.
         vertex_group_bone_indices = set(map(lambda weight: weight.bone_index, psk.weights))
         for import_bone in map(lambda x: import_bones[x], sorted(list(vertex_group_bone_indices))):
-            import_bone.vertex_group = mesh_object.vertex_groups.new(name=import_bone.psk_bone.name.decode('windows-1252'))
+            import_bone.vertex_group = mesh_object.vertex_groups.new(
+                name=import_bone.psk_bone.name.decode('windows-1252'))
 
         for weight in psk.weights:
             import_bones[weight.bone_index].vertex_group.add((weight.point_index,), weight.weight, 'ADD')
@@ -256,6 +260,15 @@ class PskImportPropertyGroup(PropertyGroup):
         options=set(),
         description='Import extra UV maps from PSKX files, if available'
     )
+    bone_length: FloatProperty(
+        default=1.0,
+        min=sys.float_info.epsilon,
+        step=100,
+        soft_min=1.0,
+        name='Bone Length',
+        options=set(),
+        description='Length of the bones'
+    )
 
 
 class PskImportOperator(Operator, ImportHelper):
@@ -277,7 +290,11 @@ class PskImportOperator(Operator, ImportHelper):
         psk = reader.read(self.filepath)
         options = PskImportOptions()
         options.name = os.path.splitext(os.path.basename(self.filepath))[0]
+        options.should_import_extra_uvs = pg.should_import_extra_uvs
+        options.should_import_vertex_colors = pg.should_import_vertex_colors
+        options.should_import_vertex_normals = pg.should_import_vertex_normals
         options.vertex_color_space = pg.vertex_color_space
+        options.bone_length = pg.bone_length
         PskImporter().import_psk(psk, context, options)
         return {'FINISHED'}
 
@@ -291,6 +308,7 @@ class PskImportOperator(Operator, ImportHelper):
         layout.prop(pg, 'should_import_vertex_colors')
         if pg.should_import_vertex_colors:
             layout.prop(pg, 'vertex_color_space')
+        layout.prop(pg, 'bone_length')
 
 
 classes = (

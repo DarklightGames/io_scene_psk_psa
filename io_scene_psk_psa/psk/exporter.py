@@ -1,11 +1,13 @@
-from .data import *
-from ..types import BoneGroupListItem
-from ..helpers import populate_bone_group_list
-from .builder import PskBuilder, PskBuilderOptions
 from typing import Type
+
+from bpy.props import StringProperty, CollectionProperty, IntProperty, EnumProperty
 from bpy.types import Operator, PropertyGroup
 from bpy_extras.io_utils import ExportHelper
-from bpy.props import StringProperty, CollectionProperty, IntProperty, BoolProperty, EnumProperty
+
+from .builder import PskBuilder, PskBuilderOptions
+from .data import *
+from ..helpers import populate_bone_group_list
+from ..types import BoneGroupListItem
 
 MAX_WEDGE_COUNT = 65536
 MAX_POINT_COUNT = 4294967296
@@ -144,7 +146,8 @@ class PskExportPropertyGroup(PropertyGroup):
         description='',
         items=(
             ('ALL', 'All', 'All bones will be exported.'),
-            ('BONE_GROUPS', 'Bone Groups', 'Only bones belonging to the selected bone groups and their ancestors will be exported.')
+            ('BONE_GROUPS', 'Bone Groups',
+             'Only bones belonging to the selected bone groups and their ancestors will be exported.')
         )
     )
     bone_group_list: CollectionProperty(type=BoneGroupListItem)

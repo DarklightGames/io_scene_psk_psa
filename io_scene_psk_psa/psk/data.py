@@ -1,9 +1,9 @@
 from typing import List
+
 from ..data import *
 
 
 class Psk(object):
-
     class Wedge(object):
         def __init__(self):
             self.point_index: int = 0

@@ -1,7 +1,9 @@
+from typing import Dict, Iterable
+
+from bpy.types import Action
+
 from .data import *
 from ..helpers import *
-from typing import Dict, Iterable
-from bpy.types import Action
 
 
 class PsaBuilderOptions(object):
@@ -37,13 +39,13 @@ class PsaBuilder(object):
             return options.fps_custom
         elif options.fps_source == 'ACTION_METADATA':
             # Get the minimum value of action metadata FPS values.
-            psa_fps_list = []
-            for action in filter(lambda x: 'psa_fps' in x, actions):
-                psa_fps = action['psa_fps']
-                if type(psa_fps) == int or type(psa_fps) == float:
-                    psa_fps_list.append(psa_fps)
-            if len(psa_fps_list) > 0:
-                return min(psa_fps_list)
+            fps_list = []
+            for action in filter(lambda x: 'psa_sequence_fps' in x, actions):
+                fps = action['psa_sequence_fps']
+                if type(fps) == int or type(fps) == float:
+                    fps_list.append(fps)
+            if len(fps_list) > 0:
+                return min(fps_list)
             else:
                 # No valid action metadata to use, fallback to scene FPS
                 return context.scene.render.fps
@@ -166,7 +168,8 @@ class PsaBuilder(object):
                 export_sequence.nla_state.action = None
                 export_sequence.nla_state.frame_min = frame_min
                 export_sequence.nla_state.frame_max = frame_max
-                nla_strips_actions = set(map(lambda x: x.action, get_nla_strips_in_timeframe(active_object, frame_min, frame_max)))
+                nla_strips_actions = set(
+                    map(lambda x: x.action, get_nla_strips_in_timeframe(active_object, frame_min, frame_max)))
                 export_sequence.fps = self.get_sequence_fps(context, options, nla_strips_actions)
                 export_sequences.append(export_sequence)
         else:

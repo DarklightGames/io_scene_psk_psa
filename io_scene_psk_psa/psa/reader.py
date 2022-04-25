@@ -1,14 +1,17 @@
-from .data import *
 import ctypes
+
 import numpy as np
+
+from .data import *
 
 
 class PsaReader(object):
     """
-    This class will read the sequences and bone information immediately upon instantiation and hold onto a file handle.
+    This class reads the sequences and bone information immediately upon instantiation and hold onto a file handle.
     The key data is not read into memory upon instantiation due to it's potentially very large size.
     To read the key data for a particular sequence, call `read_sequence_keys`.
     """
+
     def __init__(self, path):
         self.keys_data_offset: int = 0
         self.fp = open(path, 'rb')
@@ -21,15 +24,6 @@ class PsaReader(object):
     @property
     def sequences(self) -> OrderedDict[Psa.Sequence]:
         return self.psa.sequences
-
-    @staticmethod
-    def _read_types(fp, data_class: ctypes.Structure, section: Section, data):
-        buffer_length = section.data_size * section.data_count
-        buffer = fp.read(buffer_length)
-        offset = 0
-        for _ in range(section.data_count):
-            data.append(data_class.from_buffer_copy(buffer, offset))
-            offset += section.data_size
 
     def read_sequence_data_matrix(self, sequence_name: str):
         sequence = self.psa.sequences[sequence_name]
@@ -65,6 +59,15 @@ class PsaReader(object):
             offset += data_size
         return keys
 
+    @staticmethod
+    def _read_types(fp, data_class: ctypes.Structure, section: Section, data):
+        buffer_length = section.data_size * section.data_count
+        buffer = fp.read(buffer_length)
+        offset = 0
+        for _ in range(section.data_count):
+            data.append(data_class.from_buffer_copy(buffer, offset))
+            offset += section.data_size
+
     def _read(self, fp) -> Psa:
         psa = Psa()
         while fp.read(1):
@@ -88,4 +91,3 @@ class PsaReader(object):
             else:
                 raise RuntimeError(f'Unrecognized section "{section.name}"')
         return psa
-1

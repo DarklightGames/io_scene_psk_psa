@@ -1,16 +1,19 @@
-import bpy
-from bpy.types import Operator, PropertyGroup, Action, UIList, BoneGroup, Panel, TimelineMarker
-from bpy.props import CollectionProperty, IntProperty, FloatProperty, PointerProperty, StringProperty, BoolProperty, EnumProperty
-from bpy_extras.io_utils import ExportHelper
-from typing import Type
-from .builder import PsaBuilder, PsaBuilderOptions
-from .data import *
-from ..types import BoneGroupListItem
-from ..helpers import *
-from collections import Counter
+import fnmatch
 import re
 import sys
-import fnmatch
+from collections import Counter
+from typing import Type
+
+import bpy
+from bpy.props import BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty, PointerProperty, \
+    StringProperty
+from bpy.types import Action, Operator, PropertyGroup, UIList
+from bpy_extras.io_utils import ExportHelper
+
+from .builder import PsaBuilder, PsaBuilderOptions
+from .data import *
+from ..helpers import *
+from ..types import BoneGroupListItem
 
 
 class PsaExporter(object):
@@ -57,7 +60,7 @@ def update_action_names(context):
         item.action_name = get_psa_sequence_name(action, pg.should_use_original_sequence_names)
 
 
-def should_use_original_sequence_names_updated(property, context):
+def should_use_original_sequence_names_updated(_, context):
     update_action_names(context)
 
 
@@ -68,7 +71,8 @@ class PsaExportPropertyGroup(PropertyGroup):
         description='',
         items=(
             ('ACTIONS', 'Actions', 'Sequences will be exported using actions', 'ACTION', 0),
-            ('TIMELINE_MARKERS', 'Timeline Markers', 'Sequences will be exported using timeline markers', 'MARKER_HLT', 1),
+            ('TIMELINE_MARKERS', 'Timeline Markers', 'Sequences will be exported using timeline markers', 'MARKER_HLT',
+             1),
         )
     )
     fps_source: EnumProperty(
@@ -77,11 +81,14 @@ class PsaExportPropertyGroup(PropertyGroup):
         description='',
         items=(
             ('SCENE', 'Scene', '', 'SCENE_DATA', 0),
-            ('ACTION_METADATA', 'Action Metadata', 'The frame rate will be determined by action\'s "psa_fps" custom property, if it exists. If the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used. If no metadata is available, the scene\'s frame rate will be used.', 'PROPERTIES', 1),
+            ('ACTION_METADATA', 'Action Metadata',
+             'The frame rate will be determined by action\'s "psa_sequence_fps" custom property, if it exists. If the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used. If no metadata is available, the scene\'s frame rate will be used.',
+             'PROPERTIES', 1),
             ('CUSTOM', 'Custom', '', 2)
         )
     )
-    fps_custom: FloatProperty(default=30.0, min=sys.float_info.epsilon, soft_min=1.0, options=set(), step=100, soft_max=60.0)
+    fps_custom: FloatProperty(default=30.0, min=sys.float_info.epsilon, soft_min=1.0, options=set(), step=100,
+                              soft_max=60.0)
     action_list: CollectionProperty(type=PsaExportActionListItem)
     action_list_index: IntProperty(default=0)
     marker_list: CollectionProperty(type=PsaExportTimelineMarkerListItem)
@@ -117,7 +124,8 @@ class PsaExportPropertyGroup(PropertyGroup):
     sequence_name_suffix: StringProperty(name='Suffix', options=set())
     sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
     sequence_use_filter_invert: BoolProperty(default=False, options=set())
-    sequence_filter_asset: BoolProperty(default=False, name='Show assets', description='Show actions that belong to an asset library', options=set())
+    sequence_filter_asset: BoolProperty(default=False, name='Show assets',
+                                        description='Show actions that belong to an asset library', options=set())
     sequence_use_filter_sort_reverse: BoolProperty(default=True, options=set())
 
 
@@ -178,7 +186,8 @@ class PsaExportOperator(Operator, ExportHelper):
 
         elif pg.sequence_source == 'TIMELINE_MARKERS':
             rows = max(3, min(len(pg.marker_list), 10))
-            layout.template_list('PSA_UL_ExportTimelineMarkerList', '', pg, 'marker_list', pg, 'marker_list_index', rows=rows)
+            layout.template_list('PSA_UL_ExportTimelineMarkerList', '', pg, 'marker_list', pg, 'marker_list_index',
+                                 rows=rows)
 
             col = layout.column()
             col.use_property_split = True
@@ -208,7 +217,8 @@ class PsaExportOperator(Operator, ExportHelper):
             row.operator(PsaExportBoneGroupsSelectAll.bl_idname, text='All', icon='CHECKBOX_HLT')
             row.operator(PsaExportBoneGroupsDeselectAll.bl_idname, text='None', icon='CHECKBOX_DEHLT')
             rows = max(3, min(len(pg.bone_group_list), 10))
-            layout.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg, 'bone_group_list_index', rows=rows)
+            layout.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg, 'bone_group_list_index',
+                                 rows=rows)
 
     def should_action_be_selected_by_default(self, action):
         return action is not None and action.asset_data is None
@@ -336,7 +346,8 @@ def filter_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_c
     return flt_flags
 
 
-def get_visible_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[PsaExportActionListItem]:
+def get_visible_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[
+    PsaExportActionListItem]:
     visible_sequences = []
     for i, flag in enumerate(filter_sequences(pg, sequences)):
         if bool(flag & (1 << 30)):

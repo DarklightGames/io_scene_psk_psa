@@ -1,14 +1,16 @@
-import bpy
-import os
-import numpy as np
-import re
 import fnmatch
-from mathutils import Vector, Quaternion, Matrix
-from .data import Psa
-from typing import List, AnyStr, Optional
-from bpy.types import Operator, Action, UIList, PropertyGroup, Panel, Armature, FileSelectParams
-from bpy_extras.io_utils import ImportHelper
+import os
+import re
+from typing import List, Optional
+
+import bpy
+import numpy as np
 from bpy.props import StringProperty, BoolProperty, CollectionProperty, PointerProperty, IntProperty
+from bpy.types import Operator, UIList, PropertyGroup, Panel
+from bpy_extras.io_utils import ImportHelper
+from mathutils import Vector, Quaternion
+
+from .data import Psa
 from .reader import PsaReader
 
 
@@ -18,7 +20,6 @@ class PsaImportOptions(object):
         self.should_use_fake_user = False
         self.should_stash = False
         self.sequence_names = []
-        self.should_use_action_name_prefix = False
         self.should_overwrite = False
         self.should_write_keyframes = True
         self.should_write_metadata = True
@@ -76,7 +77,8 @@ class PsaImporter(object):
         # Report if there are missing bones in the target armature.
         missing_bone_names = set(psa_bone_names).difference(set(armature_bone_names))
         if len(missing_bone_names) > 0:
-            print(f'The armature object \'{armature_object.name}\' is missing the following bones that exist in the PSA:')
+            print(
+                f'The armature object \'{armature_object.name}\' is missing the following bones that exist in the PSA:')
             print(list(sorted(missing_bone_names)))
         del armature_bone_names
 
@@ -192,14 +194,16 @@ class PsaImporter(object):
                         if bone_has_writeable_keyframes:
                             # This bone has writeable keyframes for this frame.
                             key_data = sequence_data_matrix[frame_index, bone_index]
-                            for fcurve, should_write, datum in zip(import_bone.fcurves, keyframe_write_matrix[frame_index, bone_index], key_data):
+                            for fcurve, should_write, datum in zip(import_bone.fcurves,
+                                                                   keyframe_write_matrix[frame_index, bone_index],
+                                                                   key_data):
                                 if should_write:
                                     fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
 
             # Write
             if options.should_write_metadata:
                 action['psa_sequence_name'] = sequence_name
-                action['psa_fps'] = sequence.fps
+                action['psa_sequence_fps'] = sequence.fps
 
             action.use_fake_user = options.should_use_fake_user
 
@@ -259,18 +263,28 @@ class PsaImportPropertyGroup(PropertyGroup):
     psa: PointerProperty(type=PsaDataPropertyGroup)
     sequence_list: CollectionProperty(type=PsaImportActionListItem)
     sequence_list_index: IntProperty(name='', default=0)
-    should_clean_keys: BoolProperty(default=True, name='Clean Keyframes', description='Exclude unnecessary keyframes from being written to the actions.', options=set())
-    should_use_fake_user: BoolProperty(default=True, name='Fake User', description='Assign each imported action a fake user so that the data block is saved even it has no users.', options=set())
-    should_stash: BoolProperty(default=False, name='Stash', description='Stash each imported action as a strip on a new non-contributing NLA track', options=set())
+    should_clean_keys: BoolProperty(default=True, name='Clean Keyframes',
+                                    description='Exclude unnecessary keyframes from being written to the actions',
+                                    options=set())
+    should_use_fake_user: BoolProperty(default=True, name='Fake User',
+                                       description='Assign each imported action a fake user so that the data block is saved even it has no users',
+                                       options=set())
+    should_stash: BoolProperty(default=False, name='Stash',
+                               description='Stash each imported action as a strip on a new non-contributing NLA track',
+                               options=set())
     should_use_action_name_prefix: BoolProperty(default=False, name='Prefix Action Name', options=set())
-    should_overwrite: BoolProperty(default=False, name='Reuse Existing Datablocks', options=set())
-    should_write_keyframes: BoolProperty(default=True, name='Keyframes', options=set())
-    should_write_metadata: BoolProperty(default=True, name='Metadata', options=set(), description='Additional data will be written to the custom properties of the Action (e.g., frame rate)')
     action_name_prefix: StringProperty(default='', name='Prefix', options=set())
+    should_overwrite: BoolProperty(default=False, name='Reuse Existing Actions', options=set(),
+                                   description='If an action with a matching name already exists, the existing action will have it\'s data overwritten instead of a new action being created')
+    should_write_keyframes: BoolProperty(default=True, name='Keyframes', options=set())
+    should_write_metadata: BoolProperty(default=True, name='Metadata', options=set(),
+                                        description='Additional data will be written to the custom properties of the Action (e.g., frame rate)')
     sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
-    sequence_filter_is_selected: BoolProperty(default=False, options=set(), name='Only Show Selected', description='Only show selected sequences')
+    sequence_filter_is_selected: BoolProperty(default=False, options=set(), name='Only Show Selected',
+                                              description='Only show selected sequences')
     sequence_use_filter_invert: BoolProperty(default=False, options=set())
-    sequence_use_filter_regex: BoolProperty(default=False, name='Regular Expression', description='Filter using regular expressions', options=set())
+    sequence_use_filter_regex: BoolProperty(default=False, name='Regular Expression',
+                                            description='Filter using regular expressions', options=set())
     select_text: PointerProperty(type=bpy.types.Text)
 
 
@@ -290,7 +304,7 @@ def filter_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_c
             except re.error:
                 pass
         else:
-            # User regular matching
+            # User regular text matching.
             for i, sequence in enumerate(sequences):
                 if not fnmatch.fnmatch(sequence.action_name, f'*{pg.sequence_filter_name}*'):
                     flt_flags[i] &= ~bitflag_filter_item
@@ -308,7 +322,8 @@ def filter_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_c
     return flt_flags
 
 
-def get_visible_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[PsaImportActionListItem]:
+def get_visible_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[
+    PsaImportActionListItem]:
     bitflag_filter_item = 1 << 30
     visible_sequences = []
     for i, flag in enumerate(filter_sequences(pg, sequences)):
@@ -451,21 +466,6 @@ class PSA_PT_ImportPanel_Advanced(Panel):
             col.prop(pg, 'action_name_prefix')
 
 
-class PSA_PT_ImportPanel_PsaData(Panel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_label = 'PSA Info'
-    bl_options = {'DEFAULT_CLOSED'}
-    bl_parent_id = 'PSA_PT_ImportPanel'
-
-    def draw(self, context):
-        layout = self.layout
-        pg = context.scene.psa_import.psa
-
-        layout.label(text=f'{len(pg.bones)} Bones', icon='BONE_DATA')
-        layout.label(text=f'{pg.sequence_count} Sequences', icon='SEQUENCE')
-
-
 class PSA_PT_ImportPanel(Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -584,7 +584,7 @@ class PsaImportOperator(Operator):
         options.should_clean_keys = pg.should_clean_keys
         options.should_use_fake_user = pg.should_use_fake_user
         options.should_stash = pg.should_stash
-        options.action_name_prefix = pg.action_name_prefix
+        options.action_name_prefix = pg.action_name_prefix if pg.should_use_action_name_prefix else ''
         options.should_overwrite = pg.should_overwrite
         options.should_write_metadata = pg.should_write_metadata
         options.should_write_keyframes = pg.should_write_keyframes
@@ -632,7 +632,6 @@ classes = (
     PsaImportFileReload,
     PSA_PT_ImportPanel,
     PSA_PT_ImportPanel_Advanced,
-    PSA_PT_ImportPanel_PsaData,
     PsaImportOperator,
     PsaImportFileSelectOperator,
     PsaImportSelectFile,

@@ -1,7 +1,8 @@
-from bpy.types import NlaStrip
-from typing import List, Tuple, Optional
-from collections import Counter
 import datetime
+from collections import Counter
+from typing import List
+
+from bpy.types import NlaStrip
 
 
 class Timer:

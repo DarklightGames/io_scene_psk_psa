@@ -1,5 +1,5 @@
-from bpy.types import PropertyGroup, UIList
 from bpy.props import StringProperty, IntProperty, BoolProperty
+from bpy.types import PropertyGroup, UIList
 
 
 class PSX_UL_BoneGroupList(UIList):
