@@ -55,6 +55,10 @@ class Vector3(Structure):
     def __repr__(self):
         return repr(tuple(self))
 
+    @classmethod
+    def zero(cls):
+        return Vector3(0, 0, 0)
+
 
 class Quaternion(Structure):
     _fields_ = [
@@ -72,6 +76,10 @@ class Quaternion(Structure):
 
     def __repr__(self):
         return repr(tuple(self))
+
+    @classmethod
+    def identity(cls):
+        return Quaternion(0, 0, 0, 1)
 
 
 class Section(Structure):

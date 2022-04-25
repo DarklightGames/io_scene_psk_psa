@@ -1,12 +1,16 @@
-import bpy
+import fnmatch
 import os
+import re
+from typing import List, Optional
+
+import bpy
 import numpy as np
-from mathutils import Vector, Quaternion, Matrix
-from .data import Psa
-from typing import List, AnyStr, Optional
-from bpy.types import Operator, Action, UIList, PropertyGroup, Panel, Armature, FileSelectParams
-from bpy_extras.io_utils import ExportHelper, ImportHelper
 from bpy.props import StringProperty, BoolProperty, CollectionProperty, PointerProperty, IntProperty
+from bpy.types import Operator, UIList, PropertyGroup, Panel
+from bpy_extras.io_utils import ImportHelper
+from mathutils import Vector, Quaternion
+
+from .data import Psa
 from .reader import PsaReader
 
 
@@ -16,6 +20,10 @@ class PsaImportOptions(object):
         self.should_use_fake_user = False
         self.should_stash = False
         self.sequence_names = []
+        self.should_overwrite = False
+        self.should_write_keyframes = True
+        self.should_write_metadata = True
+        self.action_name_prefix = ''
 
 
 class PsaImporter(object):
@@ -69,7 +77,8 @@ class PsaImporter(object):
         # Report if there are missing bones in the target armature.
         missing_bone_names = set(psa_bone_names).difference(set(armature_bone_names))
         if len(missing_bone_names) > 0:
-            print(f'The armature object \'{armature_object.name}\' is missing the following bones that exist in the PSA:')
+            print(
+                f'The armature object \'{armature_object.name}\' is missing the following bones that exist in the PSA:')
             print(list(sorted(missing_bone_names)))
         del armature_bone_names
 
@@ -115,75 +124,92 @@ class PsaImporter(object):
         actions = []
         for sequence in sequences:
             # Add the action.
-            action = bpy.data.actions.new(name=sequence.name.decode())
-            action.use_fake_user = options.should_use_fake_user
-
-            # Create f-curves for the rotation and location of each bone.
-            for psa_bone_index, armature_bone_index in psa_to_armature_bone_indices.items():
-                import_bone = import_bones[psa_bone_index]
-                pose_bone = import_bone.pose_bone
-                rotation_data_path = pose_bone.path_from_id('rotation_quaternion')
-                location_data_path = pose_bone.path_from_id('location')
-                import_bone.fcurves = [
-                    action.fcurves.new(rotation_data_path, index=0),  # Qw
-                    action.fcurves.new(rotation_data_path, index=1),  # Qx
-                    action.fcurves.new(rotation_data_path, index=2),  # Qy
-                    action.fcurves.new(rotation_data_path, index=3),  # Qz
-                    action.fcurves.new(location_data_path, index=0),  # Lx
-                    action.fcurves.new(location_data_path, index=1),  # Ly
-                    action.fcurves.new(location_data_path, index=2),  # Lz
-                ]
-
             sequence_name = sequence.name.decode('windows-1252')
+            action_name = options.action_name_prefix + sequence_name
 
-            # Read the sequence data matrix from the PSA.
-            sequence_data_matrix = psa_reader.read_sequence_data_matrix(sequence_name)
-            keyframe_write_matrix = np.ones(sequence_data_matrix.shape, dtype=np.int8)
+            if options.should_overwrite and action_name in bpy.data.actions:
+                action = bpy.data.actions[action_name]
+            else:
+                action = bpy.data.actions.new(name=action_name)
 
-            # Convert the sequence's data from world-space to local-space.
-            for bone_index, import_bone in enumerate(import_bones):
-                if import_bone is None:
-                    continue
-                for frame_index in range(sequence.frame_count):
-                    # This bone has writeable keyframes for this frame.
-                    key_data = sequence_data_matrix[frame_index, bone_index]
-                    # Calculate the local-space key data for the bone.
-                    sequence_data_matrix[frame_index, bone_index] = calculate_fcurve_data(import_bone, key_data)
+            if options.should_write_keyframes:
+                # Remove existing f-curves (replace with action.fcurves.clear() in Blender 3.2)
+                while len(action.fcurves) > 0:
+                    action.fcurves.remove(action.fcurves[-1])
 
-            # Clean the keyframe data. This is accomplished by writing zeroes to the write matrix when there is an
-            # insufficiently large change in the data from frame-to-frame.
-            if options.should_clean_keys:
-                threshold = 0.001
+                # Create f-curves for the rotation and location of each bone.
+                for psa_bone_index, armature_bone_index in psa_to_armature_bone_indices.items():
+                    import_bone = import_bones[psa_bone_index]
+                    pose_bone = import_bone.pose_bone
+                    rotation_data_path = pose_bone.path_from_id('rotation_quaternion')
+                    location_data_path = pose_bone.path_from_id('location')
+                    import_bone.fcurves = [
+                        action.fcurves.new(rotation_data_path, index=0, action_group=pose_bone.name),  # Qw
+                        action.fcurves.new(rotation_data_path, index=1, action_group=pose_bone.name),  # Qx
+                        action.fcurves.new(rotation_data_path, index=2, action_group=pose_bone.name),  # Qy
+                        action.fcurves.new(rotation_data_path, index=3, action_group=pose_bone.name),  # Qz
+                        action.fcurves.new(location_data_path, index=0, action_group=pose_bone.name),  # Lx
+                        action.fcurves.new(location_data_path, index=1, action_group=pose_bone.name),  # Ly
+                        action.fcurves.new(location_data_path, index=2, action_group=pose_bone.name),  # Lz
+                    ]
+
+                # Read the sequence data matrix from the PSA.
+                sequence_data_matrix = psa_reader.read_sequence_data_matrix(sequence_name)
+                keyframe_write_matrix = np.ones(sequence_data_matrix.shape, dtype=np.int8)
+
+                # Convert the sequence's data from world-space to local-space.
                 for bone_index, import_bone in enumerate(import_bones):
                     if import_bone is None:
                         continue
-                    for fcurve_index in range(len(import_bone.fcurves)):
-                        # Get all the keyframe data for the bone's f-curve data from the sequence data matrix.
-                        fcurve_frame_data = sequence_data_matrix[:, bone_index, fcurve_index]
-                        last_written_datum = 0
-                        for frame_index, datum in enumerate(fcurve_frame_data):
-                            # If the f-curve data is not different enough to the last written frame, un-mark this data for writing.
-                            if frame_index > 0 and abs(datum - last_written_datum) < threshold:
-                                keyframe_write_matrix[frame_index, bone_index, fcurve_index] = 0
-                            else:
-                                last_written_datum = datum
-
-            # Write the keyframes out!
-            for frame_index in range(sequence.frame_count):
-                for bone_index, import_bone in enumerate(import_bones):
-                    if import_bone is None:
-                        continue
-                    bone_has_writeable_keyframes = any(keyframe_write_matrix[frame_index, bone_index])
-                    if bone_has_writeable_keyframes:
+                    for frame_index in range(sequence.frame_count):
                         # This bone has writeable keyframes for this frame.
                         key_data = sequence_data_matrix[frame_index, bone_index]
-                        for fcurve, should_write, datum in zip(import_bone.fcurves, keyframe_write_matrix[frame_index, bone_index], key_data):
-                            if should_write:
-                                fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
+                        # Calculate the local-space key data for the bone.
+                        sequence_data_matrix[frame_index, bone_index] = calculate_fcurve_data(import_bone, key_data)
+
+                # Clean the keyframe data. This is accomplished by writing zeroes to the write matrix when there is an
+                # insufficiently large change in the data from the last written frame.
+                if options.should_clean_keys:
+                    threshold = 0.001
+                    for bone_index, import_bone in enumerate(import_bones):
+                        if import_bone is None:
+                            continue
+                        for fcurve_index in range(len(import_bone.fcurves)):
+                            # Get all the keyframe data for the bone's f-curve data from the sequence data matrix.
+                            fcurve_frame_data = sequence_data_matrix[:, bone_index, fcurve_index]
+                            last_written_datum = 0
+                            for frame_index, datum in enumerate(fcurve_frame_data):
+                                # If the f-curve data is not different enough to the last written frame, un-mark this data for writing.
+                                if frame_index > 0 and abs(datum - last_written_datum) < threshold:
+                                    keyframe_write_matrix[frame_index, bone_index, fcurve_index] = 0
+                                else:
+                                    last_written_datum = datum
+
+                # Write the keyframes out!
+                for frame_index in range(sequence.frame_count):
+                    for bone_index, import_bone in enumerate(import_bones):
+                        if import_bone is None:
+                            continue
+                        bone_has_writeable_keyframes = any(keyframe_write_matrix[frame_index, bone_index])
+                        if bone_has_writeable_keyframes:
+                            # This bone has writeable keyframes for this frame.
+                            key_data = sequence_data_matrix[frame_index, bone_index]
+                            for fcurve, should_write, datum in zip(import_bone.fcurves,
+                                                                   keyframe_write_matrix[frame_index, bone_index],
+                                                                   key_data):
+                                if should_write:
+                                    fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
+
+            # Write
+            if options.should_write_metadata:
+                action['psa_sequence_name'] = sequence_name
+                action['psa_sequence_fps'] = sequence.fps
+
+            action.use_fake_user = options.should_use_fake_user
 
             actions.append(action)
 
-        # If the user specifies, store the new animations as strips on a non-contributing NLA stack.
+        # If the user specifies, store the new animations as strips on a non-contributing NLA track.
         if options.should_stash:
             if armature_object.animation_data is None:
                 armature_object.animation_data_create()
@@ -194,57 +220,119 @@ class PsaImporter(object):
                 nla_track.strips.new(name=action.name, start=0, action=action)
 
 
-class PsaImportPsaBoneItem(PropertyGroup):
-    bone_name: StringProperty()
-
-    @property
-    def name(self):
-        return self.bone_name
-
-
 class PsaImportActionListItem(PropertyGroup):
-    action_name: StringProperty()
-    frame_count: IntProperty()
-    is_selected: BoolProperty(default=False)
+    action_name: StringProperty(options=set())
+    is_selected: BoolProperty(default=False, options=set())
 
-    @property
-    def name(self):
-        return self.action_name
+
+def load_psa_file(context):
+    pg = context.scene.psa_import
+    pg.sequence_list.clear()
+    pg.psa.bones.clear()
+    pg.psa_error = ''
+    try:
+        # Read the file and populate the action list.
+        p = os.path.abspath(pg.psa_file_path)
+        psa_reader = PsaReader(p)
+        for sequence in psa_reader.sequences.values():
+            item = pg.sequence_list.add()
+            item.action_name = sequence.name.decode('windows-1252')
+        for psa_bone in psa_reader.bones:
+            item = pg.psa.bones.add()
+            item.bone_name = psa_bone.name.decode('windows-1252')
+    except Exception as e:
+        pg.psa_error = str(e)
 
 
 def on_psa_file_path_updated(property, context):
-    property_group = context.scene.psa_import
-    property_group.action_list.clear()
-    property_group.psa_bones.clear()
-    try:
-        # Read the file and populate the action list.
-        p = os.path.abspath(property_group.psa_file_path)
-        psa_reader = PsaReader(p)
-        for sequence in psa_reader.sequences.values():
-            item = property_group.action_list.add()
-            item.action_name = sequence.name.decode('windows-1252')
-            item.frame_count = sequence.frame_count
-            item.is_selected = True
-        for psa_bone in psa_reader.bones:
-            item = property_group.psa_bones.add()
-            item.bone_name = psa_bone.name
-    except IOError as e:
-        # TODO: set an error somewhere so the user knows the PSA could not be read.
-        pass
+    load_psa_file(context)
+
+
+class PsaBonePropertyGroup(PropertyGroup):
+    bone_name: StringProperty(options=set())
+
+
+class PsaDataPropertyGroup(PropertyGroup):
+    bones: CollectionProperty(type=PsaBonePropertyGroup)
+    sequence_count: IntProperty(default=0)
 
 
 class PsaImportPropertyGroup(PropertyGroup):
-    psa_file_path: StringProperty(default='', update=on_psa_file_path_updated, name='PSA File Path')
-    psa_bones: CollectionProperty(type=PsaImportPsaBoneItem)
-    action_list: CollectionProperty(type=PsaImportActionListItem)
-    action_list_index: IntProperty(name='', default=0)
-    action_filter_name: StringProperty(default='')
-    should_clean_keys: BoolProperty(default=True, name='Clean Keyframes', description='Exclude unnecessary keyframes from being written to the actions.')
-    should_use_fake_user: BoolProperty(default=True, name='Fake User', description='Assign each imported action a fake user so that the data block is saved even it has no users.')
-    should_stash: BoolProperty(default=False, name='Stash', description='Stash each imported action as a strip on a new non-contributing NLA track')
+    psa_file_path: StringProperty(default='', options=set(), update=on_psa_file_path_updated, name='PSA File Path')
+    psa_error: StringProperty(default='')
+    psa: PointerProperty(type=PsaDataPropertyGroup)
+    sequence_list: CollectionProperty(type=PsaImportActionListItem)
+    sequence_list_index: IntProperty(name='', default=0)
+    should_clean_keys: BoolProperty(default=True, name='Clean Keyframes',
+                                    description='Exclude unnecessary keyframes from being written to the actions',
+                                    options=set())
+    should_use_fake_user: BoolProperty(default=True, name='Fake User',
+                                       description='Assign each imported action a fake user so that the data block is saved even it has no users',
+                                       options=set())
+    should_stash: BoolProperty(default=False, name='Stash',
+                               description='Stash each imported action as a strip on a new non-contributing NLA track',
+                               options=set())
+    should_use_action_name_prefix: BoolProperty(default=False, name='Prefix Action Name', options=set())
+    action_name_prefix: StringProperty(default='', name='Prefix', options=set())
+    should_overwrite: BoolProperty(default=False, name='Reuse Existing Actions', options=set(),
+                                   description='If an action with a matching name already exists, the existing action will have it\'s data overwritten instead of a new action being created')
+    should_write_keyframes: BoolProperty(default=True, name='Keyframes', options=set())
+    should_write_metadata: BoolProperty(default=True, name='Metadata', options=set(),
+                                        description='Additional data will be written to the custom properties of the Action (e.g., frame rate)')
+    sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
+    sequence_filter_is_selected: BoolProperty(default=False, options=set(), name='Only Show Selected',
+                                              description='Only show selected sequences')
+    sequence_use_filter_invert: BoolProperty(default=False, options=set())
+    sequence_use_filter_regex: BoolProperty(default=False, name='Regular Expression',
+                                            description='Filter using regular expressions', options=set())
+    select_text: PointerProperty(type=bpy.types.Text)
 
 
-class PSA_UL_ImportActionList(UIList):
+def filter_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[int]:
+    bitflag_filter_item = 1 << 30
+    flt_flags = [bitflag_filter_item] * len(sequences)
+
+    if pg.sequence_filter_name is not None:
+        # Filter name is non-empty.
+        if pg.sequence_use_filter_regex:
+            # Use regular expression. If regex pattern doesn't compile, just ignore it.
+            try:
+                regex = re.compile(pg.sequence_filter_name)
+                for i, sequence in enumerate(sequences):
+                    if not regex.match(sequence.action_name):
+                        flt_flags[i] &= ~bitflag_filter_item
+            except re.error:
+                pass
+        else:
+            # User regular text matching.
+            for i, sequence in enumerate(sequences):
+                if not fnmatch.fnmatch(sequence.action_name, f'*{pg.sequence_filter_name}*'):
+                    flt_flags[i] &= ~bitflag_filter_item
+
+    if pg.sequence_filter_is_selected:
+        for i, sequence in enumerate(sequences):
+            if not sequence.is_selected:
+                flt_flags[i] &= ~bitflag_filter_item
+
+    if pg.sequence_use_filter_invert:
+        # Invert filter flags for all items.
+        for i, sequence in enumerate(sequences):
+            flt_flags[i] ^= bitflag_filter_item
+
+    return flt_flags
+
+
+def get_visible_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[
+    PsaImportActionListItem]:
+    bitflag_filter_item = 1 << 30
+    visible_sequences = []
+    for i, flag in enumerate(filter_sequences(pg, sequences)):
+        if bool(flag & bitflag_filter_item):
+            visible_sequences.append(sequences[i])
+    return visible_sequences
+
+
+class PSA_UL_SequenceList(UIList):
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         row = layout.row(align=True)
@@ -255,64 +343,127 @@ class PSA_UL_ImportActionList(UIList):
         column.label(text=item.action_name)
 
     def draw_filter(self, context, layout):
+        pg = context.scene.psa_import
         row = layout.row()
         subrow = row.row(align=True)
-        subrow.prop(self, 'filter_name', text="")
-        subrow.prop(self, 'use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
-        subrow = row.row(align=True)
-        subrow.prop(self, 'use_filter_sort_reverse', text='', icon='SORT_ASC')
+        subrow.prop(pg, 'sequence_filter_name', text="")
+        subrow.prop(pg, 'sequence_use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
+        subrow.prop(pg, 'sequence_use_filter_regex', text="", icon='SORTBYEXT')
+        subrow.prop(pg, 'sequence_filter_is_selected', text="", icon='CHECKBOX_HLT')
 
     def filter_items(self, context, data, property):
-        actions = getattr(data, property)
-        flt_flags = []
-        flt_neworder = []
-        if self.filter_name:
-            flt_flags = bpy.types.UI_UL_list.filter_items_by_name(
-                self.filter_name,
-                self.bitflag_filter_item,
-                actions,
-                'action_name',
-                reverse=self.use_filter_invert
-            )
+        pg = context.scene.psa_import
+        sequences = getattr(data, property)
+        flt_flags = filter_sequences(pg, sequences)
+        flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(sequences, 'action_name')
         return flt_flags, flt_neworder
 
 
-class PsaImportSelectAll(bpy.types.Operator):
-    bl_idname = 'psa_import.actions_select_all'
+class PSA_UL_ImportSequenceList(PSA_UL_SequenceList, UIList):
+    pass
+
+
+class PSA_UL_ImportActionList(PSA_UL_SequenceList, UIList):
+    pass
+
+
+class PsaImportSequencesFromText(Operator):
+    bl_idname = 'psa_import.sequences_select_from_text'
+    bl_label = 'Select By Text List'
+    bl_description = 'Select sequences by name from text list'
+    bl_options = {'INTERNAL', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        pg = context.scene.psa_import
+        return len(pg.sequence_list) > 0
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=256)
+
+    def draw(self, context):
+        layout = self.layout
+        pg = context.scene.psa_import
+        layout.label(icon='INFO', text='Each sequence name should be on a new line.')
+        layout.prop(pg, 'select_text', text='')
+
+    def execute(self, context):
+        pg = context.scene.psa_import
+        contents = pg.select_text.as_string()
+        count = 0
+        for line in contents.split('\n'):
+            for sequence in pg.sequence_list:
+                if sequence.action_name == line:
+                    sequence.is_selected = True
+                    count += 1
+        self.report({'INFO'}, f'Selected {count} sequence(s)')
+        return {'FINISHED'}
+
+
+class PsaImportSequencesSelectAll(Operator):
+    bl_idname = 'psa_import.sequences_select_all'
     bl_label = 'All'
-    bl_description = 'Select all actions'
+    bl_description = 'Select all visible sequences'
+    bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
-        property_group = context.scene.psa_import
-        action_list = property_group.action_list
-        has_unselected_actions = any(map(lambda action: not action.is_selected, action_list))
-        return len(action_list) > 0 and has_unselected_actions
+        pg = context.scene.psa_import
+        visible_sequences = get_visible_sequences(pg, pg.sequence_list)
+        has_unselected_actions = any(map(lambda action: not action.is_selected, visible_sequences))
+        return len(visible_sequences) > 0 and has_unselected_actions
 
     def execute(self, context):
-        property_group = context.scene.psa_import
-        for action in property_group.action_list:
-            action.is_selected = True
+        pg = context.scene.psa_import
+        visible_sequences = get_visible_sequences(pg, pg.sequence_list)
+        for sequence in visible_sequences:
+            sequence.is_selected = True
         return {'FINISHED'}
 
 
-class PsaImportDeselectAll(bpy.types.Operator):
-    bl_idname = 'psa_import.actions_deselect_all'
+class PsaImportSequencesDeselectAll(Operator):
+    bl_idname = 'psa_import.sequences_deselect_all'
     bl_label = 'None'
-    bl_description = 'Deselect all actions'
+    bl_description = 'Deselect all visible sequences'
+    bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
-        property_group = context.scene.psa_import
-        action_list = property_group.action_list
-        has_selected_actions = any(map(lambda action: action.is_selected, action_list))
-        return len(action_list) > 0 and has_selected_actions
+        pg = context.scene.psa_import
+        visible_sequences = get_visible_sequences(pg, pg.sequence_list)
+        has_selected_sequences = any(map(lambda sequence: sequence.is_selected, visible_sequences))
+        return len(visible_sequences) > 0 and has_selected_sequences
 
     def execute(self, context):
-        property_group = context.scene.psa_import
-        for action in property_group.action_list:
-            action.is_selected = False
+        pg = context.scene.psa_import
+        visible_sequences = get_visible_sequences(pg, pg.sequence_list)
+        for sequence in visible_sequences:
+            sequence.is_selected = False
         return {'FINISHED'}
+
+
+class PSA_PT_ImportPanel_Advanced(Panel):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_label = 'Advanced'
+    bl_options = {'DEFAULT_CLOSED'}
+    bl_parent_id = 'PSA_PT_ImportPanel'
+
+    def draw(self, context):
+        layout = self.layout
+        pg = context.scene.psa_import
+
+        col = layout.column(heading="Options")
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(pg, 'should_clean_keys')
+        col.separator()
+        col.prop(pg, 'should_use_fake_user')
+        col.prop(pg, 'should_stash')
+        col.prop(pg, 'should_use_action_name_prefix')
+
+        if pg.should_use_action_name_prefix:
+            col.prop(pg, 'action_name_prefix')
 
 
 class PSA_PT_ImportPanel(Panel):
@@ -329,41 +480,73 @@ class PSA_PT_ImportPanel(Panel):
 
     def draw(self, context):
         layout = self.layout
-        property_group = context.scene.psa_import
+        pg = context.scene.psa_import
+
+        row = layout.row(align=True)
+        row.operator(PsaImportSelectFile.bl_idname, text='', icon='FILEBROWSER')
+        row.prop(pg, 'psa_file_path', text='')
+        row.operator(PsaImportFileReload.bl_idname, text='', icon='FILE_REFRESH')
+
+        if pg.psa_error != '':
+            row = layout.row()
+            row.label(text='File could not be read', icon='ERROR')
+
+        box = layout.box()
+
+        box.label(text=f'Sequences ({len(pg.sequence_list)})', icon='ARMATURE_DATA')
+
+        # select
+        rows = max(3, min(len(pg.sequence_list), 10))
+
+        row = box.row()
+        col = row.column()
+
+        row2 = col.row(align=True)
+        row2.label(text='Select')
+        row2.operator(PsaImportSequencesFromText.bl_idname, text='', icon='TEXT')
+        row2.operator(PsaImportSequencesSelectAll.bl_idname, text='All', icon='CHECKBOX_HLT')
+        row2.operator(PsaImportSequencesDeselectAll.bl_idname, text='None', icon='CHECKBOX_DEHLT')
+
+        col = col.row()
+        col.template_list('PSA_UL_ImportSequenceList', '', pg, 'sequence_list', pg, 'sequence_list_index', rows=rows)
+
+        col = layout.column(heading='')
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(pg, 'should_overwrite')
+
+        col = layout.column(heading='Write')
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(pg, 'should_write_keyframes')
+        col.prop(pg, 'should_write_metadata')
+
+        selected_sequence_count = sum(map(lambda x: x.is_selected, pg.sequence_list))
 
         row = layout.row()
-        row.prop(property_group, 'psa_file_path', text='')
-        row.enabled = False
 
-        row = layout.row()
-        row.operator('psa_import.select_file', text='Select PSA File', icon='FILEBROWSER')
+        import_button_text = 'Import'
+        if selected_sequence_count > 0:
+            import_button_text = f'Import ({selected_sequence_count})'
 
-        if len(property_group.action_list) > 0:
-            box = layout.box()
-            box.label(text=f'Actions ({len(property_group.action_list)})', icon='ACTION')
-            row = box.row()
-            rows = max(3, min(len(property_group.action_list), 10))
-            row.template_list('PSA_UL_ImportActionList', '', property_group, 'action_list', property_group, 'action_list_index', rows=rows)
-            row = box.row(align=True)
-            row.label(text='Select')
-            row.operator('psa_import.actions_select_all', text='All')
-            row.operator('psa_import.actions_deselect_all', text='None')
+        row.operator(PsaImportOperator.bl_idname, text=import_button_text)
 
-        row = layout.row()
-        row.prop(property_group, 'should_clean_keys')
 
-        # DATA
-        row = layout.row()
-        row.prop(property_group, 'should_use_fake_user')
-        row.prop(property_group, 'should_stash')
+class PsaImportFileReload(Operator):
+    bl_idname = 'psa_import.file_reload'
+    bl_label = 'Refresh'
+    bl_options = {'INTERNAL'}
+    bl_description = 'Refresh the PSA file'
 
-        layout.operator('psa_import.import', text=f'Import')
+    def execute(self, context):
+        load_psa_file(context)
+        return {"FINISHED"}
 
 
 class PsaImportSelectFile(Operator):
     bl_idname = 'psa_import.select_file'
     bl_label = 'Select'
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'INTERNAL'}
     bl_description = 'Select a PSA file from which to import animations'
     filepath: bpy.props.StringProperty(subtype='FILE_PATH')
     filter_glob: bpy.props.StringProperty(default="*.psa", options={'HIDDEN'})
@@ -381,32 +564,42 @@ class PsaImportOperator(Operator):
     bl_idname = 'psa_import.import'
     bl_label = 'Import'
     bl_description = 'Import the selected animations into the scene as actions'
+    bl_options = {'INTERNAL', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
-        property_group = context.scene.psa_import
+        pg = context.scene.psa_import
         active_object = context.view_layer.objects.active
-        action_list = property_group.action_list
-        has_selected_actions = any(map(lambda action: action.is_selected, action_list))
-        return has_selected_actions and active_object is not None and active_object.type == 'ARMATURE'
+        if active_object is None or active_object.type != 'ARMATURE':
+            return False
+        return any(map(lambda x: x.is_selected, pg.sequence_list))
 
     def execute(self, context):
-        property_group = context.scene.psa_import
-        psa_reader = PsaReader(property_group.psa_file_path)
-        sequence_names = [x.action_name for x in property_group.action_list if x.is_selected]
+        pg = context.scene.psa_import
+        psa_reader = PsaReader(pg.psa_file_path)
+        sequence_names = [x.action_name for x in pg.sequence_list if x.is_selected]
+
         options = PsaImportOptions()
         options.sequence_names = sequence_names
-        options.should_clean_keys = property_group.should_clean_keys
-        options.should_use_fake_user = property_group.should_use_fake_user
-        options.should_stash = property_group.should_stash
+        options.should_clean_keys = pg.should_clean_keys
+        options.should_use_fake_user = pg.should_use_fake_user
+        options.should_stash = pg.should_stash
+        options.action_name_prefix = pg.action_name_prefix if pg.should_use_action_name_prefix else ''
+        options.should_overwrite = pg.should_overwrite
+        options.should_write_metadata = pg.should_write_metadata
+        options.should_write_keyframes = pg.should_write_keyframes
+
         PsaImporter().import_psa(psa_reader, context.view_layer.objects.active, options)
+
         self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
+
         return {'FINISHED'}
 
 
 class PsaImportFileSelectOperator(Operator, ImportHelper):
     bl_idname = 'psa_import.file_select'
     bl_label = 'File Select'
+    bl_options = {'INTERNAL'}
     filename_ext = '.psa'
     filter_glob: StringProperty(default='*.psa', options={'HIDDEN'})
     filepath: StringProperty(
@@ -420,21 +613,26 @@ class PsaImportFileSelectOperator(Operator, ImportHelper):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        property_group = context.scene.psa_import
-        property_group.psa_file_path = self.filepath
-        # Load the sequence names from the selected file
+        pg = context.scene.psa_import
+        pg.psa_file_path = self.filepath
         return {'FINISHED'}
 
 
-__classes__ = [
-    PsaImportPsaBoneItem,
+classes = (
     PsaImportActionListItem,
+    PsaBonePropertyGroup,
+    PsaDataPropertyGroup,
     PsaImportPropertyGroup,
+    PSA_UL_SequenceList,
+    PSA_UL_ImportSequenceList,
     PSA_UL_ImportActionList,
-    PsaImportSelectAll,
-    PsaImportDeselectAll,
+    PsaImportSequencesSelectAll,
+    PsaImportSequencesDeselectAll,
+    PsaImportSequencesFromText,
+    PsaImportFileReload,
     PSA_PT_ImportPanel,
+    PSA_PT_ImportPanel_Advanced,
     PsaImportOperator,
     PsaImportFileSelectOperator,
     PsaImportSelectFile,
-]
+)

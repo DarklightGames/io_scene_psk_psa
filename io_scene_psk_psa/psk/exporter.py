@@ -1,11 +1,13 @@
-from .data import *
-from ..types import BoneGroupListItem
-from ..helpers import populate_bone_group_list
-from .builder import PskBuilder, PskBuilderOptions
 from typing import Type
+
+from bpy.props import StringProperty, CollectionProperty, IntProperty, EnumProperty
 from bpy.types import Operator, PropertyGroup
 from bpy_extras.io_utils import ExportHelper
-from bpy.props import StringProperty, CollectionProperty, IntProperty, BoolProperty, EnumProperty
+
+from .builder import PskBuilder, PskBuilderOptions
+from .data import *
+from ..helpers import populate_bone_group_list
+from ..types import BoneGroupListItem
 
 MAX_WEDGE_COUNT = 65536
 MAX_POINT_COUNT = 4294967296
@@ -73,6 +75,7 @@ def is_bone_filter_mode_item_available(context, identifier):
 class PskExportOperator(Operator, ExportHelper):
     bl_idname = 'export.psk'
     bl_label = 'Export'
+    bl_options = {'INTERNAL', 'UNDO'}
     __doc__ = 'Export mesh and armature to PSK'
     filename_ext = '.psk'
     filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
@@ -90,10 +93,10 @@ class PskExportOperator(Operator, ExportHelper):
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
-        property_group = context.scene.psk_export
+        pg = context.scene.psk_export
 
         # Populate bone groups list.
-        populate_bone_group_list(input_objects.armature_object, property_group.bone_group_list)
+        populate_bone_group_list(input_objects.armature_object, pg.bone_group_list)
 
         context.window_manager.fileselect_add(self)
 
@@ -102,29 +105,30 @@ class PskExportOperator(Operator, ExportHelper):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        property_group = scene.psk_export
+        pg = scene.psk_export
 
         # BONES
         box = layout.box()
         box.label(text='Bones', icon='BONE_DATA')
-        bone_filter_mode_items = property_group.bl_rna.properties['bone_filter_mode'].enum_items_static
+        bone_filter_mode_items = pg.bl_rna.properties['bone_filter_mode'].enum_items_static
         row = box.row(align=True)
         for item in bone_filter_mode_items:
             identifier = item.identifier
             item_layout = row.row(align=True)
-            item_layout.prop_enum(property_group, 'bone_filter_mode', item.identifier)
+            item_layout.prop_enum(pg, 'bone_filter_mode', item.identifier)
             item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
 
-        if property_group.bone_filter_mode == 'BONE_GROUPS':
+        if pg.bone_filter_mode == 'BONE_GROUPS':
             row = box.row()
-            rows = max(3, min(len(property_group.bone_group_list), 10))
-            row.template_list('PSX_UL_BoneGroupList', '', property_group, 'bone_group_list', property_group, 'bone_group_list_index', rows=rows)
+            rows = max(3, min(len(pg.bone_group_list), 10))
+            row.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg, 'bone_group_list_index', rows=rows)
 
     def execute(self, context):
-        property_group = context.scene.psk_export
+        pg = context.scene.psk_export
         builder = PskBuilder()
         options = PskBuilderOptions()
-        options.bone_group_indices = [x.index for x in property_group.bone_group_list if x.is_selected]
+        options.bone_filter_mode = pg.bone_filter_mode
+        options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
         try:
             psk = builder.build(context, options)
             exporter = PskExporter(psk)
@@ -138,17 +142,19 @@ class PskExportOperator(Operator, ExportHelper):
 class PskExportPropertyGroup(PropertyGroup):
     bone_filter_mode: EnumProperty(
         name='Bone Filter',
+        options=set(),
         description='',
         items=(
             ('ALL', 'All', 'All bones will be exported.'),
-            ('BONE_GROUPS', 'Bone Groups', 'Only bones belonging to the selected bone groups and their ancestors will be exported.')
+            ('BONE_GROUPS', 'Bone Groups',
+             'Only bones belonging to the selected bone groups and their ancestors will be exported.')
         )
     )
     bone_group_list: CollectionProperty(type=BoneGroupListItem)
     bone_group_list_index: IntProperty(default=0)
 
 
-__classes__ = [
+classes = (
     PskExportOperator,
     PskExportPropertyGroup
-]
+)

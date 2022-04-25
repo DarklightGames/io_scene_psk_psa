@@ -1,5 +1,6 @@
-from .data import *
 import ctypes
+
+from .data import *
 
 
 class PskReader(object):
