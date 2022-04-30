@@ -264,8 +264,12 @@ class PsaBuilder(object):
                 frame_max = sorted_timeline_markers[next_marker_index].frame
                 if options.should_trim_timeline_marker_sequences:
                     nla_strips = get_nla_strips_in_timeframe(object, marker.frame, frame_max)
-                    frame_max = min(frame_max, max(map(lambda nla_strip: nla_strip.frame_end, nla_strips)))
-                    frame_min = max(frame_min, min(map(lambda nla_strip: nla_strip.frame_start, nla_strips)))
+                    if len(nla_strips) > 0:
+                        frame_max = min(frame_max, max(map(lambda nla_strip: nla_strip.frame_end, nla_strips)))
+                        frame_min = max(frame_min, min(map(lambda nla_strip: nla_strip.frame_start, nla_strips)))
+                    else:
+                        # No strips in between this marker and the next, just export this as a one-frame animation.
+                        frame_max = frame_min
             else:
                 # There is no next marker.
                 # Find the final frame of all the NLA strips and use that as the last frame of this sequence.
