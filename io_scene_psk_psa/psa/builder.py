@@ -1,6 +1,7 @@
 from typing import Dict, Iterable
 
 from bpy.types import Action
+from mathutils import Matrix
 
 from .data import *
 from ..helpers import *
@@ -19,13 +20,7 @@ class PsaBuilderOptions(object):
         self.should_trim_timeline_marker_sequences = True
         self.sequence_name_prefix = ''
         self.sequence_name_suffix = ''
-
-
-class PsaBuilderPerformance:
-    def __init__(self):
-        self.frame_set_duration = datetime.timedelta()
-        self.key_build_duration = datetime.timedelta()
-        self.key_add_duration = datetime.timedelta()
+        self.root_motion = False
 
 
 class PsaBuilder(object):
@@ -53,7 +48,6 @@ class PsaBuilder(object):
             raise RuntimeError(f'Invalid FPS source "{options.fps_source}"')
 
     def build(self, context, options: PsaBuilderOptions) -> Psa:
-        performance = PsaBuilderPerformance()
         active_object = context.view_layer.objects.active
 
         if active_object.type != 'ARMATURE':
@@ -201,40 +195,38 @@ class PsaBuilder(object):
             frame_count = frame_max - frame_min + 1
 
             for frame in range(frame_count):
-                with Timer() as t:
-                    context.scene.frame_set(frame_min + frame)
-                performance.frame_set_duration += t.duration
+                context.scene.frame_set(frame_min + frame)
 
                 for pose_bone in pose_bones:
-                    with Timer() as t:
-                        key = Psa.Key()
+                    key = Psa.Key()
+
+                    if pose_bone.parent is not None:
                         pose_bone_matrix = pose_bone.matrix
+                        pose_bone_parent_matrix = pose_bone.parent.matrix
+                        pose_bone_matrix = pose_bone_parent_matrix.inverted() @ pose_bone_matrix
+                    else:
+                        if options.root_motion:
+                            # Export root motion
+                            pose_bone_matrix = armature.matrix_world @ pose_bone.matrix
+                        else:
+                            pose_bone_matrix = pose_bone.matrix
 
-                        if pose_bone.parent is not None:
-                            pose_bone_parent_matrix = pose_bone.parent.matrix
-                            pose_bone_matrix = pose_bone_parent_matrix.inverted() @ pose_bone_matrix
+                    location = pose_bone_matrix.to_translation()
+                    rotation = pose_bone_matrix.to_quaternion().normalized()
 
-                        location = pose_bone_matrix.to_translation()
-                        rotation = pose_bone_matrix.to_quaternion().normalized()
+                    if pose_bone.parent is not None:
+                        rotation.conjugate()
 
-                        if pose_bone.parent is not None:
-                            rotation.x = -rotation.x
-                            rotation.y = -rotation.y
-                            rotation.z = -rotation.z
+                    key.location.x = location.x
+                    key.location.y = location.y
+                    key.location.z = location.z
+                    key.rotation.x = rotation.x
+                    key.rotation.y = rotation.y
+                    key.rotation.z = rotation.z
+                    key.rotation.w = rotation.w
+                    key.time = 1.0 / psa_sequence.fps
 
-                        key.location.x = location.x
-                        key.location.y = location.y
-                        key.location.z = location.z
-                        key.rotation.x = rotation.x
-                        key.rotation.y = rotation.y
-                        key.rotation.z = rotation.z
-                        key.rotation.w = rotation.w
-                        key.time = 1.0 / psa_sequence.fps
-                    performance.key_build_duration += t.duration
-
-                    with Timer() as t:
-                        psa.keys.append(key)
-                    performance.key_add_duration += t.duration
+                    psa.keys.append(key)
 
                 psa_sequence.bone_count = len(pose_bones)
                 psa_sequence.track_time = frame_count

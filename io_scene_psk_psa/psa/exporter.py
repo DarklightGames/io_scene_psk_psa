@@ -65,6 +65,12 @@ def should_use_original_sequence_names_updated(_, context):
 
 
 class PsaExportPropertyGroup(PropertyGroup):
+    root_motion: BoolProperty(
+        name='Root Motion',
+        options=set(),
+        default=False,
+        description='When set, the root bone will be transformed as it appears in the scene',
+    )
     sequence_source: EnumProperty(
         name='Source',
         options=set(),
@@ -164,6 +170,9 @@ class PsaExportOperator(Operator, ExportHelper):
 
         # SOURCE
         layout.prop(pg, 'sequence_source', text='Source')
+
+        # ROOT MOTION
+        layout.prop(pg, 'root_motion', text='Root Motion')
 
         # SELECT ALL/NONE
         row = layout.row(align=True)
@@ -297,6 +306,7 @@ class PsaExportOperator(Operator, ExportHelper):
         options.should_trim_timeline_marker_sequences = pg.should_trim_timeline_marker_sequences
         options.sequence_name_prefix = pg.sequence_name_prefix
         options.sequence_name_suffix = pg.sequence_name_suffix
+        options.root_motion = pg.root_motion
 
         builder = PsaBuilder()
 
