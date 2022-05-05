@@ -321,18 +321,6 @@ class PsaExportOperator(Operator, ExportHelper):
         return {'FINISHED'}
 
 
-class PSA_UL_ExportTimelineMarkerList(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        layout.prop(item, 'is_selected', icon_only=True, text=item.name)
-
-    def filter_items(self, context, data, property):
-        pg = context.scene.psa_export
-        sequences = getattr(data, property)
-        flt_flags = filter_sequences(pg, sequences)
-        flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(sequences, 'name')
-        return flt_flags, flt_neworder
-
-
 def filter_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[int]:
     bitflag_filter_item = 1 << 30
     flt_flags = [bitflag_filter_item] * len(sequences)
@@ -363,6 +351,25 @@ def get_visible_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_p
         if bool(flag & (1 << 30)):
             visible_sequences.append(sequences[i])
     return visible_sequences
+
+
+class PSA_UL_ExportTimelineMarkerList(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        layout.prop(item, 'is_selected', icon_only=True, text=item.name)
+
+    def draw_filter(self, context, layout):
+        pg = context.scene.psa_export
+        row = layout.row()
+        subrow = row.row(align=True)
+        subrow.prop(pg, 'sequence_filter_name', text="")
+        subrow.prop(pg, 'sequence_use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
+
+    def filter_items(self, context, data, property):
+        pg = context.scene.psa_export
+        sequences = getattr(data, property)
+        flt_flags = filter_sequences(pg, sequences)
+        flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(sequences, 'name')
+        return flt_flags, flt_neworder
 
 
 class PSA_UL_ExportActionList(UIList):
