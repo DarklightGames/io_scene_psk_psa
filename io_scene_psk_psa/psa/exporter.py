@@ -325,21 +325,21 @@ def filter_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_c
     bitflag_filter_item = 1 << 30
     flt_flags = [bitflag_filter_item] * len(sequences)
 
-    if pg.sequence_filter_name is not None:
+    if pg.sequence_filter_name:
         # Filter name is non-empty.
         for i, sequence in enumerate(sequences):
             if not fnmatch.fnmatch(sequence.name, f'*{pg.sequence_filter_name}*'):
                 flt_flags[i] &= ~bitflag_filter_item
 
+        # Invert filter flags for all items.
+        if pg.sequence_use_filter_invert:
+            for i, sequence in enumerate(sequences):
+                flt_flags[i] ^= bitflag_filter_item
+
     if not pg.sequence_filter_asset:
         for i, sequence in enumerate(sequences):
             if hasattr(sequence, 'action') and sequence.action.asset_data is not None:
                 flt_flags[i] &= ~bitflag_filter_item
-
-    if pg.sequence_use_filter_invert:
-        # Invert filter flags for all items.
-        for i, sequence in enumerate(sequences):
-            flt_flags[i] ^= bitflag_filter_item
 
     return flt_flags
 
