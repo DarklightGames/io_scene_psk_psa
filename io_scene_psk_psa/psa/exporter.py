@@ -184,7 +184,7 @@ class PsaExportOperator(Operator, ExportHelper):
         if pg.sequence_source == 'ACTIONS':
             rows = max(3, min(len(pg.action_list), 10))
 
-            layout.template_list('PSA_UL_ExportActionList', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
+            layout.template_list('PSA_UL_ExportSequenceList', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
 
             col = layout.column()
             col.use_property_split = True
@@ -195,7 +195,7 @@ class PsaExportOperator(Operator, ExportHelper):
 
         elif pg.sequence_source == 'TIMELINE_MARKERS':
             rows = max(3, min(len(pg.marker_list), 10))
-            layout.template_list('PSA_UL_ExportTimelineMarkerList', '', pg, 'marker_list', pg, 'marker_list_index',
+            layout.template_list('PSA_UL_ExportSequenceList', '', pg, 'marker_list', pg, 'marker_list_index',
                                  rows=rows)
 
             col = layout.column()
@@ -353,35 +353,16 @@ def get_visible_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_p
     return visible_sequences
 
 
-class PSA_UL_ExportTimelineMarkerList(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        layout.prop(item, 'is_selected', icon_only=True, text=item.name)
-
-    def draw_filter(self, context, layout):
-        pg = context.scene.psa_export
-        row = layout.row()
-        subrow = row.row(align=True)
-        subrow.prop(pg, 'sequence_filter_name', text="")
-        subrow.prop(pg, 'sequence_use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
-
-    def filter_items(self, context, data, property):
-        pg = context.scene.psa_export
-        sequences = getattr(data, property)
-        flt_flags = filter_sequences(pg, sequences)
-        flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(sequences, 'name')
-        return flt_flags, flt_neworder
-
-
-class PSA_UL_ExportActionList(UIList):
+class PSA_UL_ExportSequenceList(UIList):
 
     def __init__(self):
-        super(PSA_UL_ExportActionList, self).__init__()
+        super(PSA_UL_ExportSequenceList, self).__init__()
         # Show the filtering options by default.
         self.use_filter_show = True
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         layout.prop(item, 'is_selected', icon_only=True, text=item.name)
-        if item.action.asset_data is not None:
+        if hasattr(item, 'action') and item.action.asset_data is not None:
             layout.label(text='', icon='ASSET_MANAGER')
 
     def draw_filter(self, context, layout):
@@ -390,9 +371,12 @@ class PSA_UL_ExportActionList(UIList):
         subrow = row.row(align=True)
         subrow.prop(pg, 'sequence_filter_name', text="")
         subrow.prop(pg, 'sequence_use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
-        subrow = row.row(align=True)
-        subrow.prop(pg, 'sequence_filter_asset', icon_only=True, icon='ASSET_MANAGER')
         # subrow.prop(pg, 'sequence_use_filter_sort_reverse', text='', icon='SORT_ASC')
+
+        if pg.sequence_source == 'ACTIONS':
+            subrow = row.row(align=True)
+            subrow.prop(pg, 'sequence_filter_asset', icon_only=True, icon='ASSET_MANAGER')
+
 
     def filter_items(self, context, data, property):
         pg = context.scene.psa_export
@@ -507,8 +491,7 @@ classes = (
     PsaExportTimelineMarkerListItem,
     PsaExportPropertyGroup,
     PsaExportOperator,
-    PSA_UL_ExportActionList,
-    PSA_UL_ExportTimelineMarkerList,
+    PSA_UL_ExportSequenceList,
     PsaExportActionsSelectAll,
     PsaExportActionsDeselectAll,
     PsaExportBoneGroupsSelectAll,
