@@ -58,6 +58,12 @@ def get_nla_strips_in_timeframe(object, frame_min, frame_max) -> List[NlaStrip]:
 
 
 def populate_bone_group_list(armature_object: Object, bone_group_list: Iterable[BoneGroupListItem]) -> None:
+    """
+    Updates the bone group collection.
+
+    Bone group selections are preserved between updates unless none of the groups were previously selected;
+    otherwise, all groups are selected by default.
+    """
     has_selected_groups = any([g.is_selected for g in bone_group_list])
     unassigned_group_is_selected, selected_assigned_group_names = True, []
 
