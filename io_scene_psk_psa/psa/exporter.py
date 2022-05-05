@@ -128,10 +128,21 @@ class PsaExportPropertyGroup(PropertyGroup):
     )
     sequence_name_prefix: StringProperty(name='Prefix', options=set())
     sequence_name_suffix: StringProperty(name='Suffix', options=set())
-    sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
-    sequence_use_filter_invert: BoolProperty(default=False, options=set())
-    sequence_filter_asset: BoolProperty(default=False, name='Show assets',
-                                        description='Show actions that belong to an asset library', options=set())
+    sequence_filter_name: StringProperty(
+        default='',
+        name='Filter by Name',
+        options={'TEXTEDIT_UPDATE'},
+        description='Only show items matching this name (use \'*\' as wildcard)')
+    sequence_use_filter_invert: BoolProperty(
+        default=False,
+        name='Invert',
+        options=set(),
+        description='Invert filtering (show hidden items, and vice versa)')
+    sequence_filter_asset: BoolProperty(
+        default=False,
+        name='Show assets',
+        options=set(),
+        description='Show actions that belong to an asset library')
     sequence_use_filter_sort_reverse: BoolProperty(default=True, options=set())
 
 
