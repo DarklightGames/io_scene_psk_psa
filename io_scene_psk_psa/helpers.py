@@ -58,14 +58,18 @@ def get_nla_strips_in_timeframe(object, frame_min, frame_max) -> List[NlaStrip]:
 
 
 def populate_bone_group_list(armature_object: Object, bone_group_list: Iterable[BoneGroupListItem]) -> None:
-    # Preserve group selections before clearing the list.
-    # We handle selections for the unassigned group separately to cover the edge
-    # case where there might be an actual group with 'Unassigned' as its name.
-    unassigned_group_idx, unassigned_group_is_selected = next(iter([
-        (i, g.is_selected) for i, g in enumerate(bone_group_list) if g.index == -1]), (-1, False))
+    has_selected_groups = any([g.is_selected for g in bone_group_list])
+    unassigned_group_is_selected, selected_assigned_group_names = True, []
 
-    selected_assigned_group_names = [
-        g.name for i, g in enumerate(bone_group_list) if i != unassigned_group_idx and g.is_selected]
+    if has_selected_groups:
+        # Preserve group selections before clearing the list.
+        # We handle selections for the unassigned group separately to cover the edge case
+        # where there might be an actual group with 'Unassigned' as its name.
+        unassigned_group_idx, unassigned_group_is_selected = next(iter([
+            (i, g.is_selected) for i, g in enumerate(bone_group_list) if g.index == -1]), (-1, False))
+
+        selected_assigned_group_names = [
+            g.name for i, g in enumerate(bone_group_list) if i != unassigned_group_idx and g.is_selected]
 
     bone_group_list.clear()
 
@@ -83,7 +87,7 @@ def populate_bone_group_list(armature_object: Object, bone_group_list: Iterable[
             item.name = bone_group.name
             item.index = bone_group_index
             item.count = 0 if bone_group not in bone_group_counts else bone_group_counts[bone_group]
-            item.is_selected = bone_group.name in selected_assigned_group_names
+            item.is_selected = bone_group.name in selected_assigned_group_names if has_selected_groups else True
 
 
 def get_psa_sequence_name(action, should_use_original_sequence_name):
