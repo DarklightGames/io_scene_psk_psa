@@ -128,10 +128,21 @@ class PsaExportPropertyGroup(PropertyGroup):
     )
     sequence_name_prefix: StringProperty(name='Prefix', options=set())
     sequence_name_suffix: StringProperty(name='Suffix', options=set())
-    sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
-    sequence_use_filter_invert: BoolProperty(default=False, options=set())
-    sequence_filter_asset: BoolProperty(default=False, name='Show assets',
-                                        description='Show actions that belong to an asset library', options=set())
+    sequence_filter_name: StringProperty(
+        default='',
+        name='Filter by Name',
+        options={'TEXTEDIT_UPDATE'},
+        description='Only show items matching this name (use \'*\' as wildcard)')
+    sequence_use_filter_invert: BoolProperty(
+        default=False,
+        name='Invert',
+        options=set(),
+        description='Invert filtering (show hidden items, and vice versa)')
+    sequence_filter_asset: BoolProperty(
+        default=False,
+        name='Show assets',
+        options=set(),
+        description='Show actions that belong to an asset library')
     sequence_use_filter_sort_reverse: BoolProperty(default=True, options=set())
 
 
@@ -193,7 +204,7 @@ class PsaExportOperator(Operator, ExportHelper):
         if pg.sequence_source == 'ACTIONS':
             rows = max(3, min(len(pg.action_list), 10))
 
-            layout.template_list('PSA_UL_ExportActionList', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
+            layout.template_list('PSA_UL_ExportSequenceList', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
 
             col = layout.column()
             col.use_property_split = True
@@ -204,7 +215,7 @@ class PsaExportOperator(Operator, ExportHelper):
 
         elif pg.sequence_source == 'TIMELINE_MARKERS':
             rows = max(3, min(len(pg.marker_list), 10))
-            layout.template_list('PSA_UL_ExportTimelineMarkerList', '', pg, 'marker_list', pg, 'marker_list_index',
+            layout.template_list('PSA_UL_ExportSequenceList', '', pg, 'marker_list', pg, 'marker_list_index',
                                  rows=rows)
 
             col = layout.column()
@@ -334,37 +345,25 @@ class PsaExportOperator(Operator, ExportHelper):
         return {'FINISHED'}
 
 
-class PSA_UL_ExportTimelineMarkerList(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        layout.prop(item, 'is_selected', icon_only=True, text=item.name)
-
-    def filter_items(self, context, data, property):
-        pg = context.scene.psa_export
-        sequences = getattr(data, property)
-        flt_flags = filter_sequences(pg, sequences)
-        flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(sequences, 'name')
-        return flt_flags, flt_neworder
-
-
 def filter_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[int]:
     bitflag_filter_item = 1 << 30
     flt_flags = [bitflag_filter_item] * len(sequences)
 
-    if pg.sequence_filter_name is not None:
+    if pg.sequence_filter_name:
         # Filter name is non-empty.
         for i, sequence in enumerate(sequences):
             if not fnmatch.fnmatch(sequence.name, f'*{pg.sequence_filter_name}*'):
                 flt_flags[i] &= ~bitflag_filter_item
 
+        # Invert filter flags for all items.
+        if pg.sequence_use_filter_invert:
+            for i, sequence in enumerate(sequences):
+                flt_flags[i] ^= bitflag_filter_item
+
     if not pg.sequence_filter_asset:
         for i, sequence in enumerate(sequences):
             if hasattr(sequence, 'action') and sequence.action.asset_data is not None:
                 flt_flags[i] &= ~bitflag_filter_item
-
-    if pg.sequence_use_filter_invert:
-        # Invert filter flags for all items.
-        for i, sequence in enumerate(sequences):
-            flt_flags[i] ^= bitflag_filter_item
 
     return flt_flags
 
@@ -378,16 +377,16 @@ def get_visible_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_p
     return visible_sequences
 
 
-class PSA_UL_ExportActionList(UIList):
+class PSA_UL_ExportSequenceList(UIList):
 
     def __init__(self):
-        super(PSA_UL_ExportActionList, self).__init__()
+        super(PSA_UL_ExportSequenceList, self).__init__()
         # Show the filtering options by default.
         self.use_filter_show = True
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         layout.prop(item, 'is_selected', icon_only=True, text=item.name)
-        if item.action.asset_data is not None:
+        if hasattr(item, 'action') and item.action.asset_data is not None:
             layout.label(text='', icon='ASSET_MANAGER')
 
     def draw_filter(self, context, layout):
@@ -396,9 +395,12 @@ class PSA_UL_ExportActionList(UIList):
         subrow = row.row(align=True)
         subrow.prop(pg, 'sequence_filter_name', text="")
         subrow.prop(pg, 'sequence_use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
-        subrow = row.row(align=True)
-        subrow.prop(pg, 'sequence_filter_asset', icon_only=True, icon='ASSET_MANAGER')
         # subrow.prop(pg, 'sequence_use_filter_sort_reverse', text='', icon='SORT_ASC')
+
+        if pg.sequence_source == 'ACTIONS':
+            subrow = row.row(align=True)
+            subrow.prop(pg, 'sequence_filter_asset', icon_only=True, icon='ASSET_MANAGER')
+
 
     def filter_items(self, context, data, property):
         pg = context.scene.psa_export
@@ -513,8 +515,7 @@ classes = (
     PsaExportTimelineMarkerListItem,
     PsaExportPropertyGroup,
     PsaExportOperator,
-    PSA_UL_ExportActionList,
-    PSA_UL_ExportTimelineMarkerList,
+    PSA_UL_ExportSequenceList,
     PsaExportActionsSelectAll,
     PsaExportActionsDeselectAll,
     PsaExportBoneGroupsSelectAll,
