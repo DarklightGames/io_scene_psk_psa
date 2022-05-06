@@ -159,6 +159,15 @@ class PsaExportOperator(Operator, ExportHelper):
     def __init__(self):
         self.armature = None
 
+    @classmethod
+    def poll(cls, context):
+        try:
+            cls._check_context(context)
+        except RuntimeError as e:
+            cls.poll_message_set((str(e)))
+            return False
+        return True
+
     def draw(self, context):
         layout = self.layout
         pg = context.scene.psa_export
@@ -245,17 +254,21 @@ class PsaExportOperator(Operator, ExportHelper):
                 return True
         return False
 
-    def invoke(self, context, event):
-        pg = context.scene.psa_export
-
+    @classmethod
+    def _check_context(cls, context):
         if context.view_layer.objects.active is None:
-            self.report({'ERROR_INVALID_CONTEXT'}, 'An armature must be selected')
-            return {'CANCELLED'}
+            raise RuntimeError('An armature must be selected')
 
         if context.view_layer.objects.active.type != 'ARMATURE':
-            self.report({'ERROR_INVALID_CONTEXT'}, 'The selected object must be an armature.')
-            return {'CANCELLED'}
+            raise RuntimeError('The selected object must be an armature')
 
+    def invoke(self, context, event):
+        try:
+            self._check_context(context)
+        except RuntimeError as e:
+            self.report({'ERROR_INVALID_CONTEXT'}, str(e))
+
+        pg = context.scene.psa_export
         self.armature = context.view_layer.objects.active
 
         # Populate actions list.

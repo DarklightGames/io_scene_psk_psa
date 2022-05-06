@@ -102,6 +102,15 @@ class PskExportOperator(Operator, ExportHelper):
 
         return {'RUNNING_MODAL'}
 
+    @classmethod
+    def poll(cls, context):
+        try:
+            PskBuilder.get_input_objects(context)
+        except RuntimeError as e:
+            cls.poll_message_set(str(e))
+            return False
+        return True
+
     def draw(self, context):
         layout = self.layout
         scene = context.scene
