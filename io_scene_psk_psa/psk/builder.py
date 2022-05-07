@@ -2,6 +2,8 @@ from collections import OrderedDict
 
 from .data import *
 from ..helpers import *
+import bmesh
+import bpy
 
 
 class PskInputObjects(object):
@@ -23,30 +25,30 @@ class PskBuilder(object):
     @staticmethod
     def get_input_objects(context) -> PskInputObjects:
         input_objects = PskInputObjects()
-        for obj in context.view_layer.objects.selected:
-            if obj.type != 'MESH':
-                raise RuntimeError(f'Selected object "{obj.name}" is not a mesh')
+        for selected_object in context.view_layer.objects.selected:
+            if selected_object.type != 'MESH':
+                raise RuntimeError(f'Selected object "{selected_object.name}" is not a mesh')
 
         input_objects.mesh_objects = context.view_layer.objects.selected
 
         if len(input_objects.mesh_objects) == 0:
             raise RuntimeError('At least one mesh must be selected')
 
-        for obj in input_objects.mesh_objects:
-            if len(obj.data.materials) == 0:
-                raise RuntimeError(f'Mesh "{obj.name}" must have at least one material')
+        for mesh_object in input_objects.mesh_objects:
+            if len(mesh_object.data.materials) == 0:
+                raise RuntimeError(f'Mesh "{mesh_object.name}" must have at least one material')
 
         # Ensure that there are either no armature modifiers (static mesh)
         # or that there is exactly one armature modifier object shared between
         # all selected meshes
         armature_modifier_objects = set()
 
-        for obj in input_objects.mesh_objects:
-            modifiers = [x for x in obj.modifiers if x.type == 'ARMATURE']
+        for mesh_object in input_objects.mesh_objects:
+            modifiers = [x for x in mesh_object.modifiers if x.type == 'ARMATURE']
             if len(modifiers) == 0:
                 continue
             elif len(modifiers) > 1:
-                raise RuntimeError(f'Mesh "{obj.name}" must have only one armature modifier')
+                raise RuntimeError(f'Mesh "{mesh_object.name}" must have only one armature modifier')
             armature_modifier_objects.add(modifiers[0].object)
 
         if len(armature_modifier_objects) > 1:
@@ -118,44 +120,60 @@ class PskBuilder(object):
 
                 psk.bones.append(psk_bone)
 
-        for object in input_objects.mesh_objects:
+        for mesh_object in input_objects.mesh_objects:
+
+            # MATERIALS
+            material_indices = []
+            for i, material in enumerate(mesh_object.data.materials):
+                if material is None:
+                    raise RuntimeError('Material cannot be empty (index ' + str(i) + ')')
+                if material.name in materials:
+                    # Material already evaluated, just get its index.
+                    material_index = list(materials.keys()).index(material.name)
+                else:
+                    # New material.
+                    psk_material = Psk.Material()
+                    psk_material.name = bytes(material.name, encoding='utf-8')
+                    psk_material.texture_index = len(psk.materials)
+                    psk.materials.append(psk_material)
+                    materials[material.name] = material
+                    material_index = psk_material.texture_index
+                material_indices.append(material_index)
+
+            depsgraph = context.evaluated_depsgraph_get()
+            bm = bmesh.new()
+            bm.from_object(mesh_object, depsgraph)
+
+            # TODO: make a new temporary mesh then delete it!
+            mesh_data = bpy.data.meshes.new('')
+            bm.to_mesh(mesh_data)
+            del bm
+
+            # Create a copy of the mesh object
+            mesh_object_copy = bpy.data.objects.new('', mesh_data)
+            # Copy the vertex groups
+            for vertex_group in mesh_object.vertex_groups:
+                mesh_object_copy.vertex_groups.new(name=vertex_group.name)
+
             vertex_offset = len(psk.points)
 
             # VERTICES
-            for vertex in object.data.vertices:
+            for vertex in mesh_data.vertices:
                 point = Vector3()
-                v = object.matrix_world @ vertex.co
+                v = mesh_object.matrix_world @ vertex.co
                 point.x = v.x
                 point.y = v.y
                 point.z = v.z
                 psk.points.append(point)
 
-            uv_layer = object.data.uv_layers.active.data
-
-            # MATERIALS
-            material_indices = []
-            for i, m in enumerate(object.data.materials):
-                if m is None:
-                    raise RuntimeError('Material cannot be empty (index ' + str(i) + ')')
-                if m.name in materials:
-                    # Material already evaluated, just get its index.
-                    material_index = list(materials.keys()).index(m.name)
-                else:
-                    # New material.
-                    material = Psk.Material()
-                    material.name = bytes(m.name, encoding='utf-8')
-                    material.texture_index = len(psk.materials)
-                    psk.materials.append(material)
-                    materials[m.name] = m
-                    material_index = material.texture_index
-                material_indices.append(material_index)
+            uv_layer = mesh_data.uv_layers.active.data
 
             # WEDGES
-            object.data.calc_loop_triangles()
+            mesh_data.calc_loop_triangles()
 
             # Build a list of non-unique wedges.
             wedges = []
-            for loop_index, loop in enumerate(object.data.loops):
+            for loop_index, loop in enumerate(mesh_data.loops):
                 wedge = Psk.Wedge()
                 wedge.point_index = loop.vertex_index + vertex_offset
                 wedge.u, wedge.v = uv_layer[loop_index].uv
@@ -163,13 +181,13 @@ class PskBuilder(object):
                 wedges.append(wedge)
 
             # Assign material indices to the wedges.
-            for triangle in object.data.loop_triangles:
+            for triangle in mesh_data.loop_triangles:
                 for loop_index in triangle.loops:
                     wedges[loop_index].material_index = material_indices[triangle.material_index]
 
             # Populate the list of wedges with unique wedges & build a look-up table of loop indices to wedge indices
             wedge_indices = {}
-            loop_wedge_indices = [-1] * len(object.data.loops)
+            loop_wedge_indices = [-1] * len(mesh_data.loops)
             for loop_index, wedge in enumerate(wedges):
                 wedge_hash = hash(wedge)
                 if wedge_hash in wedge_indices:
@@ -181,8 +199,8 @@ class PskBuilder(object):
                     loop_wedge_indices[loop_index] = wedge_index
 
             # FACES
-            poly_groups, groups = object.data.calc_smooth_groups(use_bitflags=True)
-            for f in object.data.loop_triangles:
+            poly_groups, groups = mesh_data.calc_smooth_groups(use_bitflags=True)
+            for f in mesh_data.loop_triangles:
                 face = Psk.Face()
                 face.material_index = material_indices[f.material_index]
                 face.wedge_indices[0] = loop_wedge_indices[f.loops[2]]
@@ -196,7 +214,7 @@ class PskBuilder(object):
                 # Because the vertex groups may contain entries for which there is no matching bone in the armature,
                 # we must filter them out and not export any weights for these vertex groups.
                 bone_names = [x.name for x in bones]
-                vertex_group_names = [x.name for x in object.vertex_groups]
+                vertex_group_names = [x.name for x in mesh_object_copy.vertex_groups]
                 vertex_group_bone_indices = dict()
                 for vertex_group_index, vertex_group_name in enumerate(vertex_group_names):
                     try:
@@ -215,12 +233,12 @@ class PskBuilder(object):
                                     break
                                 except ValueError:
                                     bone = bone.parent
-                for vertex_group_index, vertex_group in enumerate(object.vertex_groups):
+                for vertex_group_index, vertex_group in enumerate(mesh_object_copy.vertex_groups):
                     if vertex_group_index not in vertex_group_bone_indices:
                         # Vertex group has no associated bone, skip it.
                         continue
                     bone_index = vertex_group_bone_indices[vertex_group_index]
-                    for vertex_index in range(len(object.data.vertices)):
+                    for vertex_index in range(len(mesh_data.vertices)):
                         try:
                             weight = vertex_group.weight(vertex_index)
                         except RuntimeError:
@@ -232,5 +250,9 @@ class PskBuilder(object):
                         w.point_index = vertex_offset + vertex_index
                         w.weight = weight
                         psk.weights.append(w)
+
+            bpy.data.objects.remove(mesh_object_copy)
+            bpy.data.meshes.remove(mesh_data)
+            del mesh_data
 
         return psk
