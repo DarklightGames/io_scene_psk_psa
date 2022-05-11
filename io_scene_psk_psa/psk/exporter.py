@@ -1,6 +1,6 @@
 from typing import Type
 
-from bpy.props import StringProperty, CollectionProperty, IntProperty, EnumProperty
+from bpy.props import BoolProperty, StringProperty, CollectionProperty, IntProperty, EnumProperty
 from bpy.types import Operator, PropertyGroup
 from bpy_extras.io_utils import ExportHelper
 
@@ -116,6 +116,8 @@ class PskExportOperator(Operator, ExportHelper):
         scene = context.scene
         pg = scene.psk_export
 
+        layout.prop(pg, 'use_raw_mesh_data')
+
         # BONES
         box = layout.box()
         box.label(text='Bones', icon='BONE_DATA')
@@ -138,6 +140,7 @@ class PskExportOperator(Operator, ExportHelper):
         options = PskBuilderOptions()
         options.bone_filter_mode = pg.bone_filter_mode
         options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
+        options.use_raw_mesh_data = pg.use_raw_mesh_data
         try:
             psk = builder.build(context, options)
             exporter = PskExporter(psk)
@@ -161,6 +164,7 @@ class PskExportPropertyGroup(PropertyGroup):
     )
     bone_group_list: CollectionProperty(type=BoneGroupListItem)
     bone_group_list_index: IntProperty(default=0)
+    use_raw_mesh_data: BoolProperty(default=False, name='Raw Mesh Data', description='No modifiers will be evaluated as part of the exported mesh')
 
 
 classes = (

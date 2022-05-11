@@ -16,6 +16,7 @@ class PskBuilderOptions(object):
     def __init__(self):
         self.bone_filter_mode = 'ALL'
         self.bone_group_indices = []
+        self.use_raw_mesh_data = True
 
 
 class PskBuilder(object):
@@ -120,11 +121,11 @@ class PskBuilder(object):
 
                 psk.bones.append(psk_bone)
 
-        for mesh_object in input_objects.mesh_objects:
+        for input_mesh_object in input_objects.mesh_objects:
 
             # MATERIALS
             material_indices = []
-            for i, material in enumerate(mesh_object.data.materials):
+            for i, material in enumerate(input_mesh_object.data.materials):
                 if material is None:
                     raise RuntimeError('Material cannot be empty (index ' + str(i) + ')')
                 if material.name in materials:
@@ -140,20 +141,33 @@ class PskBuilder(object):
                     material_index = psk_material.texture_index
                 material_indices.append(material_index)
 
-            depsgraph = context.evaluated_depsgraph_get()
-            bm = bmesh.new()
-            bm.from_object(mesh_object, depsgraph)
+            if options.use_raw_mesh_data:
+                mesh_object = input_mesh_object
+                mesh_data = input_mesh_object.data
+            else:
+                # Create a copy of the mesh object after non-armature modifiers are applied.
 
-            # TODO: make a new temporary mesh then delete it!
-            mesh_data = bpy.data.meshes.new('')
-            bm.to_mesh(mesh_data)
-            del bm
+                # Temporarily deactivate any armature modifiers on the input mesh object.
+                active_armature_modifiers = [x for x in filter(lambda x: x.type == 'ARMATURE' and x.is_active, input_mesh_object.modifiers)]
+                for modifier in active_armature_modifiers:
+                    modifier.show_viewport = False
 
-            # Create a copy of the mesh object
-            mesh_object_copy = bpy.data.objects.new('', mesh_data)
-            # Copy the vertex groups
-            for vertex_group in mesh_object.vertex_groups:
-                mesh_object_copy.vertex_groups.new(name=vertex_group.name)
+                depsgraph = context.evaluated_depsgraph_get()
+                bm = bmesh.new()
+                bm.from_object(input_mesh_object, depsgraph)
+                mesh_data = bpy.data.meshes.new('')
+                bm.to_mesh(mesh_data)
+                del bm
+                mesh_object = bpy.data.objects.new('', mesh_data)
+                mesh_object.matrix_world = input_mesh_object.matrix_world
+
+                # Copy the vertex groups
+                for vertex_group in mesh_object.vertex_groups:
+                    mesh_object.vertex_groups.new(name=vertex_group.name)
+
+                # Reactivate previously active armature modifiers
+                for modifier in active_armature_modifiers:
+                    modifier.show_viewport = True
 
             vertex_offset = len(psk.points)
 
@@ -214,7 +228,7 @@ class PskBuilder(object):
                 # Because the vertex groups may contain entries for which there is no matching bone in the armature,
                 # we must filter them out and not export any weights for these vertex groups.
                 bone_names = [x.name for x in bones]
-                vertex_group_names = [x.name for x in mesh_object_copy.vertex_groups]
+                vertex_group_names = [x.name for x in mesh_object.vertex_groups]
                 vertex_group_bone_indices = dict()
                 for vertex_group_index, vertex_group_name in enumerate(vertex_group_names):
                     try:
@@ -233,7 +247,7 @@ class PskBuilder(object):
                                     break
                                 except ValueError:
                                     bone = bone.parent
-                for vertex_group_index, vertex_group in enumerate(mesh_object_copy.vertex_groups):
+                for vertex_group_index, vertex_group in enumerate(mesh_object.vertex_groups):
                     if vertex_group_index not in vertex_group_bone_indices:
                         # Vertex group has no associated bone, skip it.
                         continue
@@ -251,8 +265,9 @@ class PskBuilder(object):
                         w.weight = weight
                         psk.weights.append(w)
 
-            bpy.data.objects.remove(mesh_object_copy)
-            bpy.data.meshes.remove(mesh_data)
-            del mesh_data
+            if not options.use_raw_mesh_data:
+                bpy.data.objects.remove(mesh_object)
+                bpy.data.meshes.remove(mesh_data)
+                del mesh_data
 
         return psk
