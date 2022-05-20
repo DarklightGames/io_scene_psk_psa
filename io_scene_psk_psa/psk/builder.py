@@ -162,7 +162,7 @@ class PskBuilder(object):
                 mesh_object.matrix_world = input_mesh_object.matrix_world
 
                 # Copy the vertex groups
-                for vertex_group in mesh_object.vertex_groups:
+                for vertex_group in input_mesh_object.vertex_groups:
                     mesh_object.vertex_groups.new(name=vertex_group.name)
 
                 # Reactivate previously active armature modifiers
