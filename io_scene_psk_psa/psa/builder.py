@@ -69,7 +69,7 @@ class PsaBuilder(object):
         bones = list(armature.data.bones)
 
         # The order of the armature bones and the pose bones is not guaranteed to be the same.
-        # As as a result, we need to reconstruct the list of pose bones in the same order as the
+        # As a result, we need to reconstruct the list of pose bones in the same order as the
         # armature bones.
         bone_names = [x.name for x in bones]
         pose_bones = [(bone_names.index(bone.name), bone) for bone in armature.pose.bones]
@@ -88,10 +88,13 @@ class PsaBuilder(object):
         if len(bones) == 0:
             raise RuntimeError('No bones available for export')
 
+        # Check that all bone names are valid.
+        check_bone_names(map(lambda bone: bone.name, bones))
+
         # Build list of PSA bones.
         for bone in bones:
             psa_bone = Psa.Bone()
-            psa_bone.name = bytes(bone.name, encoding='utf-8')
+            psa_bone.name = bytes(bone.name, encoding='windows-1252')
 
             try:
                 parent_index = bones.index(bone.parent)

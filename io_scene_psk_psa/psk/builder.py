@@ -83,6 +83,9 @@ class PskBuilder(object):
             bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_group_indices)
             bones = [armature_object.data.bones[bone_name] for bone_name in bone_names]
 
+            # Check that all bone names are valid.
+            check_bone_names(map(lambda x: x.name, bones))
+
             for bone in bones:
                 psk_bone = Psk.Bone()
                 psk_bone.name = bytes(bone.name, encoding='windows-1252')
@@ -134,7 +137,7 @@ class PskBuilder(object):
                 else:
                     # New material.
                     psk_material = Psk.Material()
-                    psk_material.name = bytes(material.name, encoding='utf-8')
+                    psk_material.name = bytes(material.name, encoding='windows-1252')
                     psk_material.texture_index = len(psk.materials)
                     psk.materials.append(psk_material)
                     materials[material.name] = material
