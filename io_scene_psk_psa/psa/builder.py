@@ -274,7 +274,7 @@ class PsaBuilder(object):
                     for strip in nla_track.strips:
                         frame_max = max(frame_max, strip.frame_end)
 
-            if frame_min == frame_max:
+            if frame_min > frame_max:
                 continue
 
             sequence_frame_ranges[marker_name] = int(frame_min), int(frame_max)
