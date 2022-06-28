@@ -96,10 +96,7 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
                 psk_bone.parent_index = 0
 
             if bone.parent is not None:
-                rotation = bone.matrix.to_quaternion()
-                rotation.x = -rotation.x
-                rotation.y = -rotation.y
-                rotation.z = -rotation.z
+                rotation = bone.matrix.to_quaternion().conjugated()
                 quat_parent = bone.parent.matrix.to_quaternion().inverted()
                 parent_head = quat_parent @ bone.parent.head
                 parent_tail = quat_parent @ bone.parent.tail
