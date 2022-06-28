@@ -66,12 +66,13 @@ class PsaExportPropertyGroup(PropertyGroup):
         name='Root Motion',
         options=set(),
         default=False,
-        description='When set, the root bone will be transformed as it appears in the scene',
+        description='The root bone will be transformed as it appears in the scene',
     )
     should_override_animation_data: BoolProperty(
         name='Override Animation Data',
         options=set(),
-        default=False
+        default=False,
+        description='Use the animation data from a different object instead of the selected object'
     )
     animation_data_override: PointerProperty(
         type=bpy.types.Object,
@@ -160,10 +161,6 @@ def is_bone_filter_mode_item_available(context, identifier):
     return True
 
 
-def should_action_be_selected_by_default(action):
-    return action is not None and action.asset_data is None
-
-
 class PsaExportOperator(Operator, ExportHelper):
     bl_idname = 'psa_export.operator'
     bl_label = 'Export'
@@ -205,7 +202,7 @@ class PsaExportOperator(Operator, ExportHelper):
             # ANIMDATA SOURCE
             layout.prop(pg, 'should_override_animation_data')
             if pg.should_override_animation_data:
-                layout.prop(pg, 'animation_data_override')
+                layout.prop(pg, 'animation_data_override', text='')
 
         # SELECT ALL/NONE
         row = layout.row(align=True)
@@ -305,7 +302,7 @@ class PsaExportOperator(Operator, ExportHelper):
             item = pg.action_list.add()
             item.action = action
             item.name = action.name
-            item.is_selected = should_action_be_selected_by_default(action)
+            item.is_selected = False
 
         update_action_names(context)
 
@@ -314,6 +311,7 @@ class PsaExportOperator(Operator, ExportHelper):
         for marker in context.scene.timeline_markers:
             item = pg.marker_list.add()
             item.name = marker.name
+            item.is_selected = False
 
         if len(pg.action_list) == 0 and len(pg.marker_list) == 0:
             # If there are no actions at all, we have nothing to export, so just cancel the operation.
