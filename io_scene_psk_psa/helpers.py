@@ -32,22 +32,22 @@ def rgb_to_srgb(c):
         return 12.92 * c
 
 
-def get_nla_strips_ending_at_frame(object, frame) -> List[NlaStrip]:
-    if object is None or object.animation_data is None:
+def get_nla_strips_ending_at_frame(animation_data, frame) -> List[NlaStrip]:
+    if animation_data is None:
         return []
     strips = []
-    for nla_track in object.animation_data.nla_tracks:
+    for nla_track in animation_data.nla_tracks:
         for strip in nla_track.strips:
             if strip.frame_end == frame:
                 strips.append(strip)
     return strips
 
 
-def get_nla_strips_in_timeframe(object, frame_min, frame_max) -> List[NlaStrip]:
-    if object is None or object.animation_data is None:
+def get_nla_strips_in_timeframe(animation_data, frame_min, frame_max) -> List[NlaStrip]:
+    if animation_data is None:
         return []
     strips = []
-    for nla_track in object.animation_data.nla_tracks:
+    for nla_track in animation_data.nla_tracks:
         if nla_track.mute:
             continue
         for strip in nla_track.strips:

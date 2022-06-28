@@ -26,198 +26,195 @@ class PsaImportOptions(object):
         self.action_name_prefix = ''
 
 
-class PsaImporter(object):
-    def __init__(self):
-        pass
+def import_psa(psa_reader: PsaReader, armature_object, options: PsaImportOptions):
+    sequences = map(lambda x: psa_reader.sequences[x], options.sequence_names)
+    armature_data = armature_object.data
 
-    def import_psa(self, psa_reader: PsaReader, armature_object, options: PsaImportOptions):
-        sequences = map(lambda x: psa_reader.sequences[x], options.sequence_names)
-        armature_data = armature_object.data
+    class ImportBone(object):
+        def __init__(self, psa_bone: Psa.Bone):
+            self.psa_bone: Psa.Bone = psa_bone
+            self.parent: Optional[ImportBone] = None
+            self.armature_bone = None
+            self.pose_bone = None
+            self.orig_loc: Vector = Vector()
+            self.orig_quat: Quaternion = Quaternion()
+            self.post_quat: Quaternion = Quaternion()
+            self.fcurves = []
 
-        class ImportBone(object):
-            def __init__(self, psa_bone: Psa.Bone):
-                self.psa_bone: Psa.Bone = psa_bone
-                self.parent: Optional[ImportBone] = None
-                self.armature_bone = None
-                self.pose_bone = None
-                self.orig_loc: Vector = Vector()
-                self.orig_quat: Quaternion = Quaternion()
-                self.post_quat: Quaternion = Quaternion()
-                self.fcurves = []
+    def calculate_fcurve_data(import_bone: ImportBone, key_data: []):
+        # Convert world-space transforms to local-space transforms.
+        key_rotation = Quaternion(key_data[0:4])
+        key_location = Vector(key_data[4:])
+        q = import_bone.post_quat.copy()
+        q.rotate(import_bone.orig_quat)
+        quat = q
+        q = import_bone.post_quat.copy()
+        if import_bone.parent is None:
+            q.rotate(key_rotation.conjugated())
+        else:
+            q.rotate(key_rotation)
+        quat.rotate(q.conjugated())
+        loc = key_location - import_bone.orig_loc
+        loc.rotate(import_bone.post_quat.conjugated())
+        return quat.w, quat.x, quat.y, quat.z, loc.x, loc.y, loc.z
 
-        def calculate_fcurve_data(import_bone: ImportBone, key_data: []):
-            # Convert world-space transforms to local-space transforms.
-            key_rotation = Quaternion(key_data[0:4])
-            key_location = Vector(key_data[4:])
-            q = import_bone.post_quat.copy()
-            q.rotate(import_bone.orig_quat)
-            quat = q
-            q = import_bone.post_quat.copy()
-            if import_bone.parent is None:
-                q.rotate(key_rotation.conjugated())
+    # Create an index mapping from bones in the PSA to bones in the target armature.
+    psa_to_armature_bone_indices = {}
+    armature_bone_names = [x.name for x in armature_data.bones]
+    psa_bone_names = []
+    for psa_bone_index, psa_bone in enumerate(psa_reader.bones):
+        psa_bone_name = psa_bone.name.decode('windows-1252')
+        psa_bone_names.append(psa_bone_name)
+        try:
+            psa_to_armature_bone_indices[psa_bone_index] = armature_bone_names.index(psa_bone_name)
+        except ValueError:
+            pass
+
+    # Report if there are missing bones in the target armature.
+    missing_bone_names = set(psa_bone_names).difference(set(armature_bone_names))
+    if len(missing_bone_names) > 0:
+        print(
+            f'The armature object \'{armature_object.name}\' is missing the following bones that exist in the PSA:')
+        print(list(sorted(missing_bone_names)))
+    del armature_bone_names
+
+    # Create intermediate bone data for import operations.
+    import_bones = []
+    import_bones_dict = dict()
+
+    for psa_bone_index, psa_bone in enumerate(psa_reader.bones):
+        bone_name = psa_bone.name.decode('windows-1252')
+        if psa_bone_index not in psa_to_armature_bone_indices:  # TODO: replace with bone_name in armature_data.bones
+            # PSA bone does not map to armature bone, skip it and leave an empty bone in its place.
+            import_bones.append(None)
+            continue
+        import_bone = ImportBone(psa_bone)
+        import_bone.armature_bone = armature_data.bones[bone_name]
+        import_bone.pose_bone = armature_object.pose.bones[bone_name]
+        import_bones_dict[bone_name] = import_bone
+        import_bones.append(import_bone)
+
+    for import_bone in filter(lambda x: x is not None, import_bones):
+        armature_bone = import_bone.armature_bone
+        if armature_bone.parent is not None and armature_bone.parent.name in psa_bone_names:
+            import_bone.parent = import_bones_dict[armature_bone.parent.name]
+        # Calculate the original location & rotation of each bone (in world-space maybe?)
+        if armature_bone.get('orig_quat') is not None:
+            # TODO: ideally we don't rely on bone auxiliary data like this, the non-aux data path is incorrect
+            # (animations are flipped 180 around Z)
+            import_bone.orig_quat = Quaternion(armature_bone['orig_quat'])
+            import_bone.orig_loc = Vector(armature_bone['orig_loc'])
+            import_bone.post_quat = Quaternion(armature_bone['post_quat'])
+        else:
+            if import_bone.parent is not None:
+                import_bone.orig_loc = armature_bone.matrix_local.translation - armature_bone.parent.matrix_local.translation
+                import_bone.orig_loc.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
+                import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
+                import_bone.orig_quat.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
+                import_bone.orig_quat.conjugate()
             else:
-                q.rotate(key_rotation)
-            quat.rotate(q.conjugated())
-            loc = key_location - import_bone.orig_loc
-            loc.rotate(import_bone.post_quat.conjugated())
-            return quat.w, quat.x, quat.y, quat.z, loc.x, loc.y, loc.z
+                import_bone.orig_loc = armature_bone.matrix_local.translation.copy()
+                import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
+            import_bone.post_quat = import_bone.orig_quat.conjugated()
 
-        # Create an index mapping from bones in the PSA to bones in the target armature.
-        psa_to_armature_bone_indices = {}
-        armature_bone_names = [x.name for x in armature_data.bones]
-        psa_bone_names = []
-        for psa_bone_index, psa_bone in enumerate(psa_reader.bones):
-            psa_bone_name = psa_bone.name.decode('windows-1252')
-            psa_bone_names.append(psa_bone_name)
-            try:
-                psa_to_armature_bone_indices[psa_bone_index] = armature_bone_names.index(psa_bone_name)
-            except ValueError:
-                pass
+    # Create and populate the data for new sequences.
+    actions = []
+    for sequence in sequences:
+        # Add the action.
+        sequence_name = sequence.name.decode('windows-1252')
+        action_name = options.action_name_prefix + sequence_name
 
-        # Report if there are missing bones in the target armature.
-        missing_bone_names = set(psa_bone_names).difference(set(armature_bone_names))
-        if len(missing_bone_names) > 0:
-            print(
-                f'The armature object \'{armature_object.name}\' is missing the following bones that exist in the PSA:')
-            print(list(sorted(missing_bone_names)))
-        del armature_bone_names
+        if options.should_overwrite and action_name in bpy.data.actions:
+            action = bpy.data.actions[action_name]
+        else:
+            action = bpy.data.actions.new(name=action_name)
 
-        # Create intermediate bone data for import operations.
-        import_bones = []
-        import_bones_dict = dict()
+        if options.should_write_keyframes:
+            # Remove existing f-curves (replace with action.fcurves.clear() in Blender 3.2)
+            while len(action.fcurves) > 0:
+                action.fcurves.remove(action.fcurves[-1])
 
-        for psa_bone_index, psa_bone in enumerate(psa_reader.bones):
-            bone_name = psa_bone.name.decode('windows-1252')
-            if psa_bone_index not in psa_to_armature_bone_indices:  # TODO: replace with bone_name in armature_data.bones
-                # PSA bone does not map to armature bone, skip it and leave an empty bone in its place.
-                import_bones.append(None)
-                continue
-            import_bone = ImportBone(psa_bone)
-            import_bone.armature_bone = armature_data.bones[bone_name]
-            import_bone.pose_bone = armature_object.pose.bones[bone_name]
-            import_bones_dict[bone_name] = import_bone
-            import_bones.append(import_bone)
+            # Create f-curves for the rotation and location of each bone.
+            for psa_bone_index, armature_bone_index in psa_to_armature_bone_indices.items():
+                import_bone = import_bones[psa_bone_index]
+                pose_bone = import_bone.pose_bone
+                rotation_data_path = pose_bone.path_from_id('rotation_quaternion')
+                location_data_path = pose_bone.path_from_id('location')
+                import_bone.fcurves = [
+                    action.fcurves.new(rotation_data_path, index=0, action_group=pose_bone.name),  # Qw
+                    action.fcurves.new(rotation_data_path, index=1, action_group=pose_bone.name),  # Qx
+                    action.fcurves.new(rotation_data_path, index=2, action_group=pose_bone.name),  # Qy
+                    action.fcurves.new(rotation_data_path, index=3, action_group=pose_bone.name),  # Qz
+                    action.fcurves.new(location_data_path, index=0, action_group=pose_bone.name),  # Lx
+                    action.fcurves.new(location_data_path, index=1, action_group=pose_bone.name),  # Ly
+                    action.fcurves.new(location_data_path, index=2, action_group=pose_bone.name),  # Lz
+                ]
 
-        for import_bone in filter(lambda x: x is not None, import_bones):
-            armature_bone = import_bone.armature_bone
-            if armature_bone.parent is not None and armature_bone.parent.name in psa_bone_names:
-                import_bone.parent = import_bones_dict[armature_bone.parent.name]
-            # Calculate the original location & rotation of each bone (in world-space maybe?)
-            if armature_bone.get('orig_quat') is not None:
-                # TODO: ideally we don't rely on bone auxiliary data like this, the non-aux data path is incorrect (animations are flipped 180 around Z)
-                import_bone.orig_quat = Quaternion(armature_bone['orig_quat'])
-                import_bone.orig_loc = Vector(armature_bone['orig_loc'])
-                import_bone.post_quat = Quaternion(armature_bone['post_quat'])
-            else:
-                if import_bone.parent is not None:
-                    import_bone.orig_loc = armature_bone.matrix_local.translation - armature_bone.parent.matrix_local.translation
-                    import_bone.orig_loc.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
-                    import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
-                    import_bone.orig_quat.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
-                    import_bone.orig_quat.conjugate()
-                else:
-                    import_bone.orig_loc = armature_bone.matrix_local.translation.copy()
-                    import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
-                import_bone.post_quat = import_bone.orig_quat.conjugated()
+            # Read the sequence data matrix from the PSA.
+            sequence_data_matrix = psa_reader.read_sequence_data_matrix(sequence_name)
+            keyframe_write_matrix = np.ones(sequence_data_matrix.shape, dtype=np.int8)
 
-        # Create and populate the data for new sequences.
-        actions = []
-        for sequence in sequences:
-            # Add the action.
-            sequence_name = sequence.name.decode('windows-1252')
-            action_name = options.action_name_prefix + sequence_name
+            # Convert the sequence's data from world-space to local-space.
+            for bone_index, import_bone in enumerate(import_bones):
+                if import_bone is None:
+                    continue
+                for frame_index in range(sequence.frame_count):
+                    # This bone has writeable keyframes for this frame.
+                    key_data = sequence_data_matrix[frame_index, bone_index]
+                    # Calculate the local-space key data for the bone.
+                    sequence_data_matrix[frame_index, bone_index] = calculate_fcurve_data(import_bone, key_data)
 
-            if options.should_overwrite and action_name in bpy.data.actions:
-                action = bpy.data.actions[action_name]
-            else:
-                action = bpy.data.actions.new(name=action_name)
-
-            if options.should_write_keyframes:
-                # Remove existing f-curves (replace with action.fcurves.clear() in Blender 3.2)
-                while len(action.fcurves) > 0:
-                    action.fcurves.remove(action.fcurves[-1])
-
-                # Create f-curves for the rotation and location of each bone.
-                for psa_bone_index, armature_bone_index in psa_to_armature_bone_indices.items():
-                    import_bone = import_bones[psa_bone_index]
-                    pose_bone = import_bone.pose_bone
-                    rotation_data_path = pose_bone.path_from_id('rotation_quaternion')
-                    location_data_path = pose_bone.path_from_id('location')
-                    import_bone.fcurves = [
-                        action.fcurves.new(rotation_data_path, index=0, action_group=pose_bone.name),  # Qw
-                        action.fcurves.new(rotation_data_path, index=1, action_group=pose_bone.name),  # Qx
-                        action.fcurves.new(rotation_data_path, index=2, action_group=pose_bone.name),  # Qy
-                        action.fcurves.new(rotation_data_path, index=3, action_group=pose_bone.name),  # Qz
-                        action.fcurves.new(location_data_path, index=0, action_group=pose_bone.name),  # Lx
-                        action.fcurves.new(location_data_path, index=1, action_group=pose_bone.name),  # Ly
-                        action.fcurves.new(location_data_path, index=2, action_group=pose_bone.name),  # Lz
-                    ]
-
-                # Read the sequence data matrix from the PSA.
-                sequence_data_matrix = psa_reader.read_sequence_data_matrix(sequence_name)
-                keyframe_write_matrix = np.ones(sequence_data_matrix.shape, dtype=np.int8)
-
-                # Convert the sequence's data from world-space to local-space.
+            # Clean the keyframe data. This is accomplished by writing zeroes to the write matrix when there is an
+            # insufficiently large change in the data from the last written frame.
+            if options.should_clean_keys:
+                threshold = 0.001
                 for bone_index, import_bone in enumerate(import_bones):
                     if import_bone is None:
                         continue
-                    for frame_index in range(sequence.frame_count):
+                    for fcurve_index in range(len(import_bone.fcurves)):
+                        # Get all the keyframe data for the bone's f-curve data from the sequence data matrix.
+                        fcurve_frame_data = sequence_data_matrix[:, bone_index, fcurve_index]
+                        last_written_datum = 0
+                        for frame_index, datum in enumerate(fcurve_frame_data):
+                            # If the f-curve data is not different enough to the last written frame, un-mark this data for writing.
+                            if frame_index > 0 and abs(datum - last_written_datum) < threshold:
+                                keyframe_write_matrix[frame_index, bone_index, fcurve_index] = 0
+                            else:
+                                last_written_datum = datum
+
+            # Write the keyframes out!
+            for frame_index in range(sequence.frame_count):
+                for bone_index, import_bone in enumerate(import_bones):
+                    if import_bone is None:
+                        continue
+                    bone_has_writeable_keyframes = any(keyframe_write_matrix[frame_index, bone_index])
+                    if bone_has_writeable_keyframes:
                         # This bone has writeable keyframes for this frame.
                         key_data = sequence_data_matrix[frame_index, bone_index]
-                        # Calculate the local-space key data for the bone.
-                        sequence_data_matrix[frame_index, bone_index] = calculate_fcurve_data(import_bone, key_data)
+                        for fcurve, should_write, datum in zip(import_bone.fcurves,
+                                                               keyframe_write_matrix[frame_index, bone_index],
+                                                               key_data):
+                            if should_write:
+                                fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
 
-                # Clean the keyframe data. This is accomplished by writing zeroes to the write matrix when there is an
-                # insufficiently large change in the data from the last written frame.
-                if options.should_clean_keys:
-                    threshold = 0.001
-                    for bone_index, import_bone in enumerate(import_bones):
-                        if import_bone is None:
-                            continue
-                        for fcurve_index in range(len(import_bone.fcurves)):
-                            # Get all the keyframe data for the bone's f-curve data from the sequence data matrix.
-                            fcurve_frame_data = sequence_data_matrix[:, bone_index, fcurve_index]
-                            last_written_datum = 0
-                            for frame_index, datum in enumerate(fcurve_frame_data):
-                                # If the f-curve data is not different enough to the last written frame, un-mark this data for writing.
-                                if frame_index > 0 and abs(datum - last_written_datum) < threshold:
-                                    keyframe_write_matrix[frame_index, bone_index, fcurve_index] = 0
-                                else:
-                                    last_written_datum = datum
+        # Write
+        if options.should_write_metadata:
+            action['psa_sequence_name'] = sequence_name
+            action['psa_sequence_fps'] = sequence.fps
 
-                # Write the keyframes out!
-                for frame_index in range(sequence.frame_count):
-                    for bone_index, import_bone in enumerate(import_bones):
-                        if import_bone is None:
-                            continue
-                        bone_has_writeable_keyframes = any(keyframe_write_matrix[frame_index, bone_index])
-                        if bone_has_writeable_keyframes:
-                            # This bone has writeable keyframes for this frame.
-                            key_data = sequence_data_matrix[frame_index, bone_index]
-                            for fcurve, should_write, datum in zip(import_bone.fcurves,
-                                                                   keyframe_write_matrix[frame_index, bone_index],
-                                                                   key_data):
-                                if should_write:
-                                    fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
+        action.use_fake_user = options.should_use_fake_user
 
-            # Write
-            if options.should_write_metadata:
-                action['psa_sequence_name'] = sequence_name
-                action['psa_sequence_fps'] = sequence.fps
+        actions.append(action)
 
-            action.use_fake_user = options.should_use_fake_user
-
-            actions.append(action)
-
-        # If the user specifies, store the new animations as strips on a non-contributing NLA track.
-        if options.should_stash:
-            if armature_object.animation_data is None:
-                armature_object.animation_data_create()
-            for action in actions:
-                nla_track = armature_object.animation_data.nla_tracks.new()
-                nla_track.name = action.name
-                nla_track.mute = True
-                nla_track.strips.new(name=action.name, start=0, action=action)
+    # If the user specifies, store the new animations as strips on a non-contributing NLA track.
+    if options.should_stash:
+        if armature_object.animation_data is None:
+            armature_object.animation_data_create()
+        for action in actions:
+            nla_track = armature_object.animation_data.nla_tracks.new()
+            nla_track.name = action.name
+            nla_track.mute = True
+            nla_track.strips.new(name=action.name, start=0, action=action)
 
 
 class PsaImportActionListItem(PropertyGroup):
@@ -403,7 +400,7 @@ class PsaImportSequencesFromText(Operator):
 class PsaImportSequencesSelectAll(Operator):
     bl_idname = 'psa_import.sequences_select_all'
     bl_label = 'All'
-    bl_description = 'Select all visible sequences'
+    bl_description = 'Select all sequences'
     bl_options = {'INTERNAL'}
 
     @classmethod
@@ -589,7 +586,7 @@ class PsaImportOperator(Operator):
         options.should_write_metadata = pg.should_write_metadata
         options.should_write_keyframes = pg.should_write_keyframes
 
-        PsaImporter().import_psa(psa_reader, context.view_layer.objects.active, options)
+        import_psa(psa_reader, context.view_layer.objects.active, options)
 
         self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
 
