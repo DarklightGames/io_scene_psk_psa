@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from typing import Dict, List
 
 from .data import *
 from ..helpers import *
@@ -15,8 +16,9 @@ class PskInputObjects(object):
 class PskBuildOptions(object):
     def __init__(self):
         self.bone_filter_mode = 'ALL'
-        self.bone_group_indices = []
+        self.bone_group_indices: List[int] = []
         self.use_raw_mesh_data = True
+        self.material_names: List[str] = []
 
 
 def get_psk_input_objects(context) -> PskInputObjects:
@@ -62,7 +64,6 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
 
     psk = Psk()
     bones = []
-    materials = OrderedDict()
 
     if armature_object is None:
         # If the mesh has no armature object, simply assign it a dummy bone at the root to satisfy the requirement
@@ -93,7 +94,7 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
                 psk_bone.parent_index = parent_index
                 psk.bones[parent_index].children_count += 1
             except ValueError:
-                psk_bone.parent_index = 0
+                psk_bone.parent_index = -1
 
             if bone.parent is not None:
                 rotation = bone.matrix.to_quaternion().conjugated()
@@ -102,40 +103,35 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
                 parent_tail = quat_parent @ bone.parent.tail
                 location = (parent_tail - parent_head) + bone.head
             else:
-                location = armature_object.matrix_local @ bone.head
-                rot_matrix = bone.matrix @ armature_object.matrix_local.to_3x3()
+                local_matrix = armature_object.matrix_local
+                location = local_matrix @ bone.head
+                rot_matrix = bone.matrix @ local_matrix.to_3x3()
                 rotation = rot_matrix.to_quaternion()
 
             psk_bone.location.x = location.x
             psk_bone.location.y = location.y
             psk_bone.location.z = location.z
 
+            psk_bone.rotation.w = rotation.w
             psk_bone.rotation.x = rotation.x
             psk_bone.rotation.y = rotation.y
             psk_bone.rotation.z = rotation.z
-            psk_bone.rotation.w = rotation.w
 
             psk.bones.append(psk_bone)
+
+    # MATERIALS
+    material_names = options.material_names
+
+    for material_name in material_names:
+        psk_material = Psk.Material()
+        psk_material.name = bytes(material_name, encoding='windows-1252')
+        psk_material.texture_index = len(psk.materials)
+        psk.materials.append(psk_material)
 
     for input_mesh_object in input_objects.mesh_objects:
 
         # MATERIALS
-        material_indices = []
-        for i, material in enumerate(input_mesh_object.data.materials):
-            if material is None:
-                raise RuntimeError('Material cannot be empty (index ' + str(i) + ')')
-            if material.name in materials:
-                # Material already evaluated, just get its index.
-                material_index = list(materials.keys()).index(material.name)
-            else:
-                # New material.
-                psk_material = Psk.Material()
-                psk_material.name = bytes(material.name, encoding='windows-1252')
-                psk_material.texture_index = len(psk.materials)
-                psk.materials.append(psk_material)
-                materials[material.name] = material
-                material_index = psk_material.texture_index
-            material_indices.append(material_index)
+        material_indices = [material_names.index(material.name) for material in input_mesh_object.data.materials]
 
         if options.use_raw_mesh_data:
             mesh_object = input_mesh_object

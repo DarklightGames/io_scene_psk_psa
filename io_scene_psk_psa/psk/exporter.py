@@ -1,7 +1,7 @@
 from typing import Type
 
-from bpy.props import BoolProperty, StringProperty, CollectionProperty, IntProperty, EnumProperty
-from bpy.types import Operator, PropertyGroup
+from bpy.props import BoolProperty, StringProperty, CollectionProperty, IntProperty, EnumProperty, PointerProperty
+from bpy.types import Operator, PropertyGroup, UIList, Material
 from bpy_extras.io_utils import ExportHelper
 
 from .builder import build_psk, PskBuildOptions, get_psk_input_objects
@@ -67,6 +67,75 @@ def is_bone_filter_mode_item_available(context, identifier):
     return True
 
 
+class PSK_UL_MaterialList(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        row = layout.row()
+        row.label(text=str(item.material_name), icon='MATERIAL')
+
+
+class MaterialListItem(PropertyGroup):
+    material_name: StringProperty()
+    index: IntProperty()
+
+    @property
+    def name(self):
+        return self.material_name
+
+
+def populate_material_list(mesh_objects, material_list):
+    material_list.clear()
+
+    material_names = []
+    for mesh_object in mesh_objects:
+        for i, material in enumerate(mesh_object.data.materials):
+            # TODO: put this in the poll arg?
+            if material is None:
+                raise RuntimeError('Material cannot be empty (index ' + str(i) + ')')
+            if material.name not in material_names:
+                material_names.append(material.name)
+
+    for index, material_name in enumerate(material_names):
+        m = material_list.add()
+        m.material_name = material_name
+        m.index = index
+
+
+class PskMaterialListItemMoveUp(Operator):
+    bl_idname = 'psk_export.material_list_item_move_up'
+    bl_label = 'Move Up'
+    bl_options = {'INTERNAL'}
+    bl_description = 'Move the selected material up one slot'
+
+    @classmethod
+    def poll(cls, context):
+        pg = context.scene.psk_export
+        return pg.material_list_index > 0
+
+    def execute(self, context):
+        pg = context.scene.psk_export
+        pg.material_list.move(pg.material_list_index, pg.material_list_index - 1)
+        pg.material_list_index -= 1
+        return {"FINISHED"}
+
+
+class PskMaterialListItemMoveDown(Operator):
+    bl_idname = 'psk_export.material_list_item_move_down'
+    bl_label = 'Move Down'
+    bl_options = {'INTERNAL'}
+    bl_description = 'Move the selected material down one slot'
+
+    @classmethod
+    def poll(cls, context):
+        pg = context.scene.psk_export
+        return pg.material_list_index < len(pg.material_list) - 1
+
+    def execute(self, context):
+        pg = context.scene.psk_export
+        pg.material_list.move(pg.material_list_index, pg.material_list_index + 1)
+        pg.material_list_index += 1
+        return {"FINISHED"}
+
+
 class PskExportOperator(Operator, ExportHelper):
     bl_idname = 'export.psk'
     bl_label = 'Export'
@@ -92,6 +161,7 @@ class PskExportOperator(Operator, ExportHelper):
 
         # Populate bone groups list.
         populate_bone_group_list(input_objects.armature_object, pg.bone_group_list)
+        populate_material_list(input_objects.mesh_objects, pg.material_list)
 
         context.window_manager.fileselect_add(self)
 
@@ -114,10 +184,9 @@ class PskExportOperator(Operator, ExportHelper):
         layout.prop(pg, 'use_raw_mesh_data')
 
         # BONES
-        box = layout.box()
-        box.label(text='Bones', icon='BONE_DATA')
+        layout.label(text='Bones', icon='BONE_DATA')
         bone_filter_mode_items = pg.bl_rna.properties['bone_filter_mode'].enum_items_static
-        row = box.row(align=True)
+        row = layout.row(align=True)
         for item in bone_filter_mode_items:
             identifier = item.identifier
             item_layout = row.row(align=True)
@@ -125,9 +194,20 @@ class PskExportOperator(Operator, ExportHelper):
             item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
 
         if pg.bone_filter_mode == 'BONE_GROUPS':
-            row = box.row()
+            row = layout.row()
             rows = max(3, min(len(pg.bone_group_list), 10))
             row.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg, 'bone_group_list_index', rows=rows)
+
+        layout.separator()
+
+        # MATERIALS
+        layout.label(text='Materials', icon='MATERIAL')
+        row = layout.row()
+        rows = max(3, min(len(pg.bone_group_list), 10))
+        row.template_list('PSK_UL_MaterialList', '', pg, 'material_list', pg, 'material_list_index', rows=rows)
+        col = row.column(align=True)
+        col.operator(PskMaterialListItemMoveUp.bl_idname, text='', icon='TRIA_UP')
+        col.operator(PskMaterialListItemMoveDown.bl_idname, text='', icon='TRIA_DOWN')
 
     def execute(self, context):
         pg = context.scene.psk_export
@@ -135,6 +215,8 @@ class PskExportOperator(Operator, ExportHelper):
         options.bone_filter_mode = pg.bone_filter_mode
         options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
         options.use_raw_mesh_data = pg.use_raw_mesh_data
+        options.material_names = [m.material_name for m in pg.material_list]
+
         try:
             psk = build_psk(context, options)
             export_psk(psk, self.filepath)
@@ -158,9 +240,15 @@ class PskExportPropertyGroup(PropertyGroup):
     bone_group_list: CollectionProperty(type=BoneGroupListItem)
     bone_group_list_index: IntProperty(default=0)
     use_raw_mesh_data: BoolProperty(default=False, name='Raw Mesh Data', description='No modifiers will be evaluated as part of the exported mesh')
+    material_list: CollectionProperty(type=MaterialListItem)
+    material_list_index: IntProperty(default=0)
 
 
 classes = (
+    MaterialListItem,
+    PSK_UL_MaterialList,
+    PskMaterialListItemMoveUp,
+    PskMaterialListItemMoveDown,
     PskExportOperator,
-    PskExportPropertyGroup
+    PskExportPropertyGroup,
 )
