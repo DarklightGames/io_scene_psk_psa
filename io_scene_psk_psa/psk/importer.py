@@ -12,25 +12,26 @@ from bpy_extras.io_utils import ImportHelper
 from mathutils import Quaternion, Vector, Matrix
 
 from .data import Psk
-from .reader import PskReader
+from .reader import read_psk
 from ..helpers import rgb_to_srgb
 
 
 class PskImportOptions(object):
     def __init__(self):
         self.name = ''
+        self.should_import_mesh = True
         self.should_import_vertex_colors = True
         self.vertex_color_space = 'sRGB'
         self.should_import_vertex_normals = True
         self.should_import_extra_uvs = True
+        self.should_import_skeleton = True
         self.bone_length = 1.0
 
 
-class PskImporter(object):
-    def __init__(self):
-        pass
+def import_psk(psk: Psk, context, options: PskImportOptions):
+    armature_object = None
 
-    def import_psk(self, psk: Psk, context, options: PskImportOptions):
+    if options.should_import_skeleton:
         # ARMATURE
         armature_data = bpy.data.armatures.new(options.name)
         armature_object = bpy.data.objects.new(options.name, armature_data)
@@ -109,7 +110,8 @@ class PskImporter(object):
             edit_bone['orig_loc'] = import_bone.local_translation
             edit_bone['post_quat'] = import_bone.local_rotation.conjugated()
 
-        # MESH
+    # MESH
+    if options.should_import_mesh:
         mesh_data = bpy.data.meshes.new(options.name)
         mesh_object = bpy.data.objects.new(options.name, mesh_data)
 
@@ -211,24 +213,25 @@ class PskImporter(object):
 
         # Get a list of all bones that have weights associated with them.
         vertex_group_bone_indices = set(map(lambda weight: weight.bone_index, psk.weights))
-        for import_bone in map(lambda x: import_bones[x], sorted(list(vertex_group_bone_indices))):
-            import_bone.vertex_group = mesh_object.vertex_groups.new(
-                name=import_bone.psk_bone.name.decode('windows-1252'))
+        vertex_groups = [None] * len(psk.bones)
+        for bone_index, psk_bone in map(lambda x: (x, psk.bones[x]), vertex_group_bone_indices):
+            vertex_groups[bone_index] = mesh_object.vertex_groups.new(name=psk_bone.name.decode('windows-1252'))
 
         for weight in psk.weights:
-            import_bones[weight.bone_index].vertex_group.add((weight.point_index,), weight.weight, 'ADD')
-
-        # Add armature modifier to our mesh object.
-        armature_modifier = mesh_object.modifiers.new(name='Armature', type='ARMATURE')
-        armature_modifier.object = armature_object
-        mesh_object.parent = armature_object
+            vertex_groups[weight.bone_index].add((weight.point_index,), weight.weight, 'ADD')
 
         context.scene.collection.objects.link(mesh_object)
 
-        try:
-            bpy.ops.object.mode_set(mode='OBJECT')
-        except:
-            pass
+        # Add armature modifier to our mesh object.
+        if options.should_import_skeleton:
+            armature_modifier = mesh_object.modifiers.new(name='Armature', type='ARMATURE')
+            armature_modifier.object = armature_object
+            mesh_object.parent = armature_object
+
+    try:
+        bpy.ops.object.mode_set(mode='OBJECT')
+    except:
+        pass
 
 
 class PskImportPropertyGroup(PropertyGroup):
@@ -260,6 +263,18 @@ class PskImportPropertyGroup(PropertyGroup):
         options=set(),
         description='Import extra UV maps from PSKX files, if available'
     )
+    should_import_mesh: BoolProperty(
+        default=True,
+        name='Import Mesh',
+        options=set(),
+        description='Import mesh'
+    )
+    should_import_skeleton: BoolProperty(
+        default=True,
+        name='Import Skeleton',
+        options=set(),
+        description='Import skeleton'
+    )
     bone_length: FloatProperty(
         default=1.0,
         min=sys.float_info.epsilon,
@@ -273,7 +288,7 @@ class PskImportPropertyGroup(PropertyGroup):
 
 class PskImportOperator(Operator, ImportHelper):
     bl_idname = 'import.psk'
-    bl_label = 'Export'
+    bl_label = 'Import'
     bl_options = {'INTERNAL', 'UNDO'}
     __doc__ = 'Load a PSK file'
     filename_ext = '.psk'
@@ -286,29 +301,42 @@ class PskImportOperator(Operator, ImportHelper):
 
     def execute(self, context):
         pg = context.scene.psk_import
-        reader = PskReader()
-        psk = reader.read(self.filepath)
+
+        psk = read_psk(self.filepath)
+
         options = PskImportOptions()
         options.name = os.path.splitext(os.path.basename(self.filepath))[0]
+        options.should_import_mesh = pg.should_import_mesh
         options.should_import_extra_uvs = pg.should_import_extra_uvs
         options.should_import_vertex_colors = pg.should_import_vertex_colors
         options.should_import_vertex_normals = pg.should_import_vertex_normals
         options.vertex_color_space = pg.vertex_color_space
+        options.should_import_skeleton = pg.should_import_skeleton
         options.bone_length = pg.bone_length
-        PskImporter().import_psk(psk, context, options)
+
+        import_psk(psk, context, options)
+
         return {'FINISHED'}
 
     def draw(self, context):
         pg = context.scene.psk_import
         layout = self.layout
-        layout.use_property_split = True
-        layout.use_property_decorate = False
-        layout.prop(pg, 'should_import_vertex_normals')
-        layout.prop(pg, 'should_import_extra_uvs')
-        layout.prop(pg, 'should_import_vertex_colors')
-        if pg.should_import_vertex_colors:
-            layout.prop(pg, 'vertex_color_space')
-        layout.prop(pg, 'bone_length')
+        layout.prop(pg, 'should_import_mesh')
+        row = layout.column()
+        row.use_property_split = True
+        row.use_property_decorate = False
+        if pg.should_import_mesh:
+            row.prop(pg, 'should_import_vertex_normals')
+            row.prop(pg, 'should_import_extra_uvs')
+            row.prop(pg, 'should_import_vertex_colors')
+            if pg.should_import_vertex_colors:
+                row.prop(pg, 'vertex_color_space')
+        layout.prop(pg, 'should_import_skeleton')
+        row = layout.column()
+        row.use_property_split = True
+        row.use_property_decorate = False
+        if pg.should_import_skeleton:
+            row.prop(pg, 'bone_length')
 
 
 classes = (

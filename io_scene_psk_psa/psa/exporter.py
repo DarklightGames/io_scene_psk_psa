@@ -10,18 +10,13 @@ from bpy.props import BoolProperty, CollectionProperty, EnumProperty, FloatPrope
 from bpy.types import Action, Operator, PropertyGroup, UIList
 from bpy_extras.io_utils import ExportHelper
 
-from .builder import PsaBuilder, PsaBuilderOptions
+from .builder import PsaBuildOptions, build_psa
 from .data import *
 from ..helpers import *
 from ..types import BoneGroupListItem
 
 
-class PsaExporter(object):
-    def __init__(self, psa: Psa):
-        self.psa: Psa = psa
-
-    # This method is shared by both PSA/K file formats, move this?
-    @staticmethod
+def export_psa(psa: Psa, path: str):
     def write_section(fp, name: bytes, data_type: Type[Structure] = None, data: list = None):
         section = Section()
         section.name = name
@@ -32,13 +27,11 @@ class PsaExporter(object):
         if data is not None:
             for datum in data:
                 fp.write(datum)
-
-    def export(self, path: str):
-        with open(path, 'wb') as fp:
-            self.write_section(fp, b'ANIMHEAD')
-            self.write_section(fp, b'BONENAMES', Psa.Bone, self.psa.bones)
-            self.write_section(fp, b'ANIMINFO', Psa.Sequence, list(self.psa.sequences.values()))
-            self.write_section(fp, b'ANIMKEYS', Psa.Key, self.psa.keys)
+    with open(path, 'wb') as fp:
+        write_section(fp, b'ANIMHEAD')
+        write_section(fp, b'BONENAMES', Psa.Bone, psa.bones)
+        write_section(fp, b'ANIMINFO', Psa.Sequence, list(psa.sequences.values()))
+        write_section(fp, b'ANIMKEYS', Psa.Key, psa.keys)
 
 
 class PsaExportActionListItem(PropertyGroup):
@@ -64,12 +57,26 @@ def should_use_original_sequence_names_updated(_, context):
     update_action_names(context)
 
 
+def psa_export_property_group_animation_data_override_poll(_context, obj):
+    return obj.animation_data is not None
+
+
 class PsaExportPropertyGroup(PropertyGroup):
     root_motion: BoolProperty(
         name='Root Motion',
         options=set(),
         default=False,
-        description='When set, the root bone will be transformed as it appears in the scene',
+        description='The root bone will be transformed as it appears in the scene',
+    )
+    should_override_animation_data: BoolProperty(
+        name='Override Animation Data',
+        options=set(),
+        default=False,
+        description='Use the animation data from a different object instead of the selected object'
+    )
+    animation_data_override: PointerProperty(
+        type=bpy.types.Object,
+        poll=psa_export_property_group_animation_data_override_poll
     )
     sequence_source: EnumProperty(
         name='Source',
@@ -191,8 +198,11 @@ class PsaExportOperator(Operator, ExportHelper):
         # SOURCE
         layout.prop(pg, 'sequence_source', text='Source')
 
-        # ROOT MOTION
-        layout.prop(pg, 'root_motion', text='Root Motion')
+        if pg.sequence_source == 'TIMELINE_MARKERS':
+            # ANIMDATA SOURCE
+            layout.prop(pg, 'should_override_animation_data')
+            if pg.should_override_animation_data:
+                layout.prop(pg, 'animation_data_override', text='')
 
         # SELECT ALL/NONE
         row = layout.row(align=True)
@@ -249,15 +259,17 @@ class PsaExportOperator(Operator, ExportHelper):
             layout.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg, 'bone_group_list_index',
                                  rows=rows)
 
-    def should_action_be_selected_by_default(self, action):
-        return action is not None and action.asset_data is None
+        layout.separator()
+
+        # ROOT MOTION
+        layout.prop(pg, 'root_motion', text='Root Motion')
 
     def is_action_for_armature(self, action):
         if len(action.fcurves) == 0:
             return False
         bone_names = set([x.name for x in self.armature.data.bones])
         for fcurve in action.fcurves:
-            match = re.match(r'pose\.bones\["(.+)"\].\w+', fcurve.data_path)
+            match = re.match(r'pose\.bones\["(.+)"].\w+', fcurve.data_path)
             if not match:
                 continue
             bone_name = match.group(1)
@@ -273,7 +285,7 @@ class PsaExportOperator(Operator, ExportHelper):
         if context.view_layer.objects.active.type != 'ARMATURE':
             raise RuntimeError('The selected object must be an armature')
 
-    def invoke(self, context, event):
+    def invoke(self, context, _event):
         try:
             self._check_context(context)
         except RuntimeError as e:
@@ -290,7 +302,7 @@ class PsaExportOperator(Operator, ExportHelper):
             item = pg.action_list.add()
             item.action = action
             item.name = action.name
-            item.is_selected = self.should_action_be_selected_by_default(action)
+            item.is_selected = False
 
         update_action_names(context)
 
@@ -299,6 +311,7 @@ class PsaExportOperator(Operator, ExportHelper):
         for marker in context.scene.timeline_markers:
             item = pg.marker_list.add()
             item.name = marker.name
+            item.is_selected = False
 
         if len(pg.action_list) == 0 and len(pg.marker_list) == 0:
             # If there are no actions at all, we have nothing to export, so just cancel the operation.
@@ -318,7 +331,9 @@ class PsaExportOperator(Operator, ExportHelper):
         actions = [x.action for x in pg.action_list if x.is_selected]
         marker_names = [x.name for x in pg.marker_list if x.is_selected]
 
-        options = PsaBuilderOptions()
+        options = PsaBuildOptions()
+        options.should_override_animation_data = pg.should_override_animation_data
+        options.animation_data_override = pg.animation_data_override
         options.fps_source = pg.fps_source
         options.fps_custom = pg.fps_custom
         options.sequence_source = pg.sequence_source
@@ -332,16 +347,14 @@ class PsaExportOperator(Operator, ExportHelper):
         options.sequence_name_suffix = pg.sequence_name_suffix
         options.root_motion = pg.root_motion
 
-        builder = PsaBuilder()
-
         try:
-            psa = builder.build(context, options)
+            psa = build_psa(context, options)
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
-        exporter = PsaExporter(psa)
-        exporter.export(self.filepath)
+        export_psa(psa, self.filepath)
+
         return {'FINISHED'}
 
 
@@ -368,8 +381,7 @@ def filter_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_c
     return flt_flags
 
 
-def get_visible_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[
-    PsaExportActionListItem]:
+def get_visible_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[PsaExportActionListItem]:
     visible_sequences = []
     for i, flag in enumerate(filter_sequences(pg, sequences)):
         if bool(flag & (1 << 30)):
@@ -401,10 +413,9 @@ class PSA_UL_ExportSequenceList(UIList):
             subrow = row.row(align=True)
             subrow.prop(pg, 'sequence_filter_asset', icon_only=True, icon='ASSET_MANAGER')
 
-
-    def filter_items(self, context, data, property):
+    def filter_items(self, context, data, prop):
         pg = context.scene.psa_export
-        actions = getattr(data, property)
+        actions = getattr(data, prop)
         flt_flags = filter_sequences(pg, actions)
         flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(actions, 'name')
         return flt_flags, flt_neworder

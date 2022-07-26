@@ -7,8 +7,8 @@ from .data import *
 
 class PsaReader(object):
     """
-    This class reads the sequences and bone information immediately upon instantiation and hold onto a file handle.
-    The key data is not read into memory upon instantiation due to it's potentially very large size.
+    This class reads the sequences and bone information immediately upon instantiation and holds onto a file handle.
+    The keyframe data is not read into memory upon instantiation due to it's potentially very large size.
     To read the key data for a particular sequence, call `read_sequence_keys`.
     """
 

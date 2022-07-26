@@ -1,5 +1,6 @@
 import datetime
 from collections import Counter
+import re
 from typing import List, Iterable
 
 from bpy.types import NlaStrip, Object
@@ -31,22 +32,11 @@ def rgb_to_srgb(c):
         return 12.92 * c
 
 
-def get_nla_strips_ending_at_frame(object, frame) -> List[NlaStrip]:
-    if object is None or object.animation_data is None:
+def get_nla_strips_in_timeframe(animation_data, frame_min, frame_max) -> List[NlaStrip]:
+    if animation_data is None:
         return []
     strips = []
-    for nla_track in object.animation_data.nla_tracks:
-        for strip in nla_track.strips:
-            if strip.frame_end == frame:
-                strips.append(strip)
-    return strips
-
-
-def get_nla_strips_in_timeframe(object, frame_min, frame_max) -> List[NlaStrip]:
-    if object is None or object.animation_data is None:
-        return []
-    strips = []
-    for nla_track in object.animation_data.nla_tracks:
+    for nla_track in animation_data.nla_tracks:
         if nla_track.mute:
             continue
         for strip in nla_track.strips:
@@ -101,6 +91,14 @@ def get_psa_sequence_name(action, should_use_original_sequence_name):
         return action['psa_sequence_name']
     else:
         return action.name
+
+
+def check_bone_names(bone_names: Iterable[str]):
+    pattern = re.compile(r'^[a-zA-Z0-9_ ]+$')
+    invalid_bone_names = [x for x in bone_names if pattern.match(x) is None]
+    if len(invalid_bone_names) > 0:
+        raise RuntimeError(f'The following bone names are invalid: {invalid_bone_names}.\n'
+                           f'Bone names must only contain letters, numbers, spaces, and underscores.')
 
 
 def get_export_bone_names(armature_object, bone_filter_mode, bone_group_indices: List[int]) -> List[str]:
