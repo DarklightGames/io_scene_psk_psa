@@ -15,10 +15,6 @@ class BoneGroupListItem(PropertyGroup):
     count: IntProperty()
     is_selected: BoolProperty(default=False)
 
-    @property
-    def name(self):
-        return self.name
-
 
 classes = (
     BoneGroupListItem,

@@ -150,10 +150,7 @@ def build_psa(context, options: PsaBuildOptions) -> Psa:
             psa_bone.parent_index = -1
 
         if bone.parent is not None:
-            rotation = bone.matrix.to_quaternion()
-            rotation.x = -rotation.x
-            rotation.y = -rotation.y
-            rotation.z = -rotation.z
+            rotation = bone.matrix.to_quaternion().conjugated()
             inverse_parent_rotation = bone.parent.matrix.to_quaternion().inverted()
             parent_head = inverse_parent_rotation @ bone.parent.head
             parent_tail = inverse_parent_rotation @ bone.parent.tail

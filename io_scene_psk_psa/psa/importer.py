@@ -386,6 +386,9 @@ class PsaImportSequencesFromText(Operator):
 
     def execute(self, context):
         pg = context.scene.psa_import
+        if pg.select_text is None:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'No text block selected')
+            return {'CANCELLED'}
         contents = pg.select_text.as_string()
         count = 0
         for line in contents.split('\n'):
