@@ -22,7 +22,7 @@ class PsaReader(object):
         return self.psa.bones
 
     @property
-    def sequences(self) -> OrderedDict[Psa.Sequence]:
+    def sequences(self):
         return self.psa.sequences
 
     def read_sequence_data_matrix(self, sequence_name: str):
