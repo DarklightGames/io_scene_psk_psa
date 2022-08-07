@@ -3,7 +3,7 @@ import ctypes
 from .data import *
 
 
-def _read_types(fp, data_class: ctypes.Structure, section: Section, data):
+def _read_types(fp, data_class, section: Section, data):
     buffer_length = section.data_size * section.data_count
     buffer = fp.read(buffer_length)
     offset = 0

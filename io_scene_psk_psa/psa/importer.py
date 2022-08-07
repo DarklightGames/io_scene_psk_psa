@@ -26,37 +26,39 @@ class PsaImportOptions(object):
         self.action_name_prefix = ''
 
 
+class ImportBone(object):
+    def __init__(self, psa_bone: Psa.Bone):
+        self.psa_bone: Psa.Bone = psa_bone
+        self.parent: Optional[ImportBone] = None
+        self.armature_bone = None
+        self.pose_bone = None
+        self.orig_loc: Vector = Vector()
+        self.orig_quat: Quaternion = Quaternion()
+        self.post_quat: Quaternion = Quaternion()
+        self.fcurves = []
+
+
+def calculate_fcurve_data(import_bone: ImportBone, key_data: []):
+    # Convert world-space transforms to local-space transforms.
+    key_rotation = Quaternion(key_data[0:4])
+    key_location = Vector(key_data[4:])
+    q = import_bone.post_quat.copy()
+    q.rotate(import_bone.orig_quat)
+    quat = q
+    q = import_bone.post_quat.copy()
+    if import_bone.parent is None:
+        q.rotate(key_rotation.conjugated())
+    else:
+        q.rotate(key_rotation)
+    quat.rotate(q.conjugated())
+    loc = key_location - import_bone.orig_loc
+    loc.rotate(import_bone.post_quat.conjugated())
+    return quat.w, quat.x, quat.y, quat.z, loc.x, loc.y, loc.z
+
+
 def import_psa(psa_reader: PsaReader, armature_object, options: PsaImportOptions):
     sequences = map(lambda x: psa_reader.sequences[x], options.sequence_names)
     armature_data = armature_object.data
-
-    class ImportBone(object):
-        def __init__(self, psa_bone: Psa.Bone):
-            self.psa_bone: Psa.Bone = psa_bone
-            self.parent: Optional[ImportBone] = None
-            self.armature_bone = None
-            self.pose_bone = None
-            self.orig_loc: Vector = Vector()
-            self.orig_quat: Quaternion = Quaternion()
-            self.post_quat: Quaternion = Quaternion()
-            self.fcurves = []
-
-    def calculate_fcurve_data(import_bone: ImportBone, key_data: []):
-        # Convert world-space transforms to local-space transforms.
-        key_rotation = Quaternion(key_data[0:4])
-        key_location = Vector(key_data[4:])
-        q = import_bone.post_quat.copy()
-        q.rotate(import_bone.orig_quat)
-        quat = q
-        q = import_bone.post_quat.copy()
-        if import_bone.parent is None:
-            q.rotate(key_rotation.conjugated())
-        else:
-            q.rotate(key_rotation)
-        quat.rotate(q.conjugated())
-        loc = key_location - import_bone.orig_loc
-        loc.rotate(import_bone.post_quat.conjugated())
-        return quat.w, quat.x, quat.y, quat.z, loc.x, loc.y, loc.z
 
     # Create an index mapping from bones in the PSA to bones in the target armature.
     psa_to_armature_bone_indices = {}
@@ -176,7 +178,8 @@ def import_psa(psa_reader: PsaReader, armature_object, options: PsaImportOptions
                         fcurve_frame_data = sequence_data_matrix[:, bone_index, fcurve_index]
                         last_written_datum = 0
                         for frame_index, datum in enumerate(fcurve_frame_data):
-                            # If the f-curve data is not different enough to the last written frame, un-mark this data for writing.
+                            # If the f-curve data is not different enough to the last written frame,
+                            # un-mark this data for writing.
                             if frame_index > 0 and abs(datum - last_written_datum) < threshold:
                                 keyframe_write_matrix[frame_index, bone_index, fcurve_index] = 0
                             else:
@@ -217,9 +220,12 @@ def import_psa(psa_reader: PsaReader, armature_object, options: PsaImportOptions
             nla_track.strips.new(name=action.name, start=0, action=action)
 
 
+empty_set = set()
+
+
 class PsaImportActionListItem(PropertyGroup):
-    action_name: StringProperty(options=set())
-    is_selected: BoolProperty(default=False, options=set())
+    action_name: StringProperty(options=empty_set)
+    is_selected: BoolProperty(default=False, options=empty_set)
 
 
 def load_psa_file(context):
@@ -246,7 +252,7 @@ def on_psa_file_path_updated(property, context):
 
 
 class PsaBonePropertyGroup(PropertyGroup):
-    bone_name: StringProperty(options=set())
+    bone_name: StringProperty(options=empty_set)
 
 
 class PsaDataPropertyGroup(PropertyGroup):
@@ -255,37 +261,37 @@ class PsaDataPropertyGroup(PropertyGroup):
 
 
 class PsaImportPropertyGroup(PropertyGroup):
-    psa_file_path: StringProperty(default='', options=set(), update=on_psa_file_path_updated, name='PSA File Path')
+    psa_file_path: StringProperty(default='', options=empty_set, update=on_psa_file_path_updated, name='PSA File Path')
     psa_error: StringProperty(default='')
     psa: PointerProperty(type=PsaDataPropertyGroup)
     sequence_list: CollectionProperty(type=PsaImportActionListItem)
     sequence_list_index: IntProperty(name='', default=0)
     should_clean_keys: BoolProperty(default=True, name='Clean Keyframes',
                                     description='Exclude unnecessary keyframes from being written to the actions',
-                                    options=set())
+                                    options=empty_set)
     should_use_fake_user: BoolProperty(default=True, name='Fake User',
                                        description='Assign each imported action a fake user so that the data block is saved even it has no users',
-                                       options=set())
+                                       options=empty_set)
     should_stash: BoolProperty(default=False, name='Stash',
                                description='Stash each imported action as a strip on a new non-contributing NLA track',
-                               options=set())
-    should_use_action_name_prefix: BoolProperty(default=False, name='Prefix Action Name', options=set())
-    action_name_prefix: StringProperty(default='', name='Prefix', options=set())
-    should_overwrite: BoolProperty(default=False, name='Reuse Existing Actions', options=set(),
+                               options=empty_set)
+    should_use_action_name_prefix: BoolProperty(default=False, name='Prefix Action Name', options=empty_set)
+    action_name_prefix: StringProperty(default='', name='Prefix', options=empty_set)
+    should_overwrite: BoolProperty(default=False, name='Reuse Existing Actions', options=empty_set,
                                    description='If an action with a matching name already exists, the existing action will have it\'s data overwritten instead of a new action being created')
-    should_write_keyframes: BoolProperty(default=True, name='Keyframes', options=set())
-    should_write_metadata: BoolProperty(default=True, name='Metadata', options=set(),
+    should_write_keyframes: BoolProperty(default=True, name='Keyframes', options=empty_set)
+    should_write_metadata: BoolProperty(default=True, name='Metadata', options=empty_set,
                                         description='Additional data will be written to the custom properties of the Action (e.g., frame rate)')
     sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
-    sequence_filter_is_selected: BoolProperty(default=False, options=set(), name='Only Show Selected',
+    sequence_filter_is_selected: BoolProperty(default=False, options=empty_set, name='Only Show Selected',
                                               description='Only show selected sequences')
-    sequence_use_filter_invert: BoolProperty(default=False, options=set())
+    sequence_use_filter_invert: BoolProperty(default=False, options=empty_set)
     sequence_use_filter_regex: BoolProperty(default=False, name='Regular Expression',
-                                            description='Filter using regular expressions', options=set())
+                                            description='Filter using regular expressions', options=empty_set)
     select_text: PointerProperty(type=bpy.types.Text)
 
 
-def filter_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[int]:
+def filter_sequences(pg: PsaImportPropertyGroup, sequences) -> List[int]:
     bitflag_filter_item = 1 << 30
     flt_flags = [bitflag_filter_item] * len(sequences)
 
@@ -319,8 +325,7 @@ def filter_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_c
     return flt_flags
 
 
-def get_visible_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[
-    PsaImportActionListItem]:
+def get_visible_sequences(pg: PsaImportPropertyGroup, sequences) -> List[PsaImportActionListItem]:
     bitflag_filter_item = 1 << 30
     visible_sequences = []
     for i, flag in enumerate(filter_sequences(pg, sequences)):
@@ -330,26 +335,25 @@ def get_visible_sequences(pg: PsaImportPropertyGroup, sequences: bpy.types.bpy_p
 
 
 class PSA_UL_SequenceList(UIList):
-
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_property, index, flt_flag):
         row = layout.row(align=True)
         split = row.split(align=True, factor=0.75)
         column = split.row(align=True)
         column.alignment = 'LEFT'
         column.prop(item, 'is_selected', icon_only=True)
-        column.label(text=item.action_name)
+        column.label(text=getattr(item, 'action_name'))
 
     def draw_filter(self, context, layout):
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
         row = layout.row()
-        subrow = row.row(align=True)
-        subrow.prop(pg, 'sequence_filter_name', text="")
-        subrow.prop(pg, 'sequence_use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
-        subrow.prop(pg, 'sequence_use_filter_regex', text="", icon='SORTBYEXT')
-        subrow.prop(pg, 'sequence_filter_is_selected', text="", icon='CHECKBOX_HLT')
+        sub_row = row.row(align=True)
+        sub_row.prop(pg, 'sequence_filter_name', text="")
+        sub_row.prop(pg, 'sequence_use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
+        sub_row.prop(pg, 'sequence_use_filter_regex', text="", icon='SORTBYEXT')
+        sub_row.prop(pg, 'sequence_filter_is_selected', text="", icon='CHECKBOX_HLT')
 
     def filter_items(self, context, data, property):
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
         sequences = getattr(data, property)
         flt_flags = filter_sequences(pg, sequences)
         flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(sequences, 'action_name')
@@ -372,7 +376,7 @@ class PsaImportSequencesFromText(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
         return len(pg.sequence_list) > 0
 
     def invoke(self, context, event):
@@ -380,12 +384,12 @@ class PsaImportSequencesFromText(Operator):
 
     def draw(self, context):
         layout = self.layout
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
         layout.label(icon='INFO', text='Each sequence name should be on a new line.')
         layout.prop(pg, 'select_text', text='')
 
     def execute(self, context):
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
         if pg.select_text is None:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No text block selected')
             return {'CANCELLED'}
@@ -408,13 +412,13 @@ class PsaImportSequencesSelectAll(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
         visible_sequences = get_visible_sequences(pg, pg.sequence_list)
         has_unselected_actions = any(map(lambda action: not action.is_selected, visible_sequences))
         return len(visible_sequences) > 0 and has_unselected_actions
 
     def execute(self, context):
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
         visible_sequences = get_visible_sequences(pg, pg.sequence_list)
         for sequence in visible_sequences:
             sequence.is_selected = True
@@ -429,13 +433,13 @@ class PsaImportSequencesDeselectAll(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
         visible_sequences = get_visible_sequences(pg, pg.sequence_list)
         has_selected_sequences = any(map(lambda sequence: sequence.is_selected, visible_sequences))
         return len(visible_sequences) > 0 and has_selected_sequences
 
     def execute(self, context):
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
         visible_sequences = get_visible_sequences(pg, pg.sequence_list)
         for sequence in visible_sequences:
             sequence.is_selected = False
@@ -451,7 +455,7 @@ class PSA_PT_ImportPanel_Advanced(Panel):
 
     def draw(self, context):
         layout = self.layout
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
 
         col = layout.column(heading="Options")
         col.use_property_split = True
@@ -476,11 +480,11 @@ class PSA_PT_ImportPanel(Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.object.type == 'ARMATURE'
+        return context.view_layer.objects.active.type == 'ARMATURE'
 
     def draw(self, context):
         layout = self.layout
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
 
         row = layout.row(align=True)
         row.operator(PsaImportSelectFile.bl_idname, text='', icon='FILEBROWSER')
@@ -552,7 +556,7 @@ class PsaImportSelectFile(Operator):
     filter_glob: bpy.props.StringProperty(default="*.psa", options={'HIDDEN'})
 
     def execute(self, context):
-        context.scene.psa_import.psa_file_path = self.filepath
+        getattr(context.scene, 'psa_import').psa_file_path = self.filepath
         return {"FINISHED"}
 
     def invoke(self, context, event):
@@ -568,14 +572,14 @@ class PsaImportOperator(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
         active_object = context.view_layer.objects.active
         if active_object is None or active_object.type != 'ARMATURE':
             return False
         return any(map(lambda x: x.is_selected, pg.sequence_list))
 
     def execute(self, context):
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
         psa_reader = PsaReader(pg.psa_file_path)
         sequence_names = [x.action_name for x in pg.sequence_list if x.is_selected]
 
@@ -613,7 +617,7 @@ class PsaImportFileSelectOperator(Operator, ImportHelper):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        pg = context.scene.psa_import
+        pg = getattr(context.scene, 'psa_import')
         pg.psa_file_path = self.filepath
         return {'FINISHED'}
 

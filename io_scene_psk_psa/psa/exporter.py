@@ -1,7 +1,5 @@
 import fnmatch
-import re
 import sys
-from collections import Counter
 from typing import Type
 
 import bpy
@@ -16,17 +14,19 @@ from ..helpers import *
 from ..types import BoneGroupListItem
 
 
+def write_section(fp, name: bytes, data_type: Type[Structure] = None, data: list = None):
+    section = Section()
+    section.name = name
+    if data_type is not None and data is not None:
+        section.data_size = sizeof(data_type)
+        section.data_count = len(data)
+    fp.write(section)
+    if data is not None:
+        for datum in data:
+            fp.write(datum)
+
+
 def export_psa(psa: Psa, path: str):
-    def write_section(fp, name: bytes, data_type: Type[Structure] = None, data: list = None):
-        section = Section()
-        section.name = name
-        if data_type is not None and data is not None:
-            section.data_size = sizeof(data_type)
-            section.data_count = len(data)
-        fp.write(section)
-        if data is not None:
-            for datum in data:
-                fp.write(datum)
     with open(path, 'wb') as fp:
         write_section(fp, b'ANIMHEAD')
         write_section(fp, b'BONENAMES', Psa.Bone, psa.bones)
@@ -61,16 +61,19 @@ def psa_export_property_group_animation_data_override_poll(_context, obj):
     return obj.animation_data is not None
 
 
+empty_set = set()
+
+
 class PsaExportPropertyGroup(PropertyGroup):
     root_motion: BoolProperty(
         name='Root Motion',
-        options=set(),
+        options=empty_set,
         default=False,
         description='The root bone will be transformed as it appears in the scene',
     )
     should_override_animation_data: BoolProperty(
         name='Override Animation Data',
-        options=set(),
+        options=empty_set,
         default=False,
         description='Use the animation data from a different object instead of the selected object'
     )
@@ -80,7 +83,7 @@ class PsaExportPropertyGroup(PropertyGroup):
     )
     sequence_source: EnumProperty(
         name='Source',
-        options=set(),
+        options=empty_set,
         description='',
         items=(
             ('ACTIONS', 'Actions', 'Sequences will be exported using actions', 'ACTION', 0),
@@ -90,7 +93,7 @@ class PsaExportPropertyGroup(PropertyGroup):
     )
     fps_source: EnumProperty(
         name='FPS Source',
-        options=set(),
+        options=empty_set,
         description='',
         items=(
             ('SCENE', 'Scene', '', 'SCENE_DATA', 0),
@@ -100,7 +103,7 @@ class PsaExportPropertyGroup(PropertyGroup):
             ('CUSTOM', 'Custom', '', 2)
         )
     )
-    fps_custom: FloatProperty(default=30.0, min=sys.float_info.epsilon, soft_min=1.0, options=set(), step=100,
+    fps_custom: FloatProperty(default=30.0, min=sys.float_info.epsilon, soft_min=1.0, options=empty_set, step=100,
                               soft_max=60.0)
     action_list: CollectionProperty(type=PsaExportActionListItem)
     action_list_index: IntProperty(default=0)
@@ -108,7 +111,7 @@ class PsaExportPropertyGroup(PropertyGroup):
     marker_list_index: IntProperty(default=0)
     bone_filter_mode: EnumProperty(
         name='Bone Filter',
-        options=set(),
+        options=empty_set,
         description='',
         items=(
             ('ALL', 'All', 'All bones will be exported.'),
@@ -121,7 +124,7 @@ class PsaExportPropertyGroup(PropertyGroup):
     should_use_original_sequence_names: BoolProperty(
         default=False,
         name='Original Names',
-        options=set(),
+        options=empty_set,
         update=should_use_original_sequence_names_updated,
         description='If the action was imported from the PSA Import panel, the original name of the sequence will be '
                     'used instead of the Blender action name',
@@ -129,12 +132,12 @@ class PsaExportPropertyGroup(PropertyGroup):
     should_trim_timeline_marker_sequences: BoolProperty(
         default=True,
         name='Trim Sequences',
-        options=set(),
+        options=empty_set,
         description='Frames without NLA track information at the boundaries of timeline markers will be excluded from '
                     'the exported sequences '
     )
-    sequence_name_prefix: StringProperty(name='Prefix', options=set())
-    sequence_name_suffix: StringProperty(name='Suffix', options=set())
+    sequence_name_prefix: StringProperty(name='Prefix', options=empty_set)
+    sequence_name_suffix: StringProperty(name='Suffix', options=empty_set)
     sequence_filter_name: StringProperty(
         default='',
         name='Filter by Name',
@@ -143,14 +146,14 @@ class PsaExportPropertyGroup(PropertyGroup):
     sequence_use_filter_invert: BoolProperty(
         default=False,
         name='Invert',
-        options=set(),
+        options=empty_set,
         description='Invert filtering (show hidden items, and vice versa)')
     sequence_filter_asset: BoolProperty(
         default=False,
         name='Show assets',
-        options=set(),
+        options=empty_set,
         description='Show actions that belong to an asset library')
-    sequence_use_filter_sort_reverse: BoolProperty(default=True, options=set())
+    sequence_use_filter_sort_reverse: BoolProperty(default=True, options=empty_set)
 
 
 def is_bone_filter_mode_item_available(context, identifier):
@@ -182,13 +185,13 @@ class PsaExportOperator(Operator, ExportHelper):
         try:
             cls._check_context(context)
         except RuntimeError as e:
-            cls.poll_message_set((str(e)))
+            cls.poll_message_set(str(e))
             return False
         return True
 
     def draw(self, context):
         layout = self.layout
-        pg = context.scene.psa_export
+        pg = getattr(context.scene, 'psa_export')
 
         # FPS
         layout.prop(pg, 'fps_source', text='FPS')
@@ -291,7 +294,7 @@ class PsaExportOperator(Operator, ExportHelper):
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
 
-        pg = context.scene.psa_export
+        pg = getattr(context.scene, 'psa_export')
         self.armature = context.view_layer.objects.active
 
         # Populate actions list.
@@ -326,7 +329,7 @@ class PsaExportOperator(Operator, ExportHelper):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        pg = context.scene.psa_export
+        pg = getattr(context.scene, 'psa_export')
 
         actions = [x.action for x in pg.action_list if x.is_selected]
         marker_names = [x.name for x in pg.marker_list if x.is_selected]
@@ -349,6 +352,7 @@ class PsaExportOperator(Operator, ExportHelper):
 
         try:
             psa = build_psa(context, options)
+            self.report({'INFO'}, f'PSA export successful')
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
@@ -358,7 +362,7 @@ class PsaExportOperator(Operator, ExportHelper):
         return {'FINISHED'}
 
 
-def filter_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[int]:
+def filter_sequences(pg: PsaExportPropertyGroup, sequences) -> List[int]:
     bitflag_filter_item = 1 << 30
     flt_flags = [bitflag_filter_item] * len(sequences)
 
@@ -381,7 +385,7 @@ def filter_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_c
     return flt_flags
 
 
-def get_visible_sequences(pg: PsaExportPropertyGroup, sequences: bpy.types.bpy_prop_collection) -> List[PsaExportActionListItem]:
+def get_visible_sequences(pg: PsaExportPropertyGroup, sequences) -> List[PsaExportActionListItem]:
     visible_sequences = []
     for i, flag in enumerate(filter_sequences(pg, sequences)):
         if bool(flag & (1 << 30)):
@@ -402,7 +406,7 @@ class PSA_UL_ExportSequenceList(UIList):
             layout.label(text='', icon='ASSET_MANAGER')
 
     def draw_filter(self, context, layout):
-        pg = context.scene.psa_export
+        pg = getattr(context.scene, 'psa_export')
         row = layout.row()
         subrow = row.row(align=True)
         subrow.prop(pg, 'sequence_filter_name', text="")
@@ -414,7 +418,7 @@ class PSA_UL_ExportSequenceList(UIList):
             subrow.prop(pg, 'sequence_filter_asset', icon_only=True, icon='ASSET_MANAGER')
 
     def filter_items(self, context, data, prop):
-        pg = context.scene.psa_export
+        pg = getattr(context.scene, 'psa_export')
         actions = getattr(data, prop)
         flt_flags = filter_sequences(pg, actions)
         flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(actions, 'name')
@@ -438,14 +442,14 @@ class PsaExportActionsSelectAll(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = context.scene.psa_export
+        pg = getattr(context.scene, 'psa_export')
         item_list = cls.get_item_list(context)
         visible_sequences = get_visible_sequences(pg, item_list)
         has_unselected_sequences = any(map(lambda item: not item.is_selected, visible_sequences))
         return has_unselected_sequences
 
     def execute(self, context):
-        pg = context.scene.psa_export
+        pg = getattr(context.scene, 'psa_export')
         sequences = self.get_item_list(context)
         for sequence in get_visible_sequences(pg, sequences):
             sequence.is_selected = True
@@ -474,7 +478,7 @@ class PsaExportActionsDeselectAll(Operator):
         return len(item_list) > 0 and has_selected_items
 
     def execute(self, context):
-        pg = context.scene.psa_export
+        pg = getattr(context.scene, 'psa_export')
         item_list = self.get_item_list(context)
         for sequence in get_visible_sequences(pg, item_list):
             sequence.is_selected = False
@@ -489,13 +493,13 @@ class PsaExportBoneGroupsSelectAll(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = context.scene.psa_export
+        pg = getattr(context.scene, 'psa_export')
         item_list = pg.bone_group_list
         has_unselected_items = any(map(lambda action: not action.is_selected, item_list))
         return len(item_list) > 0 and has_unselected_items
 
     def execute(self, context):
-        pg = context.scene.psa_export
+        pg = getattr(context.scene, 'psa_export')
         for item in pg.bone_group_list:
             item.is_selected = True
         return {'FINISHED'}
@@ -509,13 +513,13 @@ class PsaExportBoneGroupsDeselectAll(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = context.scene.psa_export
+        pg = getattr(context.scene, 'psa_export')
         item_list = pg.bone_group_list
         has_selected_actions = any(map(lambda action: action.is_selected, item_list))
         return len(item_list) > 0 and has_selected_actions
 
     def execute(self, context):
-        pg = context.scene.psa_export
+        pg = getattr(context.scene, 'psa_export')
         for action in pg.bone_group_list:
             action.is_selected = False
         return {'FINISHED'}

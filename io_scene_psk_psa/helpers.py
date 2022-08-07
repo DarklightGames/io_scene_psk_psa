@@ -1,10 +1,10 @@
 import datetime
-from collections import Counter
 import re
+from collections import Counter
 from typing import List, Iterable
 
+import bpy.types
 from bpy.types import NlaStrip, Object
-from .types import BoneGroupListItem
 
 
 class Timer:
@@ -47,7 +47,7 @@ def get_nla_strips_in_timeframe(animation_data, frame_min, frame_max) -> List[Nl
     return strips
 
 
-def populate_bone_group_list(armature_object: Object, bone_group_list: Iterable[BoneGroupListItem]) -> None:
+def populate_bone_group_list(armature_object: Object, bone_group_list: bpy.types.Collection) -> None:
     """
     Updates the bone group collection.
 

@@ -8,8 +8,8 @@ from .data import *
 class PsaReader(object):
     """
     This class reads the sequences and bone information immediately upon instantiation and holds onto a file handle.
-    The keyframe data is not read into memory upon instantiation due to it's potentially very large size.
-    To read the key data for a particular sequence, call `read_sequence_keys`.
+    The keyframe data is not read into memory upon instantiation due to its potentially very large size.
+    To read the key data for a particular sequence, call :read_sequence_keys.
     """
 
     def __init__(self, path):
@@ -38,7 +38,8 @@ class PsaReader(object):
         return matrix
 
     def read_sequence_keys(self, sequence_name: str) -> List[Psa.Key]:
-        """ Reads and returns the key data for a sequence.
+        """
+        Reads and returns the key data for a sequence.
 
         :param sequence_name: The name of the sequence.
         :return: A list of Psa.Keys.
@@ -60,7 +61,7 @@ class PsaReader(object):
         return keys
 
     @staticmethod
-    def _read_types(fp, data_class: ctypes.Structure, section: Section, data):
+    def _read_types(fp, data_class, section: Section, data):
         buffer_length = section.data_size * section.data_count
         buffer = fp.read(buffer_length)
         offset = 0
@@ -86,7 +87,7 @@ class PsaReader(object):
                 # Skip keys on this pass. We will keep this file open and read from it as needed.
                 self.keys_data_offset = fp.tell()
                 fp.seek(section.data_size * section.data_count, 1)
-            elif section.name in [b'SCALEKEYS']:
+            elif section.name == b'SCALEKEYS':
                 fp.seek(section.data_size * section.data_count, 1)
             else:
                 raise RuntimeError(f'Unrecognized section "{section.name}"')

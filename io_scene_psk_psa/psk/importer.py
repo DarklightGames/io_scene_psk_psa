@@ -1,13 +1,13 @@
 import os
 import sys
 from math import inf
-from typing import Optional
+from typing import Optional, List
 
 import bmesh
 import bpy
 import numpy as np
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, StringProperty
-from bpy.types import Operator, PropertyGroup
+from bpy.types import Operator, PropertyGroup, VertexGroup
 from bpy_extras.io_utils import ImportHelper
 from mathutils import Quaternion, Vector, Matrix
 
@@ -26,6 +26,24 @@ class PskImportOptions(object):
         self.should_import_extra_uvs = True
         self.should_import_skeleton = True
         self.bone_length = 1.0
+
+
+class ImportBone(object):
+    """
+    Intermediate bone type for the purpose of construction.
+    """
+    def __init__(self, index: int, psk_bone: Psk.Bone):
+        self.index: int = index
+        self.psk_bone: Psk.Bone = psk_bone
+        self.parent: Optional[ImportBone] = None
+        self.local_rotation: Quaternion = Quaternion()
+        self.local_translation: Vector = Vector()
+        self.world_rotation_matrix: Matrix = Matrix()
+        self.world_matrix: Matrix = Matrix()
+        self.vertex_group = None
+        self.orig_quat: Quaternion = Quaternion()
+        self.orig_loc: Vector = Vector()
+        self.post_quat: Quaternion = Quaternion()
 
 
 def import_psk(psk: Psk, context, options: PskImportOptions):
@@ -48,21 +66,6 @@ def import_psk(psk: Psk, context, options: PskImportOptions):
         bpy.context.view_layer.objects.active = armature_object
 
         bpy.ops.object.mode_set(mode='EDIT')
-
-        # Intermediate bone type for the purpose of construction.
-        class ImportBone(object):
-            def __init__(self, index: int, psk_bone: Psk.Bone):
-                self.index: int = index
-                self.psk_bone: Psk.Bone = psk_bone
-                self.parent: Optional[ImportBone] = None
-                self.local_rotation: Quaternion = Quaternion()
-                self.local_translation: Vector = Vector()
-                self.world_rotation_matrix: Matrix = Matrix()
-                self.world_matrix: Matrix = Matrix()
-                self.vertex_group = None
-                self.orig_quat: Quaternion = Quaternion()
-                self.orig_loc: Vector = Vector()
-                self.post_quat: Quaternion = Quaternion()
 
         import_bones = []
 
@@ -213,7 +216,7 @@ def import_psk(psk: Psk, context, options: PskImportOptions):
 
         # Get a list of all bones that have weights associated with them.
         vertex_group_bone_indices = set(map(lambda weight: weight.bone_index, psk.weights))
-        vertex_groups = [None] * len(psk.bones)
+        vertex_groups: List[Optional[VertexGroup]] = [None] * len(psk.bones)
         for bone_index, psk_bone in map(lambda x: (x, psk.bones[x]), vertex_group_bone_indices):
             vertex_groups[bone_index] = mesh_object.vertex_groups.new(name=psk_bone.name.decode('windows-1252'))
 
@@ -234,16 +237,19 @@ def import_psk(psk: Psk, context, options: PskImportOptions):
         pass
 
 
+empty_set = set()
+
+
 class PskImportPropertyGroup(PropertyGroup):
     should_import_vertex_colors: BoolProperty(
         default=True,
-        options=set(),
+        options=empty_set,
         name='Vertex Colors',
         description='Import vertex colors from PSKX files, if available'
     )
     vertex_color_space: EnumProperty(
         name='Vertex Color Space',
-        options=set(),
+        options=empty_set,
         description='The source vertex color space',
         default='SRGBA',
         items=(
@@ -254,25 +260,25 @@ class PskImportPropertyGroup(PropertyGroup):
     should_import_vertex_normals: BoolProperty(
         default=True,
         name='Vertex Normals',
-        options=set(),
+        options=empty_set,
         description='Import vertex normals from PSKX files, if available'
     )
     should_import_extra_uvs: BoolProperty(
         default=True,
         name='Extra UVs',
-        options=set(),
+        options=empty_set,
         description='Import extra UV maps from PSKX files, if available'
     )
     should_import_mesh: BoolProperty(
         default=True,
         name='Import Mesh',
-        options=set(),
+        options=empty_set,
         description='Import mesh'
     )
     should_import_skeleton: BoolProperty(
         default=True,
         name='Import Skeleton',
-        options=set(),
+        options=empty_set,
         description='Import skeleton'
     )
     bone_length: FloatProperty(
@@ -281,7 +287,7 @@ class PskImportPropertyGroup(PropertyGroup):
         step=100,
         soft_min=1.0,
         name='Bone Length',
-        options=set(),
+        options=empty_set,
         description='Length of the bones'
     )
 
@@ -300,7 +306,7 @@ class PskImportOperator(Operator, ImportHelper):
         default='')
 
     def execute(self, context):
-        pg = context.scene.psk_import
+        pg = getattr(context.scene, 'psk_import')
 
         psk = read_psk(self.filepath)
 
@@ -319,7 +325,7 @@ class PskImportOperator(Operator, ImportHelper):
         return {'FINISHED'}
 
     def draw(self, context):
-        pg = context.scene.psk_import
+        pg = getattr(context.scene, 'psk_import')
         layout = self.layout
         layout.prop(pg, 'should_import_mesh')
         row = layout.column()

@@ -1,4 +1,4 @@
-from typing import Dict, Iterable
+from typing import Dict
 
 from bpy.types import Action
 
@@ -217,7 +217,8 @@ def build_psa(context, options: PsaBuildOptions) -> Psa:
 
     # Add prefixes and suffices to the names of the export sequences and strip whitespace.
     for export_sequence in export_sequences:
-        export_sequence.name = f'{options.sequence_name_prefix}{export_sequence.name}{options.sequence_name_suffix}'.strip()
+        export_sequence.name = f'{options.sequence_name_prefix}{export_sequence.name}{options.sequence_name_suffix}'
+        export_sequence.name = export_sequence.name.strip()
 
     # Now build the PSA sequences.
     # We actually alter the timeline frame and simply record the resultant pose bone matrices.

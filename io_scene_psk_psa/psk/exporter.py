@@ -1,7 +1,7 @@
 from typing import Type
 
-from bpy.props import BoolProperty, StringProperty, CollectionProperty, IntProperty, EnumProperty, PointerProperty
-from bpy.types import Operator, PropertyGroup, UIList, Material
+from bpy.props import BoolProperty, StringProperty, CollectionProperty, IntProperty, EnumProperty
+from bpy.types import Operator, PropertyGroup, UIList
 from bpy_extras.io_utils import ExportHelper
 
 from .builder import build_psk, PskBuildOptions, get_psk_input_objects
@@ -70,7 +70,7 @@ def is_bone_filter_mode_item_available(context, identifier):
 class PSK_UL_MaterialList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         row = layout.row()
-        row.label(text=str(item.material_name), icon='MATERIAL')
+        row.label(text=str(getattr(item, 'material_name')), icon='MATERIAL')
 
 
 class MaterialListItem(PropertyGroup):
@@ -108,11 +108,11 @@ class PskMaterialListItemMoveUp(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = context.scene.psk_export
+        pg = getattr(context.scene, 'psk_export')
         return pg.material_list_index > 0
 
     def execute(self, context):
-        pg = context.scene.psk_export
+        pg = getattr(context.scene, 'psk_export')
         pg.material_list.move(pg.material_list_index, pg.material_list_index - 1)
         pg.material_list_index -= 1
         return {"FINISHED"}
@@ -126,11 +126,11 @@ class PskMaterialListItemMoveDown(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = context.scene.psk_export
+        pg = getattr(context.scene, 'psk_export')
         return pg.material_list_index < len(pg.material_list) - 1
 
     def execute(self, context):
-        pg = context.scene.psk_export
+        pg = getattr(context.scene, 'psk_export')
         pg.material_list.move(pg.material_list_index, pg.material_list_index + 1)
         pg.material_list_index += 1
         return {"FINISHED"}
@@ -157,7 +157,7 @@ class PskExportOperator(Operator, ExportHelper):
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
-        pg = context.scene.psk_export
+        pg = getattr(context.scene, 'psk_export')
 
         # Populate bone groups list.
         populate_bone_group_list(input_objects.armature_object, pg.bone_group_list)
@@ -178,8 +178,7 @@ class PskExportOperator(Operator, ExportHelper):
 
     def draw(self, context):
         layout = self.layout
-        scene = context.scene
-        pg = scene.psk_export
+        pg = getattr(context.scene, 'psk_export')
 
         layout.prop(pg, 'use_raw_mesh_data')
 
@@ -220,6 +219,7 @@ class PskExportOperator(Operator, ExportHelper):
         try:
             psk = build_psk(context, options)
             export_psk(psk, self.filepath)
+            self.report({'INFO'}, f'PSK export successful')
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
