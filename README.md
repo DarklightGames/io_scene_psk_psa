@@ -1,4 +1,4 @@
-This Blender add-on allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats).
+This Blender 2.80+ add-on allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats) used in many version of the Unreal Engine.
 
 # Features
 * Full PSK/PSA import and export capabilities
@@ -6,8 +6,8 @@ This Blender add-on allows you to import and export meshes and animations to and
 * Fine-grained PSA sequence importing for efficient workflow when working with large PSA files
 * Automatic keyframe reduction on PSA import
 * PSA sequence metadata (e.g., frame rate, sequence name) is preserved on import, allowing this data to be reused on export
-* An armature's [bone groups](https://docs.blender.org/manual/en/latest/animation/armatures/properties/bone_groups.html) can be excluded from PSK/PSA export (useful for excluding non-contributing bones such as IK controllers)
-* PSA sequences can be exported directly from actions or delineated using a scene's [timeline markers](https://docs.blender.org/manual/en/latest/animation/markers.html), allowing use of the [NLA](https://docs.blender.org/manual/en/latest/editors/nla/index.html) when creating sequences 
+* Specific [bone groups](https://docs.blender.org/manual/en/latest/animation/armatures/properties/bone_groups.html) can be excluded from PSK/PSA export (useful for excluding non-contributing bones such as IK controllers)
+* PSA sequences can be exported directly from actions or delineated using a scene's [timeline markers](https://docs.blender.org/manual/en/latest/animation/markers.html), allowing direct use of the [NLA](https://docs.blender.org/manual/en/latest/editors/nla/index.html) when creating sequences 
 
 # Installation
 1. Download the zip file for the latest version from the [releases](https://github.com/DarklightGames/io_export_psk_psa/releases) page.
