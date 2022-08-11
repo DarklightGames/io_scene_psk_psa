@@ -1,7 +1,7 @@
 bl_info = {
     "name": "PSK/PSA Importer/Exporter",
     "author": "Colin Basnett, Yurii Ti",
-    "version": (4, 0, 0),
+    "version": (4, 0, 1),
     "blender": (2, 80, 0),
     # "location": "File > Export > PSK Export (.psk)",
     "description": "PSK/PSA Import/Export (.psk/.psa)",
