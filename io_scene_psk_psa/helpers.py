@@ -98,7 +98,7 @@ def check_bone_names(bone_names: Iterable[str]):
     invalid_bone_names = [x for x in bone_names if pattern.match(x) is None]
     if len(invalid_bone_names) > 0:
         raise RuntimeError(f'The following bone names are invalid: {invalid_bone_names}.\n'
-                           f'Bone names must only contain letters, numbers, spaces, and underscores.')
+                           f'Bone names must only contain letters, numbers, spaces, hyphens and underscores.')
 
 
 def get_export_bone_names(armature_object, bone_filter_mode, bone_group_indices: List[int]) -> List[str]:
