@@ -25,7 +25,12 @@ class PsaReader(object):
     def sequences(self):
         return self.psa.sequences
 
-    def read_sequence_data_matrix(self, sequence_name: str):
+    def read_sequence_data_matrix(self, sequence_name: str) -> np.ndarray:
+        """
+        Reads and returns the data matrix for the given sequence.
+        @param sequence_name: The name of the sequence.
+        @return: An FxBx7 matrix where F is the number of frames, B is the number of bones.
+        """
         sequence = self.psa.sequences[sequence_name]
         keys = self.read_sequence_keys(sequence_name)
         bone_count = len(self.bones)
@@ -41,8 +46,8 @@ class PsaReader(object):
         """
         Reads and returns the key data for a sequence.
 
-        :param sequence_name: The name of the sequence.
-        :return: A list of Psa.Keys.
+        @param sequence_name: The name of the sequence.
+        @return: A list of Psa.Keys.
         """
         # Set the file reader to the beginning of the keys data
         sequence = self.psa.sequences[sequence_name]

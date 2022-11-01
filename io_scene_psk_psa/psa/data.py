@@ -6,7 +6,7 @@ from ..data import *
 
 """
 Note that keys are not stored within the Psa object.
-Use the PsaReader::get_sequence_keys to get a the keys for a sequence.
+Use the PsaReader::get_sequence_keys to get the keys for a sequence.
 """
 
 
@@ -60,5 +60,5 @@ class Psa(object):
 
     def __init__(self):
         self.bones: List[Psa.Bone] = []
-        self.sequences: typing.OrderedDict[Psa.Sequence] = OrderedDict()
+        self.sequences: typing.OrderedDict[str, Psa.Sequence] = OrderedDict()
         self.keys: List[Psa.Key] = []
