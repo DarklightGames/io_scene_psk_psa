@@ -224,6 +224,10 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
         export_sequence.name = f'{options.sequence_name_prefix}{export_sequence.name}{options.sequence_name_suffix}'
         export_sequence.name = export_sequence.name.strip()
 
+    # Save the current action and frame so that we can restore the state once we are done.
+    saved_frame_current = context.scene.frame_current
+    saved_action = animation_data.action
+
     # Now build the PSA sequences.
     # We actually alter the timeline frame and simply record the resultant pose bone matrices.
     frame_start_index = 0
@@ -283,5 +287,9 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
         frame_start_index += frame_count
 
         psa.sequences[export_sequence.name] = psa_sequence
+
+    # Restore the previous action & frame.
+    animation_data.action = saved_action
+    context.scene.frame_set(saved_frame_current)
 
     return psa
