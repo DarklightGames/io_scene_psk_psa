@@ -4,7 +4,6 @@ import re
 from typing import List, Optional
 
 import bpy
-import numpy as np
 from bpy.props import StringProperty, BoolProperty, CollectionProperty, PointerProperty, IntProperty
 from bpy.types import Operator, UIList, PropertyGroup, Panel
 from bpy_extras.io_utils import ImportHelper
@@ -16,7 +15,6 @@ from .reader import PsaReader
 
 class PsaImportOptions(object):
     def __init__(self):
-        self.should_clean_keys = True
         self.should_use_fake_user = False
         self.should_stash = False
         self.sequence_names = []
@@ -24,6 +22,7 @@ class PsaImportOptions(object):
         self.should_write_keyframes = True
         self.should_write_metadata = True
         self.action_name_prefix = ''
+        self.should_convert_to_samples = False
 
 
 class ImportBone(object):
@@ -154,7 +153,6 @@ def import_psa(psa_reader: PsaReader, armature_object, options: PsaImportOptions
 
             # Read the sequence data matrix from the PSA.
             sequence_data_matrix = psa_reader.read_sequence_data_matrix(sequence_name)
-            keyframe_write_matrix = np.ones(sequence_data_matrix.shape, dtype=np.int8)
 
             # Convert the sequence's data from world-space to local-space.
             for bone_index, import_bone in enumerate(import_bones):
@@ -166,39 +164,18 @@ def import_psa(psa_reader: PsaReader, armature_object, options: PsaImportOptions
                     # Calculate the local-space key data for the bone.
                     sequence_data_matrix[frame_index, bone_index] = calculate_fcurve_data(import_bone, key_data)
 
-            # Clean the keyframe data. This is accomplished by writing zeroes to the write matrix when there is an
-            # insufficiently large change in the data from the last written frame.
-            if options.should_clean_keys:
-                threshold = 0.001
-                for bone_index, import_bone in enumerate(import_bones):
-                    if import_bone is None:
-                        continue
-                    for fcurve_index in range(len(import_bone.fcurves)):
-                        # Get all the keyframe data for the bone's f-curve data from the sequence data matrix.
-                        fcurve_frame_data = sequence_data_matrix[:, bone_index, fcurve_index]
-                        last_written_datum = 0
-                        for frame_index, datum in enumerate(fcurve_frame_data):
-                            # If the f-curve data is not different enough to the last written frame,
-                            # un-mark this data for writing.
-                            if frame_index > 0 and abs(datum - last_written_datum) < threshold:
-                                keyframe_write_matrix[frame_index, bone_index, fcurve_index] = 0
-                            else:
-                                last_written_datum = datum
-
             # Write the keyframes out!
             for frame_index in range(sequence.frame_count):
                 for bone_index, import_bone in enumerate(import_bones):
                     if import_bone is None:
                         continue
-                    bone_has_writeable_keyframes = any(keyframe_write_matrix[frame_index, bone_index])
-                    if bone_has_writeable_keyframes:
-                        # This bone has writeable keyframes for this frame.
-                        key_data = sequence_data_matrix[frame_index, bone_index]
-                        for fcurve, should_write, datum in zip(import_bone.fcurves,
-                                                               keyframe_write_matrix[frame_index, bone_index],
-                                                               key_data):
-                            if should_write:
-                                fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
+                    key_data = sequence_data_matrix[frame_index, bone_index]
+                    for fcurve, datum in zip(import_bone.fcurves, key_data):
+                        fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
+
+            if options.should_convert_to_samples:
+                for fcurve in action.fcurves:
+                    fcurve.convert_to_samples(start=0, end=sequence.frame_count)
 
         # Write
         if options.should_write_metadata:
@@ -266,9 +243,6 @@ class PsaImportPropertyGroup(PropertyGroup):
     psa: PointerProperty(type=PsaDataPropertyGroup)
     sequence_list: CollectionProperty(type=PsaImportActionListItem)
     sequence_list_index: IntProperty(name='', default=0)
-    should_clean_keys: BoolProperty(default=True, name='Clean Keyframes',
-                                    description='Exclude unnecessary keyframes from being written to the actions',
-                                    options=empty_set)
     should_use_fake_user: BoolProperty(default=True, name='Fake User',
                                        description='Assign each imported action a fake user so that the data block is saved even it has no users',
                                        options=empty_set)
@@ -289,6 +263,11 @@ class PsaImportPropertyGroup(PropertyGroup):
     sequence_use_filter_regex: BoolProperty(default=False, name='Regular Expression',
                                             description='Filter using regular expressions', options=empty_set)
     select_text: PointerProperty(type=bpy.types.Text)
+    should_convert_to_samples: BoolProperty(
+        default=True,
+        name='Convert to Samples',
+        description='Convert keyframes to read-only samples. Recommended if you do not plan on editing the actions directly'
+    )
 
 
 def filter_sequences(pg: PsaImportPropertyGroup, sequences) -> List[int]:
@@ -457,11 +436,14 @@ class PSA_PT_ImportPanel_Advanced(Panel):
         layout = self.layout
         pg = getattr(context.scene, 'psa_import')
 
-        col = layout.column(heading="Options")
+        col = layout.column(heading='Keyframes')
         col.use_property_split = True
         col.use_property_decorate = False
-        col.prop(pg, 'should_clean_keys')
+        col.prop(pg, 'should_convert_to_samples')
         col.separator()
+        col = layout.column(heading='Options')
+        col.use_property_split = True
+        col.use_property_decorate = False
         col.prop(pg, 'should_use_fake_user')
         col.prop(pg, 'should_stash')
         col.prop(pg, 'should_use_action_name_prefix')
@@ -585,13 +567,13 @@ class PsaImportOperator(Operator):
 
         options = PsaImportOptions()
         options.sequence_names = sequence_names
-        options.should_clean_keys = pg.should_clean_keys
         options.should_use_fake_user = pg.should_use_fake_user
         options.should_stash = pg.should_stash
         options.action_name_prefix = pg.action_name_prefix if pg.should_use_action_name_prefix else ''
         options.should_overwrite = pg.should_overwrite
         options.should_write_metadata = pg.should_write_metadata
         options.should_write_keyframes = pg.should_write_keyframes
+        options.should_convert_to_samples = pg.should_convert_to_samples
 
         import_psa(psa_reader, context.view_layer.objects.active, options)
 
