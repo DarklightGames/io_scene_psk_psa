@@ -1,10 +1,8 @@
-from collections import OrderedDict
-from typing import Dict, List
+import bmesh
+import bpy
 
 from .data import *
 from ..helpers import *
-import bmesh
-import bpy
 
 
 class PskInputObjects(object):
@@ -135,16 +133,17 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
         # MATERIALS
         material_indices = [material_names.index(material.name) for material in input_mesh_object.data.materials]
 
+        # MESH DATA
         if options.use_raw_mesh_data:
             mesh_object = input_mesh_object
             mesh_data = input_mesh_object.data
         else:
             # Create a copy of the mesh object after non-armature modifiers are applied.
 
-            # Temporarily deactivate any armature modifiers on the input mesh object.
-            active_armature_modifiers = [x for x in filter(lambda x: x.type == 'ARMATURE' and x.is_active, input_mesh_object.modifiers)]
-            for modifier in active_armature_modifiers:
-                modifier.show_viewport = False
+            # Temporarily force the armature into the rest position.
+            # We will undo this later.
+            old_pose_position = armature_object.data.pose_position
+            armature_object.data.pose_position = 'REST'
 
             depsgraph = context.evaluated_depsgraph_get()
             bm = bmesh.new()
@@ -159,9 +158,8 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
             for vertex_group in input_mesh_object.vertex_groups:
                 mesh_object.vertex_groups.new(name=vertex_group.name)
 
-            # Reactivate previously active armature modifiers
-            for modifier in active_armature_modifiers:
-                modifier.show_viewport = True
+            # Restore the previous pose position on the armature.
+            armature_object.data.pose_position = old_pose_position
 
         vertex_offset = len(psk.points)
 
