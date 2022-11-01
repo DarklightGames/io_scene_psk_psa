@@ -136,6 +136,12 @@ class PsaExportPropertyGroup(PropertyGroup):
         description='Frames without NLA track information at the boundaries of timeline markers will be excluded from '
                     'the exported sequences '
     )
+    should_ignore_bone_name_restrictions: BoolProperty(
+        default=False,
+        name='Ignore Bone Name Restrictions',
+        description='Bone names restrictions will be ignored. Note that bone names without properly formatted names '
+                    'cannot be referenced in scripts.'
+    )
     sequence_name_prefix: StringProperty(name='Prefix', options=empty_set)
     sequence_name_suffix: StringProperty(name='Suffix', options=empty_set)
     sequence_filter_name: StringProperty(
@@ -262,6 +268,8 @@ class PsaExportOperator(Operator, ExportHelper):
             layout.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg, 'bone_group_list_index',
                                  rows=rows)
 
+        layout.prop(pg, 'should_ignore_bone_name_restrictions')
+
         layout.separator()
 
         # ROOT MOTION
@@ -346,6 +354,7 @@ class PsaExportOperator(Operator, ExportHelper):
         options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
         options.should_use_original_sequence_names = pg.should_use_original_sequence_names
         options.should_trim_timeline_marker_sequences = pg.should_trim_timeline_marker_sequences
+        options.should_ignore_bone_name_restrictions = pg.should_ignore_bone_name_restrictions
         options.sequence_name_prefix = pg.sequence_name_prefix
         options.sequence_name_suffix = pg.sequence_name_suffix
         options.root_motion = pg.root_motion

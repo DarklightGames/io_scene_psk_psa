@@ -1,6 +1,6 @@
 from typing import Dict
 
-from bpy.types import Action
+from bpy.types import Action, Armature, Bone
 
 from .data import *
 from ..helpers import *
@@ -19,6 +19,7 @@ class PsaBuildOptions(object):
         self.bone_group_indices = []
         self.should_use_original_sequence_names = False
         self.should_trim_timeline_marker_sequences = True
+        self.should_ignore_bone_name_restrictions = False
         self.sequence_name_prefix = ''
         self.sequence_name_suffix = ''
         self.root_motion = False
@@ -87,7 +88,7 @@ def get_timeline_marker_sequence_frame_ranges(animation_data, context, options: 
     return sequence_frame_ranges
 
 
-def build_psa(context, options: PsaBuildOptions) -> Psa:
+def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
     active_object = context.view_layer.objects.active
 
     if active_object.type != 'ARMATURE':
@@ -112,7 +113,8 @@ def build_psa(context, options: PsaBuildOptions) -> Psa:
     psa = Psa()
 
     armature = active_object
-    bones = list(armature.data.bones)
+    armature_data = typing.cast(Armature, armature)
+    bones: List[Bone] = list(iter(armature_data.bones))
 
     # The order of the armature bones and the pose bones is not guaranteed to be the same.
     # As a result, we need to reconstruct the list of pose bones in the same order as the
@@ -135,7 +137,8 @@ def build_psa(context, options: PsaBuildOptions) -> Psa:
         raise RuntimeError('No bones available for export')
 
     # Check that all bone names are valid.
-    check_bone_names(map(lambda bone: bone.name, bones))
+    if not options.should_ignore_bone_name_restrictions:
+        check_bone_names(map(lambda bone: bone.name, bones))
 
     # Build list of PSA bones.
     for bone in bones:
@@ -208,6 +211,7 @@ def build_psa(context, options: PsaBuildOptions) -> Psa:
             export_sequence.nla_state.action = None
             export_sequence.nla_state.frame_min = frame_min
             export_sequence.nla_state.frame_max = frame_max
+
             nla_strips_actions = set(
                 map(lambda x: x.action, get_nla_strips_in_timeframe(animation_data, frame_min, frame_max)))
             export_sequence.fps = get_sequence_fps(context, options, nla_strips_actions)

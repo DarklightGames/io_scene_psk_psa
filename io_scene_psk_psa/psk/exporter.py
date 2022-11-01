@@ -208,6 +208,10 @@ class PskExportOperator(Operator, ExportHelper):
         col.operator(PskMaterialListItemMoveUp.bl_idname, text='', icon='TRIA_UP')
         col.operator(PskMaterialListItemMoveDown.bl_idname, text='', icon='TRIA_DOWN')
 
+        layout.separator()
+
+        layout.prop(pg, 'should_ignore_bone_name_restrictions')
+
     def execute(self, context):
         pg = context.scene.psk_export
         options = PskBuildOptions()
@@ -215,6 +219,7 @@ class PskExportOperator(Operator, ExportHelper):
         options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
         options.use_raw_mesh_data = pg.use_raw_mesh_data
         options.material_names = [m.material_name for m in pg.material_list]
+        options.should_ignore_bone_name_restrictions = pg.should_ignore_bone_name_restrictions
 
         try:
             psk = build_psk(context, options)
@@ -242,6 +247,12 @@ class PskExportPropertyGroup(PropertyGroup):
     use_raw_mesh_data: BoolProperty(default=False, name='Raw Mesh Data', description='No modifiers will be evaluated as part of the exported mesh')
     material_list: CollectionProperty(type=MaterialListItem)
     material_list_index: IntProperty(default=0)
+    should_ignore_bone_name_restrictions: BoolProperty(
+        default=False,
+        name='Ignore Bone Name Restrictions',
+        description='Bone names restrictions will be ignored. Note that bone names without properly formatted names '
+                    'cannot be referenced in scripts.'
+    )
 
 
 classes = (
