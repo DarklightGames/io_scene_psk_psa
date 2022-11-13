@@ -46,7 +46,13 @@ class ImportBone(object):
         self.post_quat: Quaternion = Quaternion()
 
 
-def import_psk(psk: Psk, context, options: PskImportOptions):
+class PskImportResult:
+    def __init__(self):
+        self.warnings: List[str] = []
+
+
+def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
+    result = PskImportResult()
     armature_object = None
 
     if options.should_import_skeleton:
@@ -142,7 +148,7 @@ def import_psk(psk: Psk, context, options: PskImportOptions):
                 degenerate_face_indices.add(face_index)
 
         if len(degenerate_face_indices) > 0:
-            print(f'WARNING: Discarded {len(degenerate_face_indices)} degenerate face(s).')
+            result.warnings.append(f'Discarded {len(degenerate_face_indices)} degenerate face(s).')
 
         bm.to_mesh(mesh_data)
 
@@ -200,7 +206,8 @@ def import_psk(psk: Psk, context, options: PskImportOptions):
                     vertex_color_data.data[loop_index].color = 1.0, 1.0, 1.0, 1.0
 
             if len(ambiguous_vertex_color_point_indices) > 0:
-                print(f'WARNING: {len(ambiguous_vertex_color_point_indices)} vertex(es) with ambiguous vertex colors.')
+                result.warnings.append(
+                    f'{len(ambiguous_vertex_color_point_indices)} vertex(es) with ambiguous vertex colors.')
 
         # VERTEX NORMALS
         if psk.has_vertex_normals and options.should_import_vertex_normals:
@@ -235,6 +242,8 @@ def import_psk(psk: Psk, context, options: PskImportOptions):
         bpy.ops.object.mode_set(mode='OBJECT')
     except:
         pass
+
+    return result
 
 
 empty_set = set()
@@ -320,7 +329,14 @@ class PskImportOperator(Operator, ImportHelper):
         options.should_import_skeleton = pg.should_import_skeleton
         options.bone_length = pg.bone_length
 
-        import_psk(psk, context, options)
+        result = import_psk(psk, context, options)
+
+        if len(result.warnings):
+            message = f'PSK imported with {len(result.warnings)} warning(s)\n'
+            message += '\n'.join(result.warnings)
+            self.report({'WARNING'}, message)
+        else:
+            self.report({'INFO'}, f'PSK imported')
 
         return {'FINISHED'}
 

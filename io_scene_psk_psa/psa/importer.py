@@ -1,10 +1,12 @@
 import fnmatch
 import os
 import re
+import typing
+from collections import Counter
 from typing import List, Optional
 
 import bpy
-from bpy.props import StringProperty, BoolProperty, CollectionProperty, PointerProperty, IntProperty
+from bpy.props import StringProperty, BoolProperty, CollectionProperty, PointerProperty, IntProperty, EnumProperty
 from bpy.types import Operator, UIList, PropertyGroup, Panel
 from bpy_extras.io_utils import ImportHelper
 from mathutils import Vector, Quaternion
@@ -23,6 +25,7 @@ class PsaImportOptions(object):
         self.should_write_metadata = True
         self.action_name_prefix = ''
         self.should_convert_to_samples = False
+        self.bone_mapping_mode = 'CASE_INSENSITIVE'
 
 
 class ImportBone(object):
@@ -37,7 +40,7 @@ class ImportBone(object):
         self.fcurves = []
 
 
-def calculate_fcurve_data(import_bone: ImportBone, key_data: []):
+def calculate_fcurve_data(import_bone: ImportBone, key_data: typing.Iterable[float]):
     # Convert world-space transforms to local-space transforms.
     key_rotation = Quaternion(key_data[0:4])
     key_location = Vector(key_data[4:])
@@ -55,44 +58,73 @@ def calculate_fcurve_data(import_bone: ImportBone, key_data: []):
     return quat.w, quat.x, quat.y, quat.z, loc.x, loc.y, loc.z
 
 
-def import_psa(psa_reader: PsaReader, armature_object, options: PsaImportOptions):
+class PsaImportResult:
+    def __init__(self):
+        self.warnings: List[str] = []
+
+
+def import_psa(psa_reader: PsaReader, armature_object: bpy.types.Object, options: PsaImportOptions) -> PsaImportResult:
+    result = PsaImportResult()
     sequences = map(lambda x: psa_reader.sequences[x], options.sequence_names)
-    armature_data = armature_object.data
+    armature_data = typing.cast(bpy.types.Armature, armature_object.data)
 
     # Create an index mapping from bones in the PSA to bones in the target armature.
     psa_to_armature_bone_indices = {}
     armature_bone_names = [x.name for x in armature_data.bones]
     psa_bone_names = []
     for psa_bone_index, psa_bone in enumerate(psa_reader.bones):
-        psa_bone_name = psa_bone.name.decode('windows-1252')
-        psa_bone_names.append(psa_bone_name)
+        psa_bone_name: str = psa_bone.name.decode('windows-1252')
         try:
             psa_to_armature_bone_indices[psa_bone_index] = armature_bone_names.index(psa_bone_name)
         except ValueError:
-            pass
+            # PSA bone could not be mapped directly to an armature bone by name.
+            # Attempt to create a bone mapping by ignoring the case of the names.
+            if options.bone_mapping_mode == 'CASE_INSENSITIVE':
+                for armature_bone_index, armature_bone_name in enumerate(armature_bone_names):
+                    if armature_bone_name.upper() == psa_bone_name.upper():
+                        psa_to_armature_bone_indices[psa_bone_index] = armature_bone_index
+                        psa_bone_name = armature_bone_name
+                        break
+        psa_bone_names.append(psa_bone_name)
+
+    # Remove ambiguous bone mappings (where multiple PSA bones correspond to the same armature bone).
+    armature_bone_index_counts = Counter(psa_to_armature_bone_indices.values())
+    for armature_bone_index, count in armature_bone_index_counts.items():
+        if count > 1:
+            psa_bone_indices = []
+            for psa_bone_index, mapped_bone_index in psa_to_armature_bone_indices:
+                if mapped_bone_index == armature_bone_index:
+                    psa_bone_indices.append(psa_bone_index)
+            ambiguous_psa_bone_names = list(sorted([psa_bone_names[x] for x in psa_bone_indices]))
+            result.warnings.append(
+                f'Ambiguous mapping for bone {armature_bone_names[armature_bone_index]}!\n'
+                f'The following PSA bones all map to the same armature bone: {ambiguous_psa_bone_names}\n'
+                f'These bones will be ignored.'
+            )
 
     # Report if there are missing bones in the target armature.
     missing_bone_names = set(psa_bone_names).difference(set(armature_bone_names))
     if len(missing_bone_names) > 0:
-        print(
-            f'The armature object \'{armature_object.name}\' is missing the following bones that exist in the PSA:')
-        print(list(sorted(missing_bone_names)))
+        result.warnings.append(
+            f'The armature \'{armature_object.name}\' is missing {len(missing_bone_names)} bones that exist in '
+            'the PSA:\n' +
+            str(list(sorted(missing_bone_names)))
+        )
     del armature_bone_names
 
     # Create intermediate bone data for import operations.
     import_bones = []
     import_bones_dict = dict()
 
-    for psa_bone_index, psa_bone in enumerate(psa_reader.bones):
-        bone_name = psa_bone.name.decode('windows-1252')
-        if psa_bone_index not in psa_to_armature_bone_indices:  # TODO: replace with bone_name in armature_data.bones
+    for (psa_bone_index, psa_bone), psa_bone_name in zip(enumerate(psa_reader.bones), psa_bone_names):
+        if psa_bone_index not in psa_to_armature_bone_indices:
             # PSA bone does not map to armature bone, skip it and leave an empty bone in its place.
             import_bones.append(None)
             continue
         import_bone = ImportBone(psa_bone)
-        import_bone.armature_bone = armature_data.bones[bone_name]
-        import_bone.pose_bone = armature_object.pose.bones[bone_name]
-        import_bones_dict[bone_name] = import_bone
+        import_bone.armature_bone = armature_data.bones[psa_bone_name]
+        import_bone.pose_bone = armature_object.pose.bones[psa_bone_name]
+        import_bones_dict[psa_bone_name] = import_bone
         import_bones.append(import_bone)
 
     for import_bone in filter(lambda x: x is not None, import_bones):
@@ -164,7 +196,7 @@ def import_psa(psa_reader: PsaReader, armature_object, options: PsaImportOptions
                     # Calculate the local-space key data for the bone.
                     sequence_data_matrix[frame_index, bone_index] = calculate_fcurve_data(import_bone, key_data)
 
-            # Write the keyframes out!
+            # Write the keyframes out.
             for frame_index in range(sequence.frame_count):
                 for bone_index, import_bone in enumerate(import_bones):
                     if import_bone is None:
@@ -174,10 +206,11 @@ def import_psa(psa_reader: PsaReader, armature_object, options: PsaImportOptions
                         fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
 
             if options.should_convert_to_samples:
+                # Bake the curve to samples.
                 for fcurve in action.fcurves:
                     fcurve.convert_to_samples(start=0, end=sequence.frame_count)
 
-        # Write
+        # Write meta-data.
         if options.should_write_metadata:
             action['psa_sequence_name'] = sequence_name
             action['psa_sequence_fps'] = sequence.fps
@@ -195,6 +228,8 @@ def import_psa(psa_reader: PsaReader, armature_object, options: PsaImportOptions
             nla_track.name = action.name
             nla_track.mute = True
             nla_track.strips.new(name=action.name, start=0, action=action)
+
+    return result
 
 
 empty_set = set()
@@ -224,7 +259,7 @@ def load_psa_file(context):
         pg.psa_error = str(e)
 
 
-def on_psa_file_path_updated(property, context):
+def on_psa_file_path_updated(property_, context):
     load_psa_file(context)
 
 
@@ -244,7 +279,8 @@ class PsaImportPropertyGroup(PropertyGroup):
     sequence_list: CollectionProperty(type=PsaImportActionListItem)
     sequence_list_index: IntProperty(name='', default=0)
     should_use_fake_user: BoolProperty(default=True, name='Fake User',
-                                       description='Assign each imported action a fake user so that the data block is saved even it has no users',
+                                       description='Assign each imported action a fake user so that the data block is '
+                                                   'saved even it has no users',
                                        options=empty_set)
     should_stash: BoolProperty(default=False, name='Stash',
                                description='Stash each imported action as a strip on a new non-contributing NLA track',
@@ -252,10 +288,12 @@ class PsaImportPropertyGroup(PropertyGroup):
     should_use_action_name_prefix: BoolProperty(default=False, name='Prefix Action Name', options=empty_set)
     action_name_prefix: StringProperty(default='', name='Prefix', options=empty_set)
     should_overwrite: BoolProperty(default=False, name='Reuse Existing Actions', options=empty_set,
-                                   description='If an action with a matching name already exists, the existing action will have it\'s data overwritten instead of a new action being created')
+                                   description='If an action with a matching name already exists, the existing action '
+                                               'will have it\'s data overwritten instead of a new action being created')
     should_write_keyframes: BoolProperty(default=True, name='Keyframes', options=empty_set)
     should_write_metadata: BoolProperty(default=True, name='Metadata', options=empty_set,
-                                        description='Additional data will be written to the custom properties of the Action (e.g., frame rate)')
+                                        description='Additional data will be written to the custom properties of the '
+                                                    'Action (e.g., frame rate)')
     sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
     sequence_filter_is_selected: BoolProperty(default=False, options=empty_set, name='Only Show Selected',
                                               description='Only show selected sequences')
@@ -264,9 +302,20 @@ class PsaImportPropertyGroup(PropertyGroup):
                                             description='Filter using regular expressions', options=empty_set)
     select_text: PointerProperty(type=bpy.types.Text)
     should_convert_to_samples: BoolProperty(
-        default=True,
+        default=False,
         name='Convert to Samples',
-        description='Convert keyframes to read-only samples. Recommended if you do not plan on editing the actions directly'
+        description='Convert keyframes to read-only samples. '
+                    'Recommended if you do not plan on editing the actions directly'
+    )
+    bone_mapping_mode: EnumProperty(
+        name='Bone Mapping',
+        options=empty_set,
+        description='The method by which bones from the incoming PSA file are mapped to the armature',
+        items=(
+            ('EXACT', 'Exact', 'Bone names must match exactly.', 'EXACT', 0),
+            ('CASE_INSENSITIVE', 'Case Insensitive', 'Bones names must match, ignoring case (e.g., the bone PSA bone '
+             '\'root\' can be mapped to the armature bone \'Root\')', 'CASE_INSENSITIVE', 1),
+        )
     )
 
 
@@ -331,9 +380,9 @@ class PSA_UL_SequenceList(UIList):
         sub_row.prop(pg, 'sequence_use_filter_regex', text="", icon='SORTBYEXT')
         sub_row.prop(pg, 'sequence_filter_is_selected', text="", icon='CHECKBOX_HLT')
 
-    def filter_items(self, context, data, property):
+    def filter_items(self, context, data, property_):
         pg = getattr(context.scene, 'psa_import')
-        sequences = getattr(data, property)
+        sequences = getattr(data, property_)
         flt_flags = filter_sequences(pg, sequences)
         flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(sequences, 'action_name')
         return flt_flags, flt_neworder
@@ -436,11 +485,18 @@ class PSA_PT_ImportPanel_Advanced(Panel):
         layout = self.layout
         pg = getattr(context.scene, 'psa_import')
 
-        col = layout.column(heading='Keyframes')
+        col = layout.column()
         col.use_property_split = True
         col.use_property_decorate = False
-        col.prop(pg, 'should_convert_to_samples')
-        col.separator()
+        col.prop(pg, 'bone_mapping_mode')
+
+        if pg.should_write_keyframes:
+            col = layout.column(heading='Keyframes')
+            col.use_property_split = True
+            col.use_property_decorate = False
+            col.prop(pg, 'should_convert_to_samples')
+            col.separator()
+
         col = layout.column(heading='Options')
         col.use_property_split = True
         col.use_property_decorate = False
@@ -574,10 +630,16 @@ class PsaImportOperator(Operator):
         options.should_write_metadata = pg.should_write_metadata
         options.should_write_keyframes = pg.should_write_keyframes
         options.should_convert_to_samples = pg.should_convert_to_samples
+        options.bone_mapping_mode = pg.bone_mapping_mode
 
-        import_psa(psa_reader, context.view_layer.objects.active, options)
+        result = import_psa(psa_reader, context.view_layer.objects.active, options)
 
-        self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
+        if len(result.warnings) > 0:
+            message = f'Imported {len(sequence_names)} action(s) with {len(result.warnings)} warning(s)\n'
+            message += '\n'.join(result.warnings)
+            self.report({'WARNING'}, message)
+        else:
+            self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
 
         return {'FINISHED'}
 
