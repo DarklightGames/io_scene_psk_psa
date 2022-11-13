@@ -12,7 +12,7 @@ def _read_types(fp, data_class, section: Section, data):
         offset += section.data_size
 
 
-def read_psk(path) -> Psk:
+def read_psk(path: str) -> Psk:
     psk = Psk()
     with open(path, 'rb') as fp:
         while fp.read(1):

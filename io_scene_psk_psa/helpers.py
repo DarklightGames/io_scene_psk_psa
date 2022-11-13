@@ -47,7 +47,7 @@ def get_nla_strips_in_timeframe(animation_data, frame_min, frame_max) -> List[Nl
     return strips
 
 
-def populate_bone_group_list(armature_object: Object, bone_group_list: bpy.types.Collection) -> None:
+def populate_bone_group_list(armature_object: Object, bone_group_list: bpy.props.CollectionProperty) -> None:
     """
     Updates the bone group collection.
 
@@ -94,7 +94,7 @@ def get_psa_sequence_name(action, should_use_original_sequence_name):
 
 
 def check_bone_names(bone_names: Iterable[str]):
-    pattern = re.compile(r'^[a-zA-Z0-9_\- ]+$')
+    pattern = re.compile(r'^[a-zA-Z\d_\- ]+$')
     invalid_bone_names = [x for x in bone_names if pattern.match(x) is None]
     if len(invalid_bone_names) > 0:
         raise RuntimeError(f'The following bone names are invalid: {invalid_bone_names}.\n'
