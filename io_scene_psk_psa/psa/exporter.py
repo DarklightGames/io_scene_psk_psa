@@ -280,7 +280,7 @@ class PsaExportOperator(Operator, ExportHelper):
             return False
         bone_names = set([x.name for x in self.armature.data.bones])
         for fcurve in action.fcurves:
-            match = re.match(r'pose\.bones\["(.+)"].\w+', fcurve.data_path)
+            match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
             if not match:
                 continue
             bone_name = match.group(1)
