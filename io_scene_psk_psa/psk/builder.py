@@ -1,5 +1,8 @@
+import typing
+
 import bmesh
 import bpy
+from bpy.types import Armature
 
 from .data import *
 from ..helpers import *
@@ -59,7 +62,7 @@ def get_psk_input_objects(context) -> PskInputObjects:
 def build_psk(context, options: PskBuildOptions) -> Psk:
     input_objects = get_psk_input_objects(context)
 
-    armature_object = input_objects.armature_object
+    armature_object: bpy.types.Object = input_objects.armature_object
 
     psk = Psk()
     bones = []
@@ -77,7 +80,8 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
         psk.bones.append(psk_bone)
     else:
         bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_group_indices)
-        bones = [armature_object.data.bones[bone_name] for bone_name in bone_names]
+        armature_data = typing.cast(Armature, armature_object.data)
+        bones = [armature_data.bones[bone_name] for bone_name in bone_names]
 
         # Check that all bone names are valid.
         if not options.should_ignore_bone_name_restrictions:
@@ -98,9 +102,9 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
 
             if bone.parent is not None:
                 rotation = bone.matrix.to_quaternion().conjugated()
-                quat_parent = bone.parent.matrix.to_quaternion().inverted()
-                parent_head = quat_parent @ bone.parent.head
-                parent_tail = quat_parent @ bone.parent.tail
+                inverse_parent_rotation = bone.parent.matrix.to_quaternion().inverted()
+                parent_head = inverse_parent_rotation @ bone.parent.head
+                parent_tail = inverse_parent_rotation @ bone.parent.tail
                 location = (parent_tail - parent_head) + bone.head
             else:
                 armature_local_matrix = armature_object.matrix_local
@@ -219,6 +223,7 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
 
         # WEIGHTS
         if armature_object is not None:
+            armature_data = typing.cast(Armature, armature_object.data)
             # Because the vertex groups may contain entries for which there is no matching bone in the armature,
             # we must filter them out and not export any weights for these vertex groups.
             bone_names = [x.name for x in bones]
@@ -232,8 +237,8 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
                     # Check to see if there is an associated bone for this vertex group that exists in the armature.
                     # If there is, we can traverse the ancestors of that bone to find an alternate bone to use for
                     # weighting the vertices belonging to this vertex group.
-                    if vertex_group_name in armature_object.data.bones:
-                        bone = armature_object.data.bones[vertex_group_name]
+                    if vertex_group_name in armature_data.bones:
+                        bone = armature_data.bones[vertex_group_name]
                         while bone is not None:
                             try:
                                 bone_index = bone_names.index(bone.name)

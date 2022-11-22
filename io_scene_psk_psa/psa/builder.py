@@ -112,20 +112,20 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
 
     psa = Psa()
 
-    armature = active_object
-    armature_data = typing.cast(Armature, armature)
+    armature_object = active_object
+    armature_data = typing.cast(Armature, armature_object.data)
     bones: List[Bone] = list(iter(armature_data.bones))
 
     # The order of the armature bones and the pose bones is not guaranteed to be the same.
     # As a result, we need to reconstruct the list of pose bones in the same order as the
     # armature bones.
     bone_names = [x.name for x in bones]
-    pose_bones = [(bone_names.index(bone.name), bone) for bone in armature.pose.bones]
+    pose_bones = [(bone_names.index(bone.name), bone) for bone in armature_object.pose.bones]
     pose_bones.sort(key=lambda x: x[0])
     pose_bones = [x[1] for x in pose_bones]
 
     # Get a list of all the bone indices and instigator bones for the bone filter settings.
-    export_bone_names = get_export_bone_names(armature, options.bone_filter_mode, options.bone_group_indices)
+    export_bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_group_indices)
     bone_indices = [bone_names.index(x) for x in export_bone_names]
 
     # Make the bone lists contain only the bones that are going to be exported.
@@ -263,7 +263,7 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
                 else:
                     if options.root_motion:
                         # Export root motion
-                        pose_bone_matrix = armature.matrix_world @ pose_bone.matrix
+                        pose_bone_matrix = armature_object.matrix_world @ pose_bone.matrix
                     else:
                         pose_bone_matrix = pose_bone.matrix
 
