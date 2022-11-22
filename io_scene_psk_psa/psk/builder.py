@@ -103,10 +103,12 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
                 parent_tail = quat_parent @ bone.parent.tail
                 location = (parent_tail - parent_head) + bone.head
             else:
-                local_matrix = armature_object.matrix_local
-                location = local_matrix @ bone.head
-                rot_matrix = bone.matrix @ local_matrix.to_3x3()
-                rotation = rot_matrix.to_quaternion()
+                armature_local_matrix = armature_object.matrix_local
+                location = armature_local_matrix @ bone.head
+                bone_rotation = bone.matrix.to_quaternion().conjugated()
+                local_rotation = armature_local_matrix.to_3x3().to_quaternion().conjugated()
+                rotation = bone_rotation @ local_rotation
+                rotation.conjugate()
 
             psk_bone.location.x = location.x
             psk_bone.location.y = location.y
