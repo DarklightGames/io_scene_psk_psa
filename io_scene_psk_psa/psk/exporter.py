@@ -161,7 +161,12 @@ class PskExportOperator(Operator, ExportHelper):
 
         # Populate bone groups list.
         populate_bone_group_list(input_objects.armature_object, pg.bone_group_list)
-        populate_material_list(input_objects.mesh_objects, pg.material_list)
+
+        try:
+            populate_material_list(input_objects.mesh_objects, pg.material_list)
+        except RuntimeError as e:
+            self.report({'ERROR_INVALID_CONTEXT'}, str(e))
+            return {'CANCELLED'}
 
         context.window_manager.fileselect_add(self)
 
