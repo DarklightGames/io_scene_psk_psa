@@ -6,8 +6,9 @@ from collections import Counter
 from typing import List, Optional
 
 import bpy
+import numpy
 from bpy.props import StringProperty, BoolProperty, CollectionProperty, PointerProperty, IntProperty, EnumProperty
-from bpy.types import Operator, UIList, PropertyGroup, Panel
+from bpy.types import Operator, UIList, PropertyGroup, Panel, FCurve
 from bpy_extras.io_utils import ImportHelper
 from mathutils import Vector, Quaternion
 
@@ -37,7 +38,7 @@ class ImportBone(object):
         self.orig_loc: Vector = Vector()
         self.orig_quat: Quaternion = Quaternion()
         self.post_quat: Quaternion = Quaternion()
-        self.fcurves = []
+        self.fcurves: List[FCurve] = []
 
 
 def calculate_fcurve_data(import_bone: ImportBone, key_data: typing.Iterable[float]):
@@ -197,13 +198,15 @@ def import_psa(psa_reader: PsaReader, armature_object: bpy.types.Object, options
                     sequence_data_matrix[frame_index, bone_index] = calculate_fcurve_data(import_bone, key_data)
 
             # Write the keyframes out.
-            for frame_index in range(sequence.frame_count):
-                for bone_index, import_bone in enumerate(import_bones):
-                    if import_bone is None:
-                        continue
-                    key_data = sequence_data_matrix[frame_index, bone_index]
-                    for fcurve, datum in zip(import_bone.fcurves, key_data):
-                        fcurve.keyframe_points.insert(frame_index, datum, options={'FAST'})
+            fcurve_data = numpy.zeros(2 * sequence.frame_count, dtype=float)
+            fcurve_data[0::2] = range(sequence.frame_count)
+            for bone_index, import_bone in enumerate(import_bones):
+                if import_bone is None:
+                    continue
+                for fcurve_index, fcurve in enumerate(import_bone.fcurves):
+                    fcurve_data[1::2] = sequence_data_matrix[:, bone_index, fcurve_index]
+                    fcurve.keyframe_points.add(sequence.frame_count)
+                    fcurve.keyframe_points.foreach_set('co', fcurve_data)
 
             if options.should_convert_to_samples:
                 # Bake the curve to samples.
