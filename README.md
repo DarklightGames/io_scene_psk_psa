@@ -1,4 +1,4 @@
-This Blender 2.80+ add-on allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats) used in many version of the Unreal Engine.
+This Blender 2.80+ add-on allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats) used in many versions of the Unreal Engine.
 
 # Features
 * Full PSK/PSA import and export capabilities
