@@ -4,7 +4,6 @@ This Blender 2.80+ add-on allows you to import and export meshes and animations 
 * Full PSK/PSA import and export capabilities
 * Non-standard PSKX file format with vertex normals, extra UV channels and vertex colors is supported for import only
 * Fine-grained PSA sequence importing for efficient workflow when working with large PSA files
-* Automatic keyframe reduction on PSA import
 * PSA sequence metadata (e.g., frame rate, sequence name) is preserved on import, allowing this data to be reused on export
 * Specific [bone groups](https://docs.blender.org/manual/en/latest/animation/armatures/properties/bone_groups.html) can be excluded from PSK/PSA export (useful for excluding non-contributing bones such as IK controllers)
 * PSA sequences can be exported directly from actions or delineated using a scene's [timeline markers](https://docs.blender.org/manual/en/latest/animation/markers.html), allowing direct use of the [NLA](https://docs.blender.org/manual/en/latest/editors/nla/index.html) when creating sequences 
