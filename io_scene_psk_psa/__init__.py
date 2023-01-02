@@ -1,9 +1,8 @@
 bl_info = {
     "name": "PSK/PSA Importer/Exporter",
     "author": "Colin Basnett, Yurii Ti",
-    "version": (4, 2, 0),
-    "blender": (2, 80, 0),
-    # "location": "File > Export > PSK Export (.psk)",
+    "version": (5, 0, 0),
+    "blender": (3, 4, 0),
     "description": "PSK/PSA Import/Export (.psk/.psa)",
     "warning": "",
     "doc_url": "https://github.com/DarklightGames/io_scene_psk_psa",
@@ -71,6 +70,7 @@ def register():
     bpy.types.TOPBAR_MT_file_export.append(psk_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.append(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.append(psa_export_menu_func)
+    bpy.types.TOPBAR_MT_file_import.append(psa_import_menu_func)
     bpy.types.Scene.psa_import = PointerProperty(type=psa_importer.PsaImportPropertyGroup)
     bpy.types.Scene.psk_import = PointerProperty(type=psk_importer.PskImportPropertyGroup)
     bpy.types.Scene.psa_export = PointerProperty(type=psa_exporter.PsaExportPropertyGroup)
@@ -85,6 +85,7 @@ def unregister():
     bpy.types.TOPBAR_MT_file_export.remove(psk_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.remove(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.remove(psa_export_menu_func)
+    bpy.types.TOPBAR_MT_file_import.remove(psa_import_menu_func)
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
 

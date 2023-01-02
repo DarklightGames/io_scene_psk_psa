@@ -8,7 +8,7 @@ from typing import List, Optional
 import bpy
 import numpy
 from bpy.props import StringProperty, BoolProperty, CollectionProperty, PointerProperty, IntProperty, EnumProperty
-from bpy.types import Operator, UIList, PropertyGroup, Panel, FCurve
+from bpy.types import Operator, UIList, PropertyGroup, FCurve
 from bpy_extras.io_utils import ImportHelper
 from mathutils import Vector, Quaternion
 
@@ -243,14 +243,14 @@ class PsaImportActionListItem(PropertyGroup):
     is_selected: BoolProperty(default=False, options=empty_set)
 
 
-def load_psa_file(context):
+def load_psa_file(context, filepath: str):
     pg = context.scene.psa_import
     pg.sequence_list.clear()
     pg.psa.bones.clear()
     pg.psa_error = ''
     try:
         # Read the file and populate the action list.
-        p = os.path.abspath(pg.psa_file_path)
+        p = os.path.abspath(filepath)
         psa_reader = PsaReader(p)
         for sequence in psa_reader.sequences.values():
             item = pg.sequence_list.add()
@@ -262,8 +262,8 @@ def load_psa_file(context):
         pg.psa_error = str(e)
 
 
-def on_psa_file_path_updated(property_, context):
-    load_psa_file(context)
+def on_psa_file_path_updated(cls, context):
+    load_psa_file(context, cls.filepath)
 
 
 class PsaBonePropertyGroup(PropertyGroup):
@@ -276,7 +276,6 @@ class PsaDataPropertyGroup(PropertyGroup):
 
 
 class PsaImportPropertyGroup(PropertyGroup):
-    psa_file_path: StringProperty(default='', options=empty_set, update=on_psa_file_path_updated, name='PSA File Path')
     psa_error: StringProperty(default='')
     psa: PointerProperty(type=PsaDataPropertyGroup)
     sequence_list: CollectionProperty(type=PsaImportActionListItem)
@@ -477,117 +476,6 @@ class PsaImportSequencesDeselectAll(Operator):
         return {'FINISHED'}
 
 
-class PSA_PT_ImportPanel_Advanced(Panel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_label = 'Advanced'
-    bl_options = {'DEFAULT_CLOSED'}
-    bl_parent_id = 'PSA_PT_ImportPanel'
-
-    def draw(self, context):
-        layout = self.layout
-        pg = getattr(context.scene, 'psa_import')
-
-        col = layout.column()
-        col.use_property_split = True
-        col.use_property_decorate = False
-        col.prop(pg, 'bone_mapping_mode')
-
-        if pg.should_write_keyframes:
-            col = layout.column(heading='Keyframes')
-            col.use_property_split = True
-            col.use_property_decorate = False
-            col.prop(pg, 'should_convert_to_samples')
-            col.separator()
-
-        col = layout.column(heading='Options')
-        col.use_property_split = True
-        col.use_property_decorate = False
-        col.prop(pg, 'should_use_fake_user')
-        col.prop(pg, 'should_stash')
-        col.prop(pg, 'should_use_action_name_prefix')
-
-        if pg.should_use_action_name_prefix:
-            col.prop(pg, 'action_name_prefix')
-
-
-class PSA_PT_ImportPanel(Panel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_label = 'PSA Import'
-    bl_context = 'data'
-    bl_category = 'PSA Import'
-    bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        return context.view_layer.objects.active.type == 'ARMATURE'
-
-    def draw(self, context):
-        layout = self.layout
-        pg = getattr(context.scene, 'psa_import')
-
-        row = layout.row(align=True)
-        row.operator(PsaImportSelectFile.bl_idname, text='', icon='FILEBROWSER')
-        row.prop(pg, 'psa_file_path', text='')
-        row.operator(PsaImportFileReload.bl_idname, text='', icon='FILE_REFRESH')
-
-        if pg.psa_error != '':
-            row = layout.row()
-            row.label(text='File could not be read', icon='ERROR')
-
-        box = layout.box()
-
-        box.label(text=f'Sequences ({len(pg.sequence_list)})', icon='ARMATURE_DATA')
-
-        # select
-        rows = max(3, min(len(pg.sequence_list), 10))
-
-        row = box.row()
-        col = row.column()
-
-        row2 = col.row(align=True)
-        row2.label(text='Select')
-        row2.operator(PsaImportSequencesFromText.bl_idname, text='', icon='TEXT')
-        row2.operator(PsaImportSequencesSelectAll.bl_idname, text='All', icon='CHECKBOX_HLT')
-        row2.operator(PsaImportSequencesDeselectAll.bl_idname, text='None', icon='CHECKBOX_DEHLT')
-
-        col = col.row()
-        col.template_list('PSA_UL_ImportSequenceList', '', pg, 'sequence_list', pg, 'sequence_list_index', rows=rows)
-
-        col = layout.column(heading='')
-        col.use_property_split = True
-        col.use_property_decorate = False
-        col.prop(pg, 'should_overwrite')
-
-        col = layout.column(heading='Write')
-        col.use_property_split = True
-        col.use_property_decorate = False
-        col.prop(pg, 'should_write_keyframes')
-        col.prop(pg, 'should_write_metadata')
-
-        selected_sequence_count = sum(map(lambda x: x.is_selected, pg.sequence_list))
-
-        row = layout.row()
-
-        import_button_text = 'Import'
-        if selected_sequence_count > 0:
-            import_button_text = f'Import ({selected_sequence_count})'
-
-        row.operator(PsaImportOperator.bl_idname, text=import_button_text)
-
-
-class PsaImportFileReload(Operator):
-    bl_idname = 'psa_import.file_reload'
-    bl_label = 'Refresh'
-    bl_options = {'INTERNAL'}
-    bl_description = 'Refresh the PSA file'
-
-    def execute(self, context):
-        load_psa_file(context)
-        return {"FINISHED"}
-
-
 class PsaImportSelectFile(Operator):
     bl_idname = 'psa_import.select_file'
     bl_label = 'Select'
@@ -605,23 +493,32 @@ class PsaImportSelectFile(Operator):
         return {"RUNNING_MODAL"}
 
 
-class PsaImportOperator(Operator):
+class PsaImportOperator(Operator, ImportHelper):
     bl_idname = 'psa_import.import'
     bl_label = 'Import'
     bl_description = 'Import the selected animations into the scene as actions'
     bl_options = {'INTERNAL', 'UNDO'}
 
+    filename_ext = '.psa'
+    filter_glob: StringProperty(default='*.psa', options={'HIDDEN'})
+    filepath: StringProperty(
+        name='File Path',
+        description='File path used for importing the PSA file',
+        maxlen=1024,
+        default='',
+        update=on_psa_file_path_updated)
+
     @classmethod
     def poll(cls, context):
-        pg = getattr(context.scene, 'psa_import')
         active_object = context.view_layer.objects.active
         if active_object is None or active_object.type != 'ARMATURE':
+            cls.poll_message_set('The active object must be an armature')
             return False
-        return any(map(lambda x: x.is_selected, pg.sequence_list))
+        return True
 
     def execute(self, context):
         pg = getattr(context.scene, 'psa_import')
-        psa_reader = PsaReader(pg.psa_file_path)
+        psa_reader = PsaReader(self.filepath)
         sequence_names = [x.action_name for x in pg.sequence_list if x.is_selected]
 
         options = PsaImportOptions()
@@ -646,27 +543,72 @@ class PsaImportOperator(Operator):
 
         return {'FINISHED'}
 
+    def invoke(self, context: bpy.types.Context, event: bpy.types.Event):
+        # Attempt to load the PSA file for the pre-selected file.
+        load_psa_file(context, self.filepath)
 
-class PsaImportFileSelectOperator(Operator, ImportHelper):
-    bl_idname = 'psa_import.file_select'
-    bl_label = 'File Select'
-    bl_options = {'INTERNAL'}
-    filename_ext = '.psa'
-    filter_glob: StringProperty(default='*.psa', options={'HIDDEN'})
-    filepath: StringProperty(
-        name='File Path',
-        description='File path used for importing the PSA file',
-        maxlen=1024,
-        default='')
-
-    def invoke(self, context, event):
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
-    def execute(self, context):
+    def draw(self, context: bpy.types.Context):
+        layout = self.layout
         pg = getattr(context.scene, 'psa_import')
-        pg.psa_file_path = self.filepath
-        return {'FINISHED'}
+
+        if pg.psa_error:
+            row = layout.row()
+            row.label(text='Select a PSA file', icon='ERROR')
+        else:
+            box = layout.box()
+
+            box.label(text=f'Sequences ({len(pg.sequence_list)})', icon='ARMATURE_DATA')
+
+            # Select buttons.
+            rows = max(3, min(len(pg.sequence_list), 10))
+
+            row = box.row()
+            col = row.column()
+
+            row2 = col.row(align=True)
+            row2.label(text='Select')
+            row2.operator(PsaImportSequencesFromText.bl_idname, text='', icon='TEXT')
+            row2.operator(PsaImportSequencesSelectAll.bl_idname, text='All', icon='CHECKBOX_HLT')
+            row2.operator(PsaImportSequencesDeselectAll.bl_idname, text='None', icon='CHECKBOX_DEHLT')
+
+            col = col.row()
+            col.template_list('PSA_UL_ImportSequenceList', '', pg, 'sequence_list', pg, 'sequence_list_index', rows=rows)
+
+        col = layout.column(heading='')
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(pg, 'should_overwrite')
+
+        col = layout.column(heading='Write')
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(pg, 'should_write_keyframes')
+        col.prop(pg, 'should_write_metadata')
+
+        col = layout.column()
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(pg, 'bone_mapping_mode')
+
+        if pg.should_write_keyframes:
+            col = layout.column(heading='Keyframes')
+            col.use_property_split = True
+            col.use_property_decorate = False
+            col.prop(pg, 'should_convert_to_samples')
+            col.separator()
+
+        col = layout.column(heading='Options')
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(pg, 'should_use_fake_user')
+        col.prop(pg, 'should_stash')
+        col.prop(pg, 'should_use_action_name_prefix')
+
+        if pg.should_use_action_name_prefix:
+            col.prop(pg, 'action_name_prefix')
 
 
 classes = (
@@ -680,10 +622,6 @@ classes = (
     PsaImportSequencesSelectAll,
     PsaImportSequencesDeselectAll,
     PsaImportSequencesFromText,
-    PsaImportFileReload,
-    PSA_PT_ImportPanel,
-    PSA_PT_ImportPanel_Advanced,
     PsaImportOperator,
-    PsaImportFileSelectOperator,
     PsaImportSelectFile,
 )
