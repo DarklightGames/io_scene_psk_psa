@@ -10,7 +10,7 @@ Use the PsaReader::get_sequence_keys to get the keys for a sequence.
 """
 
 
-class Psa(object):
+class Psa:
     class Bone(Structure):
         _fields_ = [
             ('name', c_char * 64),

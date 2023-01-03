@@ -1,10 +1,11 @@
 import datetime
 import re
+import typing
 from collections import Counter
 from typing import List, Iterable
 
 import bpy.types
-from bpy.types import NlaStrip, Object
+from bpy.types import NlaStrip, Object, AnimData
 
 
 class Timer:
@@ -25,14 +26,14 @@ class Timer:
             return datetime.datetime.now() - self.start
 
 
-def rgb_to_srgb(c):
+def rgb_to_srgb(c: float):
     if c > 0.0031308:
         return 1.055 * (pow(c, (1.0 / 2.4))) - 0.055
     else:
         return 12.92 * c
 
 
-def get_nla_strips_in_timeframe(animation_data, frame_min, frame_max) -> List[NlaStrip]:
+def get_nla_strips_in_timeframe(animation_data: AnimData, frame_min: float, frame_max: float) -> List[NlaStrip]:
     if animation_data is None:
         return []
     strips = []
@@ -86,7 +87,7 @@ def populate_bone_group_list(armature_object: Object, bone_group_list: bpy.props
             item.is_selected = bone_group.name in selected_assigned_group_names if has_selected_groups else True
 
 
-def get_psa_sequence_name(action, should_use_original_sequence_name):
+def get_psa_sequence_name(action: bpy.types.Action, should_use_original_sequence_name: bool) -> str:
     if should_use_original_sequence_name and 'psa_sequence_name' in action:
         return action['psa_sequence_name']
     else:
@@ -101,7 +102,7 @@ def check_bone_names(bone_names: Iterable[str]):
                            f'Bone names must only contain letters, numbers, spaces, hyphens and underscores.')
 
 
-def get_export_bone_names(armature_object, bone_filter_mode, bone_group_indices: List[int]) -> List[str]:
+def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_group_indices: List[int]) -> List[str]:
     """
     Returns a sorted list of bone indices that should be exported for the given bone filter mode and bone groups.
 
@@ -115,7 +116,8 @@ def get_export_bone_names(armature_object, bone_filter_mode, bone_group_indices:
     if armature_object is None or armature_object.type != 'ARMATURE':
         raise ValueError('An armature object must be supplied')
 
-    bones = armature_object.data.bones
+    armature_data = typing.cast(bpy.types.Armature, armature_object.data)
+    bones = armature_data.bones
     pose_bones = armature_object.pose.bones
     bone_names = [x.name for x in bones]
 
