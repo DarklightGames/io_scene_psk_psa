@@ -289,7 +289,7 @@ class PsaImportPropertyGroup(PropertyGroup):
                                options=empty_set)
     should_use_action_name_prefix: BoolProperty(default=False, name='Prefix Action Name', options=empty_set)
     action_name_prefix: StringProperty(default='', name='Prefix', options=empty_set)
-    should_overwrite: BoolProperty(default=False, name='Reuse Existing Actions', options=empty_set,
+    should_overwrite: BoolProperty(default=False, name='Overwrite', options=empty_set,
                                    description='If an action with a matching name already exists, the existing action '
                                                'will have it\'s data overwritten instead of a new action being created')
     should_write_keyframes: BoolProperty(default=True, name='Keyframes', options=empty_set)
