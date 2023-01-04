@@ -1,4 +1,8 @@
 import ctypes
+import os
+import re
+import warnings
+from pathlib import Path
 
 from .data import *
 
@@ -12,8 +16,22 @@ def _read_types(fp, data_class, section: Section, data):
         offset += section.data_size
 
 
+def _read_material_references(path: str) -> List[str]:
+    property_file_path = Path(path).with_suffix('.props.txt')
+    if not property_file_path.is_file():
+        # Property file does not exist.
+        return []
+    # Do a crude regex match to find the Material list entries.
+    contents = property_file_path.read_text()
+    pattern = r"Material\s*=\s*([^\s^,]+)"
+    return re.findall(pattern, contents)
+
+
 def read_psk(path: str) -> Psk:
+
     psk = Psk()
+
+    # Read the PSK file sections.
     with open(path, 'rb') as fp:
         while fp.read(1):
             fp.seek(-1, 1)
@@ -46,5 +64,14 @@ def read_psk(path: str) -> Psk:
             elif section.name == b'VTXNORMS':
                 _read_types(fp, Vector3, section, psk.vertex_normals)
             else:
-                raise RuntimeError(f'Unrecognized section "{section.name} at position {15:fp.tell()}"')
+                # Section is not handled, skip it.
+                fp.seek(section.data_size * section.data_count, os.SEEK_CUR)
+                warnings.warn(f'Unrecognized section "{section.name} at position {fp.tell():15}"')
+
+    '''
+    UEViewer exports a sidecar file (*.props.txt) with fully-qualified reference paths for each material
+    (e.g., Texture'Package.Group.Object').
+    '''
+    psk.material_references = _read_material_references(path)
+
     return psk

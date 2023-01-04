@@ -1,34 +1,38 @@
 import os
 import sys
 from math import inf
+from pathlib import Path
 from typing import Optional, List
 
 import bmesh
 import bpy
 import numpy as np
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, StringProperty
-from bpy.types import Operator, PropertyGroup, VertexGroup
+from bpy.types import Operator, VertexGroup
 from bpy_extras.io_utils import ImportHelper
 from mathutils import Quaternion, Vector, Matrix
 
 from .data import Psk
 from .reader import read_psk
+from ..bdk import UReference
 from ..helpers import rgb_to_srgb
 
 
-class PskImportOptions(object):
+class PskImportOptions:
     def __init__(self):
         self.name = ''
         self.should_import_mesh = True
+        self.should_reuse_materials = True
         self.should_import_vertex_colors = True
         self.vertex_color_space = 'sRGB'
         self.should_import_vertex_normals = True
         self.should_import_extra_uvs = True
         self.should_import_skeleton = True
         self.bone_length = 1.0
+        self.should_import_materials = True
 
 
-class ImportBone(object):
+class ImportBone:
     """
     Intermediate bone type for the purpose of construction.
     """
@@ -49,6 +53,30 @@ class ImportBone(object):
 class PskImportResult:
     def __init__(self):
         self.warnings: List[str] = []
+
+
+def load_bdk_material(reference: UReference):
+    if reference is None:
+        return None
+    asset_libraries = bpy.context.preferences.filepaths.asset_libraries
+    asset_library_name = 'bdk-library'
+    try:
+        asset_library = next(filter(lambda x: x.name == asset_library_name, asset_libraries))
+    except StopIteration:
+        return None
+    asset_library_path = Path(asset_library.path)
+    # TODO: going to be very slow for automation!
+    blend_files = [fp for fp in asset_library_path.glob(f'**/{reference.package_name}.blend') if fp.is_file()]
+    if len(blend_files) == 0:
+        return None
+    blend_file = str(blend_files[0])
+    with bpy.data.libraries.load(blend_file, link=True, relative=False, assets_only=True) as (data_in, data_out):
+        if reference.object_name in data_in.materials:
+            data_out.materials = [reference.object_name]
+        else:
+            return None
+    material = bpy.data.materials[reference.object_name]
+    return material
 
 
 def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
@@ -125,10 +153,19 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
         mesh_object = bpy.data.objects.new(options.name, mesh_data)
 
         # MATERIALS
-        for material in psk.materials:
-            # TODO: re-use of materials should be an option
-            bpy_material = bpy.data.materials.new(material.name.decode('utf-8'))
-            mesh_data.materials.append(bpy_material)
+        if options.should_import_materials:
+            for material_index, psk_material in enumerate(psk.materials):
+                material_name = psk_material.name.decode('utf-8')
+                if options.should_reuse_materials and material_name in bpy.data.materials:
+                    # Material already exists, just re-use it.
+                    material = bpy.data.materials[material_name]
+                elif psk.has_material_references:
+                    # Material does not yet exist, attempt to load it using BDK.
+                    reference = UReference.from_string(psk.material_references[material_index])
+                    material = load_bdk_material(reference)
+                else:
+                    material = None
+                mesh_data.materials.append(material)
 
         bm = bmesh.new()
 
@@ -249,7 +286,19 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
 empty_set = set()
 
 
-class PskImportPropertyGroup(PropertyGroup):
+class PskImportOperator(Operator, ImportHelper):
+    bl_idname = 'import_scene.psk'
+    bl_label = 'Import'
+    bl_options = {'INTERNAL', 'UNDO', 'PRESET'}
+    __doc__ = 'Load a PSK file'
+    filename_ext = '.psk'
+    filter_glob: StringProperty(default='*.psk;*.pskx', options={'HIDDEN'})
+    filepath: StringProperty(
+        name='File Path',
+        description='File path used for exporting the PSK file',
+        maxlen=1024,
+        default='')
+
     should_import_vertex_colors: BoolProperty(
         default=True,
         options=empty_set,
@@ -284,6 +333,17 @@ class PskImportPropertyGroup(PropertyGroup):
         options=empty_set,
         description='Import mesh'
     )
+    should_import_materials: BoolProperty(
+        default=True,
+        name='Import Materials',
+        options=empty_set,
+    )
+    should_reuse_materials: BoolProperty(
+        default=True,
+        name='Reuse Materials',
+        options=empty_set,
+        description='Existing materials with matching names will be reused when available'
+    )
     should_import_skeleton: BoolProperty(
         default=True,
         name='Import Skeleton',
@@ -300,34 +360,19 @@ class PskImportPropertyGroup(PropertyGroup):
         description='Length of the bones'
     )
 
-
-class PskImportOperator(Operator, ImportHelper):
-    bl_idname = 'import.psk'
-    bl_label = 'Import'
-    bl_options = {'INTERNAL', 'UNDO'}
-    __doc__ = 'Load a PSK file'
-    filename_ext = '.psk'
-    filter_glob: StringProperty(default='*.psk;*.pskx', options={'HIDDEN'})
-    filepath: StringProperty(
-        name='File Path',
-        description='File path used for exporting the PSK file',
-        maxlen=1024,
-        default='')
-
     def execute(self, context):
-        pg = getattr(context.scene, 'psk_import')
-
         psk = read_psk(self.filepath)
 
         options = PskImportOptions()
         options.name = os.path.splitext(os.path.basename(self.filepath))[0]
-        options.should_import_mesh = pg.should_import_mesh
-        options.should_import_extra_uvs = pg.should_import_extra_uvs
-        options.should_import_vertex_colors = pg.should_import_vertex_colors
-        options.should_import_vertex_normals = pg.should_import_vertex_normals
-        options.vertex_color_space = pg.vertex_color_space
-        options.should_import_skeleton = pg.should_import_skeleton
-        options.bone_length = pg.bone_length
+        options.should_import_mesh = self.should_import_mesh
+        options.should_import_extra_uvs = self.should_import_extra_uvs
+        options.should_import_vertex_colors = self.should_import_vertex_colors
+        options.should_import_vertex_normals = self.should_import_vertex_normals
+        options.vertex_color_space = self.vertex_color_space
+        options.should_import_skeleton = self.should_import_skeleton
+        options.bone_length = self.bone_length
+        options.should_import_materials = self.should_import_materials
 
         result = import_psk(psk, context, options)
 
@@ -341,27 +386,26 @@ class PskImportOperator(Operator, ImportHelper):
         return {'FINISHED'}
 
     def draw(self, context):
-        pg = getattr(context.scene, 'psk_import')
         layout = self.layout
-        layout.prop(pg, 'should_import_mesh')
+        layout.prop(self, 'should_import_materials')
+        layout.prop(self, 'should_import_mesh')
         row = layout.column()
         row.use_property_split = True
         row.use_property_decorate = False
-        if pg.should_import_mesh:
-            row.prop(pg, 'should_import_vertex_normals')
-            row.prop(pg, 'should_import_extra_uvs')
-            row.prop(pg, 'should_import_vertex_colors')
-            if pg.should_import_vertex_colors:
-                row.prop(pg, 'vertex_color_space')
-        layout.prop(pg, 'should_import_skeleton')
+        if self.should_import_mesh:
+            row.prop(self, 'should_import_vertex_normals')
+            row.prop(self, 'should_import_extra_uvs')
+            row.prop(self, 'should_import_vertex_colors')
+            if self.should_import_vertex_colors:
+                row.prop(self, 'vertex_color_space')
+        layout.prop(self, 'should_import_skeleton')
         row = layout.column()
         row.use_property_split = True
         row.use_property_decorate = False
-        if pg.should_import_skeleton:
-            row.prop(pg, 'bone_length')
+        if self.should_import_skeleton:
+            row.prop(self, 'bone_length')
 
 
 classes = (
     PskImportOperator,
-    PskImportPropertyGroup,
 )
