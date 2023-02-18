@@ -30,12 +30,14 @@ def _write_section(fp, name: bytes, data_type: Type[Structure] = None, data: lis
 def export_psk(psk: Psk, path: str):
     if len(psk.wedges) > MAX_WEDGE_COUNT:
         raise RuntimeError(f'Number of wedges ({len(psk.wedges)}) exceeds limit of {MAX_WEDGE_COUNT}')
-    if len(psk.bones) > MAX_BONE_COUNT:
-        raise RuntimeError(f'Number of bones ({len(psk.bones)}) exceeds limit of {MAX_BONE_COUNT}')
     if len(psk.points) > MAX_POINT_COUNT:
         raise RuntimeError(f'Numbers of vertices ({len(psk.points)}) exceeds limit of {MAX_POINT_COUNT}')
     if len(psk.materials) > MAX_MATERIAL_COUNT:
         raise RuntimeError(f'Number of materials ({len(psk.materials)}) exceeds limit of {MAX_MATERIAL_COUNT}')
+    if len(psk.bones) > MAX_BONE_COUNT:
+        raise RuntimeError(f'Number of bones ({len(psk.bones)}) exceeds limit of {MAX_BONE_COUNT}')
+    elif len(psk.bones) == 0:
+        raise RuntimeError(f'At least one bone must be marked for export')
 
     with open(path, 'wb') as fp:
         _write_section(fp, b'ACTRHEAD')
