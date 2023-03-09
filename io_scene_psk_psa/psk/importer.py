@@ -1,7 +1,6 @@
 import os
 import sys
 from math import inf
-from pathlib import Path
 from typing import Optional, List
 
 import bmesh
@@ -14,8 +13,7 @@ from mathutils import Quaternion, Vector, Matrix
 
 from .data import Psk
 from .reader import read_psk
-from ..bdk import UReference
-from ..helpers import rgb_to_srgb
+from ..helpers import rgb_to_srgb, is_bdk_addon_loaded
 
 
 class PskImportOptions:
@@ -53,30 +51,6 @@ class ImportBone:
 class PskImportResult:
     def __init__(self):
         self.warnings: List[str] = []
-
-
-def load_bdk_material(reference: UReference):
-    if reference is None:
-        return None
-    asset_libraries = bpy.context.preferences.filepaths.asset_libraries
-    asset_library_name = 'bdk-library'
-    try:
-        asset_library = next(filter(lambda x: x.name == asset_library_name, asset_libraries))
-    except StopIteration:
-        return None
-    asset_library_path = Path(asset_library.path)
-    # TODO: going to be very slow for automation!
-    blend_files = [fp for fp in asset_library_path.glob(f'**/{reference.package_name}.blend') if fp.is_file()]
-    if len(blend_files) == 0:
-        return None
-    blend_file = str(blend_files[0])
-    with bpy.data.libraries.load(blend_file, link=True, relative=False, assets_only=True) as (data_in, data_out):
-        if reference.object_name in data_in.materials:
-            data_out.materials = [reference.object_name]
-        else:
-            return None
-    material = bpy.data.materials[reference.object_name]
-    return material
 
 
 def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
@@ -156,15 +130,16 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
         if options.should_import_materials:
             for material_index, psk_material in enumerate(psk.materials):
                 material_name = psk_material.name.decode('utf-8')
+                material = None
                 if options.should_reuse_materials and material_name in bpy.data.materials:
                     # Material already exists, just re-use it.
                     material = bpy.data.materials[material_name]
-                elif psk.has_material_references:
-                    # Material does not yet exist, attempt to load it using BDK.
-                    reference = UReference.from_string(psk.material_references[material_index])
-                    material = load_bdk_material(reference)
-                else:
-                    material = None
+                elif is_bdk_addon_loaded() and psk.has_material_references:
+                    # Material does not yet exist and we have the BDK addon installed.
+                    # Attempt to load it using BDK addon's operator.
+                    material_reference = psk.material_references[material_index]
+                    if material_reference and bpy.ops.bdk.link_material(reference=material_reference) == {'FINISHED'}:
+                        material = bpy.data.materials[material_name]
                 mesh_data.materials.append(material)
 
         bm = bmesh.new()

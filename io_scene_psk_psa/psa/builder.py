@@ -21,7 +21,7 @@ class PsaExportSequence:
 
 class PsaBuildOptions:
     def __init__(self):
-        self.animation_data: AnimData
+        self.animation_data: AnimData = None
         self.sequences: List[PsaExportSequence] = []
         self.bone_filter_mode = 'ALL'
         self.bone_group_indices: List[int] = []

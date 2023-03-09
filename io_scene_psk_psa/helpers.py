@@ -4,6 +4,7 @@ import typing
 from collections import Counter
 from typing import List, Iterable
 
+import addon_utils
 import bpy.types
 from bpy.types import NlaStrip, Object, AnimData
 
@@ -176,3 +177,7 @@ def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_g
                            f'Additional debugging information has been written to the console.')
 
     return bone_names
+
+
+def is_bdk_addon_loaded():
+    return addon_utils.check('bdk_addon')[1]
