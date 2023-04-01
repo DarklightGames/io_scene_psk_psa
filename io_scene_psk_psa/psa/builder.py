@@ -17,15 +17,15 @@ class PsaExportSequence:
         self.name: str = ''
         self.nla_state: PsaExportSequence.NlaState = PsaExportSequence.NlaState()
         self.fps: float = 30.0
+        self.is_reversed: bool = False
 
 
 class PsaBuildOptions:
     def __init__(self):
-        self.animation_data: AnimData = None
+        self.animation_data: Optional[AnimData] = None
         self.sequences: List[PsaExportSequence] = []
         self.bone_filter_mode = 'ALL'
         self.bone_group_indices: List[int] = []
-        self.should_use_original_sequence_names = False
         self.should_ignore_bone_name_restrictions = False
         self.sequence_name_prefix = ''
         self.sequence_name_suffix = ''
@@ -120,9 +120,10 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
         options.animation_data.action = export_sequence.nla_state.action
         context.view_layer.update()
 
-        frame_min = export_sequence.nla_state.frame_min
-        frame_max = export_sequence.nla_state.frame_max
-        frame_count = frame_max - frame_min + 1
+        frame_start = export_sequence.nla_state.frame_start
+        frame_end = export_sequence.nla_state.frame_end
+        frame_count = abs(frame_end - frame_start) + 1
+        frame_step = 1 if frame_start < frame_end else -1
 
         psa_sequence = Psa.Sequence()
         psa_sequence.name = bytes(export_sequence.name, encoding='windows-1252')
@@ -130,8 +131,11 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
         psa_sequence.frame_start_index = frame_start_index
         psa_sequence.fps = export_sequence.fps
 
-        for frame in range(frame_count):
-            context.scene.frame_set(frame_min + frame)
+        frame = frame_start
+        for _ in range(frame_count):
+            context.scene.frame_set(frame)
+            
+            frame += frame_step
 
             for pose_bone in pose_bones:
                 key = Psa.Key()

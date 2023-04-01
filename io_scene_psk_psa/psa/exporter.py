@@ -5,7 +5,7 @@ from typing import Type, Dict
 import bpy
 from bpy.props import BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty, PointerProperty, \
     StringProperty
-from bpy.types import Action, Operator, PropertyGroup, UIList, Context
+from bpy.types import Action, Operator, PropertyGroup, UIList, Context, Armature, TimelineMarker
 from bpy_extras.io_utils import ExportHelper
 
 from .builder import PsaBuildOptions, PsaExportSequence, build_psa
@@ -47,17 +47,8 @@ class PsaExportTimelineMarkerListItem(PropertyGroup):
     marker_index: IntProperty()
     name: StringProperty()
     is_selected: BoolProperty(default=True)
-
-
-def update_action_names(context):
-    pg = context.scene.psa_export
-    for item in pg.action_list:
-        action = item.action
-        item.action_name = get_psa_sequence_name(action, pg.should_use_original_sequence_names)
-
-
-def should_use_original_sequence_names_updated(_, context):
-    update_action_names(context)
+    frame_start: IntProperty(options={'HIDDEN'})
+    frame_end: IntProperty(options={'HIDDEN'})
 
 
 def psa_export_property_group_animation_data_override_poll(_context, obj):
@@ -124,26 +115,11 @@ class PsaExportPropertyGroup(PropertyGroup):
     )
     bone_group_list: CollectionProperty(type=BoneGroupListItem)
     bone_group_list_index: IntProperty(default=0, name='', description='')
-    should_use_original_sequence_names: BoolProperty(
-        default=False,
-        name='Original Names',
-        options=empty_set,
-        update=should_use_original_sequence_names_updated,
-        description='If the action was imported from the PSA Import panel, the original name of the sequence will be '
-                    'used instead of the Blender action name',
-    )
-    should_trim_timeline_marker_sequences: BoolProperty(
-        default=True,
-        name='Trim Sequences',
-        options=empty_set,
-        description='Frames without NLA track information at the boundaries of timeline markers will be excluded from '
-                    'the exported sequences '
-    )
     should_ignore_bone_name_restrictions: BoolProperty(
         default=False,
         name='Ignore Bone Name Restrictions',
         description='Bone names restrictions will be ignored. Note that bone names without properly formatted names '
-                    'cannot be referenced in scripts.'
+                    'cannot be referenced in scripts'
     )
     sequence_name_prefix: StringProperty(name='Prefix', options=empty_set)
     sequence_name_suffix: StringProperty(name='Suffix', options=empty_set)
@@ -177,7 +153,7 @@ def is_bone_filter_mode_item_available(context, identifier):
     return True
 
 
-def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context: Context, marker_names: List[str], should_trim_timeline_marker_sequences: bool) -> Dict:
+def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context: Context, marker_names: List[str]) -> Dict:
     # Timeline markers need to be sorted so that we can determine the sequence start and end positions.
     sequence_frame_ranges = dict()
     sorted_timeline_markers = list(sorted(context.scene.timeline_markers, key=lambda x: x.frame))
@@ -185,23 +161,22 @@ def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context:
 
     for marker_name in marker_names:
         marker = context.scene.timeline_markers[marker_name]
-        frame_min = marker.frame
+        frame_start = marker.frame
         # Determine the final frame of the sequence based on the next marker.
         # If no subsequent marker exists, use the maximum frame_end from all NLA strips.
         marker_index = sorted_timeline_marker_names.index(marker_name)
         next_marker_index = marker_index + 1
-        frame_max = 0
+        frame_end = 0
         if next_marker_index < len(sorted_timeline_markers):
             # There is a next marker. Use that next marker's frame position as the last frame of this sequence.
-            frame_max = sorted_timeline_markers[next_marker_index].frame
-            if should_trim_timeline_marker_sequences:
-                nla_strips = get_nla_strips_in_timeframe(animation_data, marker.frame, frame_max)
-                if len(nla_strips) > 0:
-                    frame_max = min(frame_max, max(map(lambda nla_strip: nla_strip.frame_end, nla_strips)))
-                    frame_min = max(frame_min, min(map(lambda nla_strip: nla_strip.frame_start, nla_strips)))
-                else:
-                    # No strips in between this marker and the next, just export this as a one-frame animation.
-                    frame_max = frame_min
+            frame_end = sorted_timeline_markers[next_marker_index].frame
+            nla_strips = get_nla_strips_in_timeframe(animation_data, marker.frame, frame_end)
+            if len(nla_strips) > 0:
+                frame_end = min(frame_end, max(map(lambda nla_strip: nla_strip.frame_end, nla_strips)))
+                frame_start = max(frame_start, min(map(lambda nla_strip: nla_strip.frame_start, nla_strips)))
+            else:
+                # No strips in between this marker and the next, just export this as a one-frame animation.
+                frame_end = frame_start
         else:
             # There is no next marker.
             # Find the final frame of all the NLA strips and use that as the last frame of this sequence.
@@ -209,12 +184,12 @@ def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context:
                 if nla_track.mute:
                     continue
                 for strip in nla_track.strips:
-                    frame_max = max(frame_max, strip.frame_end)
+                    frame_end = max(frame_end, strip.frame_end)
 
-        if frame_min > frame_max:
+        if frame_start > frame_end:
             continue
 
-        sequence_frame_ranges[marker_name] = int(frame_min), int(frame_max)
+        sequence_frame_ranges[marker_name] = int(frame_start), int(frame_end)
 
     return sequence_frame_ranges
 
@@ -222,7 +197,7 @@ def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context:
 def get_sequence_fps(context: Context, fps_source: str, fps_custom: float, actions: Iterable[Action]) -> float:
     if fps_source == 'SCENE':
         return context.scene.render.fps
-    if fps_source == 'CUSTOM':
+    elif fps_source == 'CUSTOM':
         return fps_custom
     elif fps_source == 'ACTION_METADATA':
         # Get the minimum value of action metadata FPS values.
@@ -240,6 +215,131 @@ def get_sequence_fps(context: Context, fps_source: str, fps_custom: float, actio
         raise RuntimeError(f'Invalid FPS source "{fps_source}"')
 
 
+def is_action_for_armature(armature: Armature, action: Action):
+    if len(action.fcurves) == 0:
+        return False
+    bone_names = set([x.name for x in armature.bones])
+    for fcurve in action.fcurves:
+        match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
+        if not match:
+            continue
+        bone_name = match.group(1)
+        if bone_name in bone_names:
+            return True
+    return False
+
+
+def get_animation_data_object(context: Context) -> Object:
+    pg: PsaExportPropertyGroup = getattr(context.scene, 'psa_export')
+
+    active_object = context.view_layer.objects.active
+
+    if active_object.type != 'ARMATURE':
+        raise RuntimeError('Selected object must be an Armature')
+
+    if pg.should_override_animation_data:
+        animation_data_object = pg.animation_data_override
+    else:
+        animation_data_object = active_object
+
+    return animation_data_object
+
+
+def get_sequences_from_action(action: Action) -> List[Tuple[str, int, int]]:
+    frame_start = int(action.frame_range[0])
+    frame_end = int(action.frame_range[1])
+    reversed_pattern = r'(.+)/(.+)'
+    reversed_match = re.match(reversed_pattern, action.name)
+    if reversed_match:
+        forward_name = reversed_match.group(1)
+        backwards_name = reversed_match.group(2)
+        return [
+            (forward_name, frame_start, frame_end),
+            (backwards_name, frame_end, frame_start)
+        ]
+    else:
+        return [(action.name, frame_start, frame_end)]
+
+
+def get_sequences_from_action_pose_marker(action: Action, pose_markers: List[TimelineMarker], pose_marker: TimelineMarker, pose_marker_index: int) -> List[Tuple[str, int, int]]:
+    frame_start = pose_marker.frame
+    if pose_marker_index + 1 < len(pose_markers):
+        frame_end = pose_markers[pose_marker_index + 1].frame
+    else:
+        frame_end = int(action.frame_range[1])
+    reversed_pattern = r'(.+)/(.+)'
+    reversed_match = re.match(reversed_pattern, pose_marker.name)
+    if reversed_match:
+        forward_name = reversed_match.group(1)
+        backwards_name = reversed_match.group(2)
+        return [
+            (forward_name, frame_start, frame_end),
+            (backwards_name, frame_end, frame_start)
+        ]
+    else:
+        return [(pose_marker.name, frame_start, frame_end)]
+
+
+def update_actions_and_timeline_markers(context: Context, armature: Armature):
+    pg = getattr(context.scene, 'psa_export')
+
+    # Clear actions and markers.
+    pg.action_list.clear()
+    pg.marker_list.clear()
+
+    # Get animation data.
+    animation_data_object = get_animation_data_object(context)
+    animation_data = animation_data_object.animation_data if animation_data_object else None
+
+    if animation_data is None:
+        return
+
+    # Populate actions list.
+    for action in bpy.data.actions:
+        if not is_action_for_armature(armature, action):
+            continue
+
+        if not action.name.startswith('#'):
+            for (name, frame_start, frame_end) in get_sequences_from_action(action):
+                item = pg.action_list.add()
+                item.action = action
+                item.name = name
+                item.is_selected = False
+                item.is_pose_marker = False
+                item.frame_start = frame_start
+                item.frame_end = frame_end
+
+        # Pose markers are not guaranteed to be in frame-order, so make sure that they are.
+        pose_markers = sorted(action.pose_markers, key=lambda x: x.frame)
+        for pose_marker_index, pose_marker in enumerate(pose_markers):
+            if pose_marker.name.startswith('#'):
+                continue
+            for (name, frame_start, frame_end) in get_sequences_from_action_pose_marker(action, pose_markers, pose_marker, pose_marker_index):
+                item = pg.action_list.add()
+                item.action = action
+                item.name = name
+                item.is_selected = False
+                item.is_pose_marker = True
+                item.frame_start = frame_start
+                item.frame_end = frame_end
+
+    # Populate timeline markers list.
+    marker_names = [x.name for x in context.scene.timeline_markers]
+    sequence_frame_ranges = get_timeline_marker_sequence_frame_ranges(animation_data, context, marker_names)
+
+    for marker_name in marker_names:
+        if marker_name not in sequence_frame_ranges:
+            continue
+        if marker_name.startswith('#'):
+            continue
+        item = pg.marker_list.add()
+        item.name = marker_name
+        item.is_selected = False
+        frame_start, frame_end = sequence_frame_ranges[marker_name]
+        item.frame_start = frame_start
+        item.frame_end = frame_end
+
+
 class PsaExportOperator(Operator, ExportHelper):
     bl_idname = 'psa_export.operator'
     bl_label = 'Export'
@@ -254,7 +354,7 @@ class PsaExportOperator(Operator, ExportHelper):
         default='')
 
     def __init__(self):
-        self.armature = None
+        self.armature_object = None
 
     @classmethod
     def poll(cls, context):
@@ -298,7 +398,6 @@ class PsaExportOperator(Operator, ExportHelper):
             col = layout.column()
             col.use_property_split = True
             col.use_property_decorate = False
-            col.prop(pg, 'should_use_original_sequence_names')
             col.prop(pg, 'sequence_name_prefix')
             col.prop(pg, 'sequence_name_suffix')
 
@@ -310,7 +409,6 @@ class PsaExportOperator(Operator, ExportHelper):
             col = layout.column()
             col.use_property_split = True
             col.use_property_decorate = False
-            col.prop(pg, 'should_trim_timeline_marker_sequences')
             col.prop(pg, 'sequence_name_prefix')
             col.prop(pg, 'sequence_name_suffix')
 
@@ -345,19 +443,6 @@ class PsaExportOperator(Operator, ExportHelper):
         # ROOT MOTION
         layout.prop(pg, 'root_motion', text='Root Motion')
 
-    def is_action_for_armature(self, action):
-        if len(action.fcurves) == 0:
-            return False
-        bone_names = set([x.name for x in self.armature.data.bones])
-        for fcurve in action.fcurves:
-            match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
-            if not match:
-                continue
-            bone_name = match.group(1)
-            if bone_name in bone_names:
-                return True
-        return False
-
     @classmethod
     def _check_context(cls, context):
         if context.view_layer.objects.active is None:
@@ -372,52 +457,14 @@ class PsaExportOperator(Operator, ExportHelper):
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
 
-        pg = getattr(context.scene, 'psa_export')
-        self.armature = context.view_layer.objects.active
+        pg: PsaExportPropertyGroup = getattr(context.scene, 'psa_export')
 
-        # Populate actions list.
-        pg.action_list.clear()
-        for action in bpy.data.actions:
-            if not self.is_action_for_armature(action):
-                continue
-            item = pg.action_list.add()
-            item.action = action
-            item.name = action.name
-            item.frame_start = int(action.frame_range[0])
-            item.frame_end = int(action.frame_range[1])
-            item.is_selected = False
-            item.is_pose_marker = False
-            # Pose markers are not guaranteed to be in frame-order, so make sure that they are.
-            pose_markers = sorted(action.pose_markers, key=lambda x: x.frame)
-            print([x.name for x in pose_markers])
-            for pose_marker_index, pose_marker in enumerate(pose_markers):
-                item = pg.action_list.add()
-                item.action = action
-                item.name = pose_marker.name
-                item.is_selected = False
-                item.is_pose_marker = True
-                item.frame_start = pose_marker.frame
-                if pose_marker_index + 1 < len(pose_markers):
-                    item.frame_end = pose_markers[pose_marker_index + 1].frame
-                else:
-                    item.frame_end = int(action.frame_range[1])
+        self.armature_object = context.view_layer.objects.active
 
-        update_action_names(context)
-
-        # Populate timeline markers list.
-        pg.marker_list.clear()
-        for marker in context.scene.timeline_markers:
-            item = pg.marker_list.add()
-            item.name = marker.name
-            item.is_selected = False
-
-        if len(pg.action_list) == 0 and len(pg.marker_list) == 0:
-            # If there are no actions at all, we have nothing to export, so just cancel the operation.
-            self.report({'ERROR_INVALID_CONTEXT'}, 'There are no actions or timeline markers to export.')
-            return {'CANCELLED'}
+        update_actions_and_timeline_markers(context, self.armature_object.data)
 
         # Populate bone groups list.
-        populate_bone_group_list(self.armature, pg.bone_group_list)
+        populate_bone_group_list(self.armature_object, pg.bone_group_list)
 
         context.window_manager.fileselect_add(self)
 
@@ -426,33 +473,20 @@ class PsaExportOperator(Operator, ExportHelper):
     def execute(self, context):
         pg = getattr(context.scene, 'psa_export')
 
-        # TODO: move this up the call chain
-        # Populate the export sequence list.
-        active_object = context.view_layer.objects.active
-
         # Ensure that we actually have items that we are going to be exporting.
         if pg.sequence_source == 'ACTIONS' and len(pg.action_list) == 0:
             raise RuntimeError('No actions were selected for export')
         elif pg.sequence_source == 'TIMELINE_MARKERS' and len(pg.marker_names) == 0:
             raise RuntimeError('No timeline markers were selected for export')
 
-        if active_object.type != 'ARMATURE':
-            raise RuntimeError('Selected object must be an Armature')
-
-        if pg.should_override_animation_data:
-            animation_data_object = pg.animation_data_override
-        else:
-            animation_data_object = active_object
-
+        # Populate the export sequence list.
+        animation_data_object = get_animation_data_object(context)
         animation_data = animation_data_object.animation_data
 
         if animation_data is None:
             raise RuntimeError(f'No animation data for object \'{animation_data_object.name}\'')
 
         export_sequences: List[PsaExportSequence] = []
-
-        # actions = [x.action for x in pg.action_list if x.is_selected]
-        # marker_names =
 
         if pg.sequence_source == 'ACTIONS':
             for action in filter(lambda x: x.is_selected, pg.action_list):
@@ -461,23 +495,19 @@ class PsaExportOperator(Operator, ExportHelper):
                 export_sequence = PsaExportSequence()
                 export_sequence.nla_state.action = action.action
                 export_sequence.name = action.name
-                export_sequence.nla_state.frame_min = action.frame_start
-                export_sequence.nla_state.frame_max = action.frame_end
+                export_sequence.nla_state.frame_start = action.frame_start
+                export_sequence.nla_state.frame_end = action.frame_end
                 export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [action.action])
                 export_sequences.append(export_sequence)
         elif pg.sequence_source == 'TIMELINE_MARKERS':
-            marker_names = [x.name for x in pg.marker_list if x.is_selected]
-            sequence_frame_ranges = get_timeline_marker_sequence_frame_ranges(animation_data, context, marker_names, pg.should_trim_timeline_marker_sequences)
-
-            for name, (frame_min, frame_max) in sequence_frame_ranges.items():
+            for marker in pg.marker_list:
                 export_sequence = PsaExportSequence()
-                export_sequence.name = name
+                export_sequence.name = marker.name
                 export_sequence.nla_state.action = None
-                export_sequence.nla_state.frame_min = frame_min
-                export_sequence.nla_state.frame_max = frame_max
-
+                export_sequence.nla_state.frame_start = marker.frame_start
+                export_sequence.nla_state.frame_end = marker.frame_end
                 nla_strips_actions = set(
-                    map(lambda x: x.action, get_nla_strips_in_timeframe(animation_data, frame_min, frame_max)))
+                    map(lambda x: x.action, get_nla_strips_in_timeframe(animation_data, marker.frame_start, marker.frame_end)))
                 export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, nla_strips_actions)
                 export_sequences.append(export_sequence)
         else:
@@ -488,7 +518,6 @@ class PsaExportOperator(Operator, ExportHelper):
         options.sequences = export_sequences
         options.bone_filter_mode = pg.bone_filter_mode
         options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
-        options.should_use_original_sequence_names = pg.should_use_original_sequence_names
         options.should_ignore_bone_name_restrictions = pg.should_ignore_bone_name_restrictions
         options.sequence_name_prefix = pg.sequence_name_prefix
         options.sequence_name_suffix = pg.sequence_name_suffix
@@ -550,13 +579,17 @@ class PSA_UL_ExportSequenceList(UIList):
         self.use_filter_show = True
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        item = typing.cast(PsaExportActionListItem, item)
         is_pose_marker = hasattr(item, 'is_pose_marker') and item.is_pose_marker
         layout.prop(item, 'is_selected', icon_only=True, text=item.name)
         if hasattr(item, 'action') and item.action.asset_data is not None:
             layout.label(text='', icon='ASSET_MANAGER')
+
+        row = layout.row(align=True)
+        row.alignment = 'RIGHT'
+        if item.frame_end < item.frame_start:
+            row.label(text='', icon='FRAME_PREV')
         if is_pose_marker:
-            row = layout.row(align=True)
-            row.alignment = 'RIGHT'
             row.label(text=item.action.name, icon='PMARKER')
 
     def draw_filter(self, context, layout):

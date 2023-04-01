@@ -215,7 +215,6 @@ def import_psa(psa_reader: PsaReader, armature_object: bpy.types.Object, options
 
         # Write meta-data.
         if options.should_write_metadata:
-            action['psa_sequence_name'] = sequence_name
             action['psa_sequence_fps'] = sequence.fps
 
         action.use_fake_user = options.should_use_fake_user

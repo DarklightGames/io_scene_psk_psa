@@ -88,13 +88,6 @@ def populate_bone_group_list(armature_object: Object, bone_group_list: bpy.props
             item.is_selected = bone_group.name in selected_assigned_group_names if has_selected_groups else True
 
 
-def get_psa_sequence_name(action: bpy.types.Action, should_use_original_sequence_name: bool) -> str:
-    if should_use_original_sequence_name and 'psa_sequence_name' in action:
-        return action['psa_sequence_name']
-    else:
-        return action.name
-
-
 def check_bone_names(bone_names: Iterable[str]):
     pattern = re.compile(r'^[a-zA-Z\d_\- ]+$')
     invalid_bone_names = [x for x in bone_names if pattern.match(x) is None]

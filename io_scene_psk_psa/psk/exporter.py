@@ -256,7 +256,7 @@ class PskExportPropertyGroup(PropertyGroup):
         default=False,
         name='Ignore Bone Name Restrictions',
         description='Bone names restrictions will be ignored. Note that bone names without properly formatted names '
-                    'cannot be referenced in scripts.'
+                    'cannot be referenced in scripts'
     )
 
 
