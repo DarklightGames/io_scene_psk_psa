@@ -17,7 +17,6 @@ class PsaExportSequence:
         self.name: str = ''
         self.nla_state: PsaExportSequence.NlaState = PsaExportSequence.NlaState()
         self.fps: float = 30.0
-        self.is_reversed: bool = False
 
 
 class PsaBuildOptions:
