@@ -140,6 +140,10 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
                     material_reference = psk.material_references[material_index]
                     if material_reference and bpy.ops.bdk.link_material(reference=material_reference) == {'FINISHED'}:
                         material = bpy.data.materials[material_name]
+                else:
+                    # Just create a blank material.
+                    material = bpy.data.materials.new(material_name)
+                    material.use_nodes = True
                 mesh_data.materials.append(material)
 
         bm = bmesh.new()
