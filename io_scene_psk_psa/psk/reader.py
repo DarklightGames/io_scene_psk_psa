@@ -1,4 +1,5 @@
 import ctypes
+import os
 
 from .data import *
 
@@ -46,5 +47,7 @@ def read_psk(path: str) -> Psk:
             elif section.name == b'VTXNORMS':
                 _read_types(fp, Vector3, section, psk.vertex_normals)
             else:
-                raise RuntimeError(f'Unrecognized section "{section.name} at position {15:fp.tell()}"')
+                # Section is not handled, skip it.
+                fp.seek(section.data_size * section.data_count, os.SEEK_CUR)
+                print(f'Unrecognized section "{section.name} at position {fp.tell():15}"')
     return psk
