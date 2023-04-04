@@ -80,6 +80,19 @@ class Psk(object):
             ('bone_index', c_int32),
         ]
 
+    class MorphInfo(Structure):
+        _fields_ = [
+            ('name', c_char * 64),
+            ('vertex_count', c_int32)
+        ]
+
+    class MorphData(Structure):
+        _fields_ = [
+            ('position_delta', Vector3),
+            ('tangent_z_delta', Vector3),
+            ('point_index', c_int32)
+        ]
+
     @property
     def has_extra_uvs(self):
         return len(self.extra_uvs) > 0
@@ -92,6 +105,10 @@ class Psk(object):
     def has_vertex_normals(self):
         return len(self.vertex_normals) > 0
 
+    @property
+    def has_morph_data(self):
+        return len(self.morph_infos) > 0
+
     def __init__(self):
         self.points: List[Vector3] = []
         self.wedges: List[Psk.Wedge] = []
@@ -102,3 +119,5 @@ class Psk(object):
         self.extra_uvs: List[Vector2] = []
         self.vertex_colors: List[Color] = []
         self.vertex_normals: List[Vector3] = []
+        self.morph_infos: List[Psk.MorphInfo] = []
+        self.morph_data: List[Psk.MorphData] = []

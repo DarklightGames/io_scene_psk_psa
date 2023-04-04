@@ -46,6 +46,10 @@ def read_psk(path: str) -> Psk:
                 _read_types(fp, Vector2, section, psk.extra_uvs)
             elif section.name == b'VTXNORMS':
                 _read_types(fp, Vector3, section, psk.vertex_normals)
+            elif section.name == b'MRPHINFO':
+                _read_types(fp, Psk.MorphInfo, section, psk.morph_infos)
+            elif section.name == b'MRPHDATA':
+                _read_types(fp, Psk.MorphData, section, psk.morph_data)
             else:
                 # Section is not handled, skip it.
                 fp.seek(section.data_size * section.data_count, os.SEEK_CUR)

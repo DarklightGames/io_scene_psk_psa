@@ -221,6 +221,7 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
         bm.normal_update()
         bm.free()
 
+        # WEIGHTS
         # Get a list of all bones that have weights associated with them.
         vertex_group_bone_indices = set(map(lambda weight: weight.bone_index, psk.weights))
         vertex_groups: List[Optional[VertexGroup]] = [None] * len(psk.bones)
@@ -229,6 +230,16 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
 
         for weight in psk.weights:
             vertex_groups[weight.bone_index].add((weight.point_index,), weight.weight, 'ADD')
+
+        # MORPHS (SHAPE KEYS)
+        morph_data_iterator = iter(psk.morph_data)
+        for morph_info in psk.morph_infos:
+            shape_key = mesh_object.shape_key_add(name=morph_info.name.decode('windows-1252'), from_mix=False)
+
+            for _ in range(morph_info.vertex_count):
+                morph_data = next(morph_data_iterator)
+                x, y, z = morph_data.position_delta
+                shape_key.data[morph_data.point_index].co += Vector((x, -y, z))
 
         context.scene.collection.objects.link(mesh_object)
 
