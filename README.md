@@ -1,17 +1,17 @@
-This Blender 2.80+ add-on allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats) used in many versions of the Unreal Engine.
+This Blender 2.90+ add-on allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats) used in many versions of the Unreal Engine.
 
 # Features
-* Full PSK/PSA import and export capabilities
-* Non-standard PSKX file format with vertex normals, extra UV channels and vertex colors is supported for import only
-* Fine-grained PSA sequence importing for efficient workflow when working with large PSA files
-* PSA sequence metadata (e.g., frame rate, sequence name) is preserved on import, allowing this data to be reused on export
-* Specific [bone groups](https://docs.blender.org/manual/en/latest/animation/armatures/properties/bone_groups.html) can be excluded from PSK/PSA export (useful for excluding non-contributing bones such as IK controllers)
-* PSA sequences can be exported directly from actions or delineated using a scene's [timeline markers](https://docs.blender.org/manual/en/latest/animation/markers.html), allowing direct use of the [NLA](https://docs.blender.org/manual/en/latest/editors/nla/index.html) when creating sequences 
+* Full PSK/PSA import and export capabilities.
+* Non-standard file section data is supported for import only (vertex normals, extra UV channels, vertex colors, shape keys).
+* Fine-grained PSA sequence importing for efficient workflow when working with large PSA files.
+* PSA sequence metadata (e.g., frame rate, sequence name) is preserved on import, allowing this data to be reused on export.
+* Specific [bone groups](https://docs.blender.org/manual/en/latest/animation/armatures/properties/bone_groups.html) can be excluded from PSK/PSA export (useful for excluding non-contributing bones such as IK controllers).
+* PSA sequences can be exported directly from actions or delineated using a scene's [timeline markers](https://docs.blender.org/manual/en/latest/animation/markers.html), allowing direct use of the [NLA](https://docs.blender.org/manual/en/latest/editors/nla/index.html) when creating sequences.
 * Manual re-ordering of material slots when exporting multiple mesh objects.
 
 # Installation
 1. Download the zip file for the latest version from the [releases](https://github.com/DarklightGames/io_export_psk_psa/releases) page.
-2. Open Blender 2.80 or later.
+2. Open Blender 2.90 or later.
 3. Navigate to the Blender Preferences (Edit > Preferences).
 4. Select the "Add-ons" tab.
 5. Click the "Install..." button.
@@ -26,7 +26,7 @@ This Blender 2.80+ add-on allows you to import and export meshes and animations 
 
 ## Importing a PSK/PSKX
 1. Navigate to File > Import > Unreal PSK (.psk/.pskx)
-2. Select the PSK file you want to import and click "Import"
+2. Select the PSK file you want to import and click "Import".
 
 ## Exporting a PSA
 1. Select the armature objects you wish to export.
