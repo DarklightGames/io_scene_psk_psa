@@ -25,6 +25,7 @@ class PskImportOptions(object):
         self.should_import_vertex_normals = True
         self.should_import_extra_uvs = True
         self.should_import_skeleton = True
+        self.should_import_shape_keys = True
         self.bone_length = 1.0
 
 
@@ -232,18 +233,19 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
             vertex_groups[weight.bone_index].add((weight.point_index,), weight.weight, 'ADD')
 
         # MORPHS (SHAPE KEYS)
-        morph_data_iterator = iter(psk.morph_data)
-        
-        if psk.has_morph_data:
-            mesh_object.shape_key_add(name='MORPH_BASE', from_mix=False)
+        if options.should_import_shape_keys:
+            morph_data_iterator = iter(psk.morph_data)
 
-        for morph_info in psk.morph_infos:
-            shape_key = mesh_object.shape_key_add(name=morph_info.name.decode('windows-1252'), from_mix=False)
+            if psk.has_morph_data:
+                mesh_object.shape_key_add(name='MORPH_BASE', from_mix=False)
 
-            for _ in range(morph_info.vertex_count):
-                morph_data = next(morph_data_iterator)
-                x, y, z = morph_data.position_delta
-                shape_key.data[morph_data.point_index].co += Vector((x, -y, z))
+            for morph_info in psk.morph_infos:
+                shape_key = mesh_object.shape_key_add(name=morph_info.name.decode('windows-1252'), from_mix=False)
+
+                for _ in range(morph_info.vertex_count):
+                    morph_data = next(morph_data_iterator)
+                    x, y, z = morph_data.position_delta
+                    shape_key.data[morph_data.point_index].co += Vector((x, -y, z))
 
         context.scene.collection.objects.link(mesh_object)
 
@@ -285,13 +287,13 @@ class PskImportPropertyGroup(PropertyGroup):
         default=True,
         name='Vertex Normals',
         options=empty_set,
-        description='Import vertex normals from PSKX files, if available'
+        description='Import vertex normals, if available'
     )
     should_import_extra_uvs: BoolProperty(
         default=True,
         name='Extra UVs',
         options=empty_set,
-        description='Import extra UV maps from PSKX files, if available'
+        description='Import extra UV maps, if available'
     )
     should_import_mesh: BoolProperty(
         default=True,
@@ -313,6 +315,12 @@ class PskImportPropertyGroup(PropertyGroup):
         name='Bone Length',
         options=empty_set,
         description='Length of the bones'
+    )
+    should_import_shape_keys: BoolProperty(
+        default=True,
+        name='Import Shape Keys',
+        options=empty_set,
+        description='Import shape keys, if available'
     )
 
 
@@ -342,6 +350,7 @@ class PskImportOperator(Operator, ImportHelper):
         options.should_import_vertex_normals = pg.should_import_vertex_normals
         options.vertex_color_space = pg.vertex_color_space
         options.should_import_skeleton = pg.should_import_skeleton
+        options.should_import_shape_keys = pg.should_import_shape_keys
         options.bone_length = pg.bone_length
 
         result = import_psk(psk, context, options)
@@ -374,6 +383,7 @@ class PskImportOperator(Operator, ImportHelper):
         row.use_property_decorate = False
         if pg.should_import_skeleton:
             row.prop(pg, 'bone_length')
+        layout.prop(pg, 'should_import_shape_keys')
 
 
 classes = (
