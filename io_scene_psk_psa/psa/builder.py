@@ -23,12 +23,12 @@ class PsaBuildOptions:
     def __init__(self):
         self.animation_data: Optional[AnimData] = None
         self.sequences: List[PsaExportSequence] = []
-        self.bone_filter_mode = 'ALL'
+        self.bone_filter_mode: str = 'ALL'
         self.bone_group_indices: List[int] = []
-        self.should_ignore_bone_name_restrictions = False
-        self.sequence_name_prefix = ''
-        self.sequence_name_suffix = ''
-        self.root_motion = False
+        self.should_ignore_bone_name_restrictions: bool = False
+        self.sequence_name_prefix: str = ''
+        self.sequence_name_suffix: str = ''
+        self.root_motion: bool = False
 
 
 def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
@@ -145,10 +145,11 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
                     pose_bone_matrix = pose_bone_parent_matrix.inverted() @ pose_bone_matrix
                 else:
                     if options.root_motion:
-                        # Export root motion
+                        # Get the bone's pose matrix, taking the armature object's world matrix into account.
                         pose_bone_matrix = armature_object.matrix_world @ pose_bone.matrix
                     else:
-                        pose_bone_matrix = pose_bone.matrix
+                        # Use the bind pose matrix for the root bone.
+                        pose_bone_matrix = armature_data.bones[pose_bone.name].matrix_local
 
                 location = pose_bone_matrix.to_translation()
                 rotation = pose_bone_matrix.to_quaternion().normalized()

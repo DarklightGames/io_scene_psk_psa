@@ -63,7 +63,9 @@ class PsaExportPropertyGroup(PropertyGroup):
         name='Root Motion',
         options=empty_set,
         default=False,
-        description='The root bone will be transformed as it appears in the scene',
+        description='When enabled, the root bone will be transformed as it appears in the scene.\n\n'
+                    'You might want to disable this if you are exporting an animation for an armature that is '
+                    'attached to another object, such as a weapon or a shield',
     )
     should_override_animation_data: BoolProperty(
         name='Override Animation Data',
