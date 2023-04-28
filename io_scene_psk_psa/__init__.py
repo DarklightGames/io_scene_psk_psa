@@ -1,9 +1,8 @@
 bl_info = {
     "name": "PSK/PSA Importer/Exporter",
     "author": "Colin Basnett, Yurii Ti",
-    "version": (4, 3, 0),
-    "blender": (2, 90, 0),
-    # "location": "File > Export > PSK Export (.psk)",
+    "version": (5, 0, 0),
+    "blender": (3, 4, 0),
     "description": "PSK/PSA Import/Export (.psk/.psa)",
     "warning": "",
     "doc_url": "https://github.com/DarklightGames/io_scene_psk_psa",
@@ -44,9 +43,34 @@ else:
     from .psa import importer as psa_importer
 
 import bpy
-from bpy.props import PointerProperty
+from bpy.props import CollectionProperty, PointerProperty, StringProperty, IntProperty
+from bpy.types import AddonPreferences, PropertyGroup
 
-classes = (psx_types.classes +
+
+class MaterialPathPropertyGroup(PropertyGroup):
+    path: StringProperty(name='Path', subtype='DIR_PATH')
+
+
+class PskPsaAddonPreferences(AddonPreferences):
+    bl_idname = __name__
+
+    material_path_list: CollectionProperty(type=MaterialPathPropertyGroup)
+    material_path_index: IntProperty()
+
+    def draw_filter(self, context, layout):
+        pass
+
+    def draw(self, context: bpy.types.Context):
+        self.layout.label(text='Material Paths')
+        row = self.layout.row()
+        row.template_list('PSX_UL_MaterialPathList', '', self, 'material_path_list', self, 'material_path_index')
+        column = row.column()
+        column.operator(psx_types.PSX_OT_MaterialPathAdd.bl_idname, icon='ADD', text='')
+        column.operator(psx_types.PSX_OT_MaterialPathRemove.bl_idname, icon='REMOVE', text='')
+
+
+classes = ((MaterialPathPropertyGroup, PskPsaAddonPreferences) +
+           psx_types.classes +
            psk_importer.classes +
            psk_exporter.classes +
            psa_exporter.classes +
@@ -65,26 +89,30 @@ def psa_export_menu_func(self, context):
     self.layout.operator(psa_exporter.PsaExportOperator.bl_idname, text='Unreal PSA (.psa)')
 
 
+def psa_import_menu_func(self, context):
+    self.layout.operator(psa_importer.PsaImportOperator.bl_idname, text='Unreal PSA (.psa)')
+
+
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
     bpy.types.TOPBAR_MT_file_export.append(psk_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.append(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.append(psa_export_menu_func)
+    bpy.types.TOPBAR_MT_file_import.append(psa_import_menu_func)
     bpy.types.Scene.psa_import = PointerProperty(type=psa_importer.PsaImportPropertyGroup)
-    bpy.types.Scene.psk_import = PointerProperty(type=psk_importer.PskImportPropertyGroup)
     bpy.types.Scene.psa_export = PointerProperty(type=psa_exporter.PsaExportPropertyGroup)
     bpy.types.Scene.psk_export = PointerProperty(type=psk_exporter.PskExportPropertyGroup)
 
 
 def unregister():
     del bpy.types.Scene.psa_import
-    del bpy.types.Scene.psk_import
     del bpy.types.Scene.psa_export
     del bpy.types.Scene.psk_export
     bpy.types.TOPBAR_MT_file_export.remove(psk_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.remove(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.remove(psa_export_menu_func)
+    bpy.types.TOPBAR_MT_file_import.remove(psa_import_menu_func)
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
 

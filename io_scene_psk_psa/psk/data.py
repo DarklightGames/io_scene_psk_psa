@@ -106,9 +106,13 @@ class Psk(object):
         return len(self.vertex_normals) > 0
 
     @property
+    def has_material_references(self):
+        return len(self.material_references) > 0
+
+    @property
     def has_morph_data(self):
         return len(self.morph_infos) > 0
-
+    
     def __init__(self):
         self.points: List[Vector3] = []
         self.wedges: List[Psk.Wedge] = []
@@ -121,3 +125,4 @@ class Psk(object):
         self.vertex_normals: List[Vector3] = []
         self.morph_infos: List[Psk.MorphInfo] = []
         self.morph_data: List[Psk.MorphData] = []
+        self.material_references: List[str] = []
