@@ -500,6 +500,8 @@ class PsaExportOperator(Operator, ExportHelper):
                 export_sequence.nla_state.frame_start = action.frame_start
                 export_sequence.nla_state.frame_end = action.frame_end
                 export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [action.action])
+                export_sequence.compression_ratio = action.action.psa_export.compression_ratio
+                export_sequence.key_quota = action.action.psa_export.key_quota
                 export_sequences.append(export_sequence)
         elif pg.sequence_source == 'TIMELINE_MARKERS':
             for marker in pg.marker_list:

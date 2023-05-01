@@ -1,6 +1,6 @@
 from typing import Optional
 
-from bpy.types import Armature, Bone, Action
+from bpy.types import Armature, Bone, Action, PoseBone
 
 from .data import *
 from ..helpers import *
@@ -16,6 +16,8 @@ class PsaExportSequence:
     def __init__(self):
         self.name: str = ''
         self.nla_state: PsaExportSequence.NlaState = PsaExportSequence.NlaState()
+        self.compression_ratio: float = 1.0
+        self.key_quota: int = 0
         self.fps: float = 30.0
 
 
@@ -29,6 +31,28 @@ class PsaBuildOptions:
         self.sequence_name_prefix: str = ''
         self.sequence_name_suffix: str = ''
         self.root_motion: bool = False
+
+
+def get_pose_bone_location_and_rotation(pose_bone: PoseBone, armature_object: Object, options: PsaBuildOptions):
+    if pose_bone.parent is not None:
+        pose_bone_matrix = pose_bone.matrix
+        pose_bone_parent_matrix = pose_bone.parent.matrix
+        pose_bone_matrix = pose_bone_parent_matrix.inverted() @ pose_bone_matrix
+    else:
+        if options.root_motion:
+            # Get the bone's pose matrix, taking the armature object's world matrix into account.
+            pose_bone_matrix = armature_object.matrix_world @ pose_bone.matrix
+        else:
+            # Use the bind pose matrix for the root bone.
+            pose_bone_matrix = pose_bone.matrix
+
+    location = pose_bone_matrix.to_translation()
+    rotation = pose_bone_matrix.to_quaternion().normalized()
+
+    if pose_bone.parent is not None:
+        rotation.conjugate()
+
+    return location, rotation
 
 
 def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
@@ -121,42 +145,40 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
 
         frame_start = export_sequence.nla_state.frame_start
         frame_end = export_sequence.nla_state.frame_end
-        frame_count = abs(frame_end - frame_start) + 1
-        frame_step = 1 if frame_start < frame_end else -1
+
+        # Calculate the frame step based on the compression factor.
+        frame_extents = abs(frame_end - frame_start)
+        frame_count_raw = frame_extents + 1
+        frame_count = max(export_sequence.key_quota, int(frame_count_raw * export_sequence.compression_ratio))
+
+        try:
+            frame_step = frame_extents / (frame_count - 1)
+        except ZeroDivisionError:
+            frame_step = 0.0
+
+        sequence_duration = frame_count_raw / export_sequence.fps
+
+        # If this is a reverse sequence, we need to reverse the frame step.
+        if frame_start > frame_end:
+            frame_step = -frame_step
 
         psa_sequence = Psa.Sequence()
         psa_sequence.name = bytes(export_sequence.name, encoding='windows-1252')
         psa_sequence.frame_count = frame_count
         psa_sequence.frame_start_index = frame_start_index
-        psa_sequence.fps = export_sequence.fps
+        psa_sequence.fps = frame_count / sequence_duration
+        psa_sequence.bone_count = len(pose_bones)
+        psa_sequence.track_time = frame_count
 
-        frame = frame_start
+        frame = float(frame_start)
+
         for _ in range(frame_count):
-            context.scene.frame_set(frame)
-            
-            frame += frame_step
+            context.scene.frame_set(frame=int(frame), subframe=frame % 1.0)
 
             for pose_bone in pose_bones:
+                location, rotation = get_pose_bone_location_and_rotation(pose_bone, armature_object, options)
+
                 key = Psa.Key()
-
-                if pose_bone.parent is not None:
-                    pose_bone_matrix = pose_bone.matrix
-                    pose_bone_parent_matrix = pose_bone.parent.matrix
-                    pose_bone_matrix = pose_bone_parent_matrix.inverted() @ pose_bone_matrix
-                else:
-                    if options.root_motion:
-                        # Get the bone's pose matrix, taking the armature object's world matrix into account.
-                        pose_bone_matrix = armature_object.matrix_world @ pose_bone.matrix
-                    else:
-                        # Use the bind pose matrix for the root bone.
-                        pose_bone_matrix = armature_data.bones[pose_bone.name].matrix_local
-
-                location = pose_bone_matrix.to_translation()
-                rotation = pose_bone_matrix.to_quaternion().normalized()
-
-                if pose_bone.parent is not None:
-                    rotation.conjugate()
-
                 key.location.x = location.x
                 key.location.y = location.y
                 key.location.z = location.z
@@ -165,11 +187,9 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
                 key.rotation.z = rotation.z
                 key.rotation.w = rotation.w
                 key.time = 1.0 / psa_sequence.fps
-
                 psa.keys.append(key)
 
-            psa_sequence.bone_count = len(pose_bones)
-            psa_sequence.track_time = frame_count
+            frame += frame_step
 
         frame_start_index += frame_count
 

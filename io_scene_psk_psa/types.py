@@ -1,6 +1,6 @@
 import bpy.props
-from bpy.props import StringProperty, IntProperty, BoolProperty
-from bpy.types import PropertyGroup, UIList, UILayout, Context, AnyType, Operator
+from bpy.props import StringProperty, IntProperty, BoolProperty, FloatProperty
+from bpy.types import PropertyGroup, UIList, UILayout, Context, AnyType, Operator, Panel
 
 
 class PSX_UL_BoneGroupList(UIList):
@@ -69,10 +69,36 @@ class BoneGroupListItem(PropertyGroup):
     is_selected: BoolProperty(default=False)
 
 
+class PSX_PG_ActionExportPropertyGroup(PropertyGroup):
+    compression_ratio: FloatProperty(name='Compression Ratio', default=1.0, min=0.0, max=1.0, subtype='FACTOR', description='The ratio of frames to be exported.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames')
+    key_quota: IntProperty(name='Key Quota', default=0, min=1, description='The minimum number of frames to be exported')
+
+
+class PSX_PT_ActionPropertyPanel(Panel):
+    bl_idname = 'PSX_PT_ActionPropertyPanel'
+    bl_label = 'PSA Export'
+    bl_space_type = 'DOPESHEET_EDITOR'
+    bl_region_type = 'UI'
+    bl_context = 'action'
+    bl_category = 'Action'
+
+    @classmethod
+    def poll(cls, context: 'Context'):
+        return context.active_object and context.active_object.type == 'ARMATURE' and context.active_action is not None
+
+    def draw(self, context: 'Context'):
+        action = context.active_action
+        layout = self.layout
+        layout.prop(action.psa_export, 'compression_ratio')
+        layout.prop(action.psa_export, 'key_quota')
+
+
 classes = (
+    PSX_PG_ActionExportPropertyGroup,
     BoneGroupListItem,
     PSX_UL_BoneGroupList,
     PSX_UL_MaterialPathList,
     PSX_OT_MaterialPathAdd,
-    PSX_OT_MaterialPathRemove
+    PSX_OT_MaterialPathRemove,
+    PSX_PT_ActionPropertyPanel
 )

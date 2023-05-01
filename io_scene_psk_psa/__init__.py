@@ -103,12 +103,14 @@ def register():
     bpy.types.Scene.psa_import = PointerProperty(type=psa_importer.PsaImportPropertyGroup)
     bpy.types.Scene.psa_export = PointerProperty(type=psa_exporter.PsaExportPropertyGroup)
     bpy.types.Scene.psk_export = PointerProperty(type=psk_exporter.PskExportPropertyGroup)
+    bpy.types.Action.psa_export = PointerProperty(type=psx_types.PSX_PG_ActionExportPropertyGroup)
 
 
 def unregister():
     del bpy.types.Scene.psa_import
     del bpy.types.Scene.psa_export
     del bpy.types.Scene.psk_export
+    del bpy.types.Action.psa_export
     bpy.types.TOPBAR_MT_file_export.remove(psk_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.remove(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.remove(psa_export_menu_func)
