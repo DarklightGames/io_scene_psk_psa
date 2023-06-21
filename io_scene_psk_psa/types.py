@@ -1,6 +1,5 @@
-import bpy.props
 from bpy.props import StringProperty, IntProperty, BoolProperty, FloatProperty
-from bpy.types import PropertyGroup, UIList, UILayout, Context, AnyType, Operator, Panel
+from bpy.types import PropertyGroup, UIList, UILayout, Context, AnyType, Panel
 
 
 class PSX_UL_BoneGroupList(UIList):
@@ -12,56 +11,6 @@ class PSX_UL_BoneGroupList(UIList):
         row.label(text=str(getattr(item, 'count')), icon='BONE_DATA')
 
 
-class PSX_OT_MaterialPathAdd(Operator):
-    bl_idname = 'psx.material_paths_add'
-    bl_label = 'Add Material Path'
-    bl_options = {'INTERNAL'}
-
-    directory: bpy.props.StringProperty(subtype='DIR_PATH', options={'HIDDEN'})
-    filter_folder: bpy.props.BoolProperty(default=True, options={'HIDDEN'})
-
-    def invoke(self, context: 'Context', event: 'Event'):
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
-
-    def execute(self, context: 'Context'):
-        m = context.preferences.addons[__package__].preferences.material_path_list.add()
-        m.path = self.directory
-        return {'FINISHED'}
-
-
-class PSX_OT_MaterialPathRemove(Operator):
-    bl_idname = 'psx.material_paths_remove'
-    bl_label = 'Remove Material Path'
-    bl_options = {'INTERNAL'}
-
-    @classmethod
-    def poll(cls, context: 'Context'):
-        preferences = context.preferences.addons[__package__].preferences
-        return preferences.material_path_index >= 0
-
-    def execute(self, context: 'Context'):
-        preferences = context.preferences.addons[__package__].preferences
-        preferences.material_path_list.remove(preferences.material_path_index)
-        return {'FINISHED'}
-
-
-class PSX_UL_MaterialPathList(UIList):
-
-    def draw_item(self,
-                  context: 'Context',
-                  layout: 'UILayout',
-                  data: 'AnyType',
-                  item: 'AnyType',
-                  icon: int,
-                  active_data: 'AnyType',
-                  active_property: str,
-                  index: int = 0,
-                  flt_flag: int = 0):
-        row = layout.row()
-        row.label(text=getattr(item, 'path'))
-
-
 class BoneGroupListItem(PropertyGroup):
     name: StringProperty()
     index: IntProperty()
@@ -70,7 +19,7 @@ class BoneGroupListItem(PropertyGroup):
 
 
 class PSX_PG_ActionExportPropertyGroup(PropertyGroup):
-    compression_ratio: FloatProperty(name='Compression Ratio', default=1.0, min=0.0, max=1.0, subtype='FACTOR', description='The ratio of frames to be exported.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames')
+    compression_ratio: FloatProperty(name='Compression Ratio', default=1.0, min=0.0, max=1.0, subtype='FACTOR', description='The key sampling ratio of the exported sequence.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames')
     key_quota: IntProperty(name='Key Quota', default=0, min=1, description='The minimum number of frames to be exported')
 
 

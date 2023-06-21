@@ -43,38 +43,13 @@ else:
     from .psa import importer as psa_importer
 
 import bpy
-from bpy.props import CollectionProperty, PointerProperty, StringProperty, IntProperty
-from bpy.types import AddonPreferences, PropertyGroup
+from bpy.props import PointerProperty
 
-
-class MaterialPathPropertyGroup(PropertyGroup):
-    path: StringProperty(name='Path', subtype='DIR_PATH')
-
-
-class PskPsaAddonPreferences(AddonPreferences):
-    bl_idname = __name__
-
-    material_path_list: CollectionProperty(type=MaterialPathPropertyGroup)
-    material_path_index: IntProperty()
-
-    def draw_filter(self, context, layout):
-        pass
-
-    def draw(self, context: bpy.types.Context):
-        self.layout.label(text='Material Paths')
-        row = self.layout.row()
-        row.template_list('PSX_UL_MaterialPathList', '', self, 'material_path_list', self, 'material_path_index')
-        column = row.column()
-        column.operator(psx_types.PSX_OT_MaterialPathAdd.bl_idname, icon='ADD', text='')
-        column.operator(psx_types.PSX_OT_MaterialPathRemove.bl_idname, icon='REMOVE', text='')
-
-
-classes = ((MaterialPathPropertyGroup, PskPsaAddonPreferences) +
-           psx_types.classes +
-           psk_importer.classes +
-           psk_exporter.classes +
-           psa_exporter.classes +
-           psa_importer.classes)
+classes = psx_types.classes +\
+           psk_importer.classes +\
+           psk_exporter.classes +\
+           psa_exporter.classes +\
+           psa_importer.classes
 
 
 def psk_export_menu_func(self, context):
