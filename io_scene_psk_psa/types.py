@@ -46,8 +46,5 @@ classes = (
     PSX_PG_ActionExportPropertyGroup,
     BoneGroupListItem,
     PSX_UL_BoneGroupList,
-    PSX_UL_MaterialPathList,
-    PSX_OT_MaterialPathAdd,
-    PSX_OT_MaterialPathRemove,
     PSX_PT_ActionPropertyPanel
 )
