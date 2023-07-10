@@ -3,7 +3,7 @@
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/L4L3853VR)
 
-This Blender add-on allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats) used in many version of the Unreal Engine.
+This Blender add-on allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats) used in many versions of the Unreal Engine.
 
 > **NOTE**: This addon requires Blender 3.4+. If this is not available to you, install version [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0), as it has a minimum Blender version of 2.9, but is no longer receiving new features.
 
