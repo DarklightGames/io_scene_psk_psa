@@ -1,5 +1,3 @@
-import typing
-
 import bmesh
 import bpy
 from bpy.types import Armature
@@ -52,7 +50,8 @@ def get_psk_input_objects(context) -> PskInputObjects:
         armature_modifier_objects.add(modifiers[0].object)
 
     if len(armature_modifier_objects) > 1:
-        raise RuntimeError('All selected meshes must have the same armature modifier')
+        armature_modifier_names = [x.name for x in armature_modifier_objects]
+        raise RuntimeError(f'All selected meshes must have the same armature modifier, encountered {len(armature_modifier_names)} ({", ".join(armature_modifier_names)})')
     elif len(armature_modifier_objects) == 1:
         input_objects.armature_object = list(armature_modifier_objects)[0]
 
