@@ -2,7 +2,6 @@ import fnmatch
 import os
 import re
 import typing
-from collections import Counter
 from typing import List, Optional
 
 import bpy
@@ -64,6 +63,23 @@ class PsaImportResult:
         self.warnings: List[str] = []
 
 
+def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_names: List[str], bone_mapping_mode: str = 'EXACT') -> Optional[int]:
+    """
+    @param psa_bone_name: The name of the PSA bone.
+    @param armature_bone_names: The names of the bones in the armature.
+    @param bone_mapping_mode: One of 'EXACT' or 'CASE_INSENSITIVE'.
+    @return: The index of the armature bone that corresponds to the given PSA bone, or None if no such bone exists.
+    """
+    for armature_bone_index, armature_bone_name in enumerate(armature_bone_names):
+        if bone_mapping_mode == 'CASE_INSENSITIVE':
+            if armature_bone_name.lower() == psa_bone_name.lower():
+                return armature_bone_index
+        else:
+            if armature_bone_name == psa_bone_name:
+                return armature_bone_index
+    return None
+
+
 def import_psa(psa_reader: PsaReader, armature_object: bpy.types.Object, options: PsaImportOptions) -> PsaImportResult:
     result = PsaImportResult()
     sequences = map(lambda x: psa_reader.sequences[x], options.sequence_names)
@@ -71,37 +87,33 @@ def import_psa(psa_reader: PsaReader, armature_object: bpy.types.Object, options
 
     # Create an index mapping from bones in the PSA to bones in the target armature.
     psa_to_armature_bone_indices = {}
+    armature_to_psa_bone_indices = {}
     armature_bone_names = [x.name for x in armature_data.bones]
     psa_bone_names = []
+    duplicate_mappings = []
+
     for psa_bone_index, psa_bone in enumerate(psa_reader.bones):
         psa_bone_name: str = psa_bone.name.decode('windows-1252')
-        try:
-            psa_to_armature_bone_indices[psa_bone_index] = armature_bone_names.index(psa_bone_name)
-        except ValueError:
-            # PSA bone could not be mapped directly to an armature bone by name.
-            # Attempt to create a bone mapping by ignoring the case of the names.
-            if options.bone_mapping_mode == 'CASE_INSENSITIVE':
-                for armature_bone_index, armature_bone_name in enumerate(armature_bone_names):
-                    if armature_bone_name.upper() == psa_bone_name.upper():
-                        psa_to_armature_bone_indices[psa_bone_index] = armature_bone_index
-                        psa_bone_name = armature_bone_name
-                        break
-        psa_bone_names.append(psa_bone_name)
+        armature_bone_index = _get_armature_bone_index_for_psa_bone(psa_bone_name, armature_bone_names, options.bone_mapping_mode)
+        if armature_bone_index is not None:
+            # Ensure that no other PSA bone has been mapped to this armature bone yet.
+            if armature_bone_index not in armature_to_psa_bone_indices:
+                psa_to_armature_bone_indices[psa_bone_index] = armature_bone_names.index(psa_bone_name)
+                armature_to_psa_bone_indices[armature_bone_index] = psa_bone_index
+            else:
+                # This armature bone has already been mapped to a PSA bone.
+                duplicate_mappings.append((psa_bone_index, armature_bone_index, armature_to_psa_bone_indices[armature_bone_index]))
+            psa_bone_names.append(armature_bone_names[armature_bone_index])
+        else:
+            psa_bone_names.append(psa_bone_name)
 
-    # Remove ambiguous bone mappings (where multiple PSA bones correspond to the same armature bone).
-    armature_bone_index_counts = Counter(psa_to_armature_bone_indices.values())
-    for armature_bone_index, count in armature_bone_index_counts.items():
-        if count > 1:
-            psa_bone_indices = []
-            for psa_bone_index, mapped_bone_index in psa_to_armature_bone_indices:
-                if mapped_bone_index == armature_bone_index:
-                    psa_bone_indices.append(psa_bone_index)
-            ambiguous_psa_bone_names = list(sorted([psa_bone_names[x] for x in psa_bone_indices]))
-            result.warnings.append(
-                f'Ambiguous mapping for bone {armature_bone_names[armature_bone_index]}!\n'
-                f'The following PSA bones all map to the same armature bone: {ambiguous_psa_bone_names}\n'
-                f'These bones will be ignored.'
-            )
+    # Warn about duplicate bone mappings.
+    if len(duplicate_mappings) > 0:
+        for (psa_bone_index, armature_bone_index, mapped_psa_bone_index) in duplicate_mappings:
+            psa_bone_name = psa_bone_names[psa_bone_index]
+            armature_bone_name = armature_bone_names[armature_bone_index]
+            mapped_psa_bone_name = psa_bone_names[mapped_psa_bone_index]
+            result.warnings.append(f'PSA bone {psa_bone_index} ({psa_bone_name}) could not be mapped to armature bone {armature_bone_index} ({armature_bone_name}) because the armature bone already mapped to PSA bone {mapped_psa_bone_index} ({mapped_psa_bone_name})')
 
     # Report if there are missing bones in the target armature.
     missing_bone_names = set(psa_bone_names).difference(set(armature_bone_names))
