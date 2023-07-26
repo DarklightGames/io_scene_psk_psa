@@ -113,7 +113,7 @@ def import_psa(psa_reader: PsaReader, armature_object: bpy.types.Object, options
             psa_bone_name = psa_bone_names[psa_bone_index]
             armature_bone_name = armature_bone_names[armature_bone_index]
             mapped_psa_bone_name = psa_bone_names[mapped_psa_bone_index]
-            result.warnings.append(f'PSA bone {psa_bone_index} ({psa_bone_name}) could not be mapped to armature bone {armature_bone_index} ({armature_bone_name}) because the armature bone already mapped to PSA bone {mapped_psa_bone_index} ({mapped_psa_bone_name})')
+            result.warnings.append(f'PSA bone {psa_bone_index} ({psa_bone_name}) could not be mapped to armature bone {armature_bone_index} ({armature_bone_name}) because the armature bone is already mapped to PSA bone {mapped_psa_bone_index} ({mapped_psa_bone_name})')
 
     # Report if there are missing bones in the target armature.
     missing_bone_names = set(psa_bone_names).difference(set(armature_bone_names))
