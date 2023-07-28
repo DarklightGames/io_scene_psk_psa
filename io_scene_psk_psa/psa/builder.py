@@ -98,7 +98,7 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
             psa_bone.parent_index = parent_index
             psa.bones[parent_index].children_count += 1
         except ValueError:
-            psa_bone.parent_index = -1
+            psa_bone.parent_index = 0
 
         if bone.parent is not None:
             rotation = bone.matrix.to_quaternion().conjugated()
