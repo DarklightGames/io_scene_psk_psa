@@ -1,0 +1,53 @@
+from typing import cast
+
+from bpy.types import UIList
+
+from .properties import PSA_PG_export_action_list_item, filter_sequences
+
+
+class PSA_UL_export_sequences(UIList):
+
+    def __init__(self):
+        super(PSA_UL_export_sequences, self).__init__()
+        # Show the filtering options by default.
+        self.use_filter_show = True
+
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        item = cast(PSA_PG_export_action_list_item, item)
+        is_pose_marker = hasattr(item, 'is_pose_marker') and item.is_pose_marker
+        layout.prop(item, 'is_selected', icon_only=True, text=item.name)
+        if hasattr(item, 'action') and item.action.asset_data is not None:
+            layout.label(text='', icon='ASSET_MANAGER')
+
+        row = layout.row(align=True)
+        row.alignment = 'RIGHT'
+        if item.frame_end < item.frame_start:
+            row.label(text='', icon='FRAME_PREV')
+        if is_pose_marker:
+            row.label(text=item.action.name, icon='PMARKER')
+
+    def draw_filter(self, context, layout):
+        pg = getattr(context.scene, 'psa_export')
+        row = layout.row()
+        subrow = row.row(align=True)
+        subrow.prop(pg, 'sequence_filter_name', text="")
+        subrow.prop(pg, 'sequence_use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
+        # subrow.prop(pg, 'sequence_use_filter_sort_reverse', text='', icon='SORT_ASC')
+
+        if pg.sequence_source == 'ACTIONS':
+            subrow = row.row(align=True)
+            subrow.prop(pg, 'sequence_filter_asset', icon_only=True, icon='ASSET_MANAGER')
+            subrow.prop(pg, 'sequence_filter_pose_marker', icon_only=True, icon='PMARKER')
+
+    def filter_items(self, context, data, prop):
+        pg = getattr(context.scene, 'psa_export')
+        actions = getattr(data, prop)
+        flt_flags = filter_sequences(pg, actions)
+        # flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(actions, 'name')
+        flt_neworder = list(range(len(actions)))
+        return flt_flags, flt_neworder
+
+
+classes = (
+    PSA_UL_export_sequences,
+)

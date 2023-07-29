@@ -6,7 +6,7 @@ from .data import *
 from ..helpers import *
 
 
-class PsaExportSequence:
+class PsaBuildSequence:
     class NlaState:
         def __init__(self):
             self.action: Optional[Action] = None
@@ -15,7 +15,7 @@ class PsaExportSequence:
 
     def __init__(self):
         self.name: str = ''
-        self.nla_state: PsaExportSequence.NlaState = PsaExportSequence.NlaState()
+        self.nla_state: PsaBuildSequence.NlaState = PsaBuildSequence.NlaState()
         self.compression_ratio: float = 1.0
         self.key_quota: int = 0
         self.fps: float = 30.0
@@ -24,7 +24,7 @@ class PsaExportSequence:
 class PsaBuildOptions:
     def __init__(self):
         self.animation_data: Optional[AnimData] = None
-        self.sequences: List[PsaExportSequence] = []
+        self.sequences: List[PsaBuildSequence] = []
         self.bone_filter_mode: str = 'ALL'
         self.bone_group_indices: List[int] = []
         self.should_ignore_bone_name_restrictions: bool = False
@@ -33,7 +33,7 @@ class PsaBuildOptions:
         self.root_motion: bool = False
 
 
-def get_pose_bone_location_and_rotation(pose_bone: PoseBone, armature_object: Object, options: PsaBuildOptions):
+def _get_pose_bone_location_and_rotation(pose_bone: PoseBone, armature_object: Object, options: PsaBuildOptions):
     if pose_bone.parent is not None:
         pose_bone_matrix = pose_bone.matrix
         pose_bone_parent_matrix = pose_bone.parent.matrix
@@ -138,7 +138,9 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
     # We actually alter the timeline frame and simply record the resultant pose bone matrices.
     frame_start_index = 0
 
-    for export_sequence in options.sequences:
+    context.window_manager.progress_begin(0, len(options.sequences))
+
+    for export_sequence_index, export_sequence in enumerate(options.sequences):
         # Link the action to the animation data and update view layer.
         options.animation_data.action = export_sequence.nla_state.action
         context.view_layer.update()
@@ -169,6 +171,7 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
         psa_sequence.fps = frame_count / sequence_duration
         psa_sequence.bone_count = len(pose_bones)
         psa_sequence.track_time = frame_count
+        psa_sequence.key_reduction = 1.0
 
         frame = float(frame_start)
 
@@ -176,7 +179,7 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
             context.scene.frame_set(frame=int(frame), subframe=frame % 1.0)
 
             for pose_bone in pose_bones:
-                location, rotation = get_pose_bone_location_and_rotation(pose_bone, armature_object, options)
+                location, rotation = _get_pose_bone_location_and_rotation(pose_bone, armature_object, options)
 
                 key = Psa.Key()
                 key.location.x = location.x
@@ -195,8 +198,12 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
 
         psa.sequences[export_sequence.name] = psa_sequence
 
+        context.window_manager.progress_update(export_sequence_index)
+
     # Restore the previous action & frame.
     options.animation_data.action = saved_action
     context.scene.frame_set(saved_frame_current)
+
+    context.window_manager.progress_end()
 
     return psa

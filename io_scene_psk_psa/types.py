@@ -2,7 +2,7 @@ from bpy.props import StringProperty, IntProperty, BoolProperty, FloatProperty
 from bpy.types import PropertyGroup, UIList, UILayout, Context, AnyType, Panel
 
 
-class PSX_UL_BoneGroupList(UIList):
+class PSX_UL_bone_group_list(UIList):
 
     def draw_item(self, context: Context, layout: UILayout, data: AnyType, item: AnyType, icon: int,
                   active_data: AnyType, active_property: str, index: int = 0, flt_flag: int = 0):
@@ -11,7 +11,7 @@ class PSX_UL_BoneGroupList(UIList):
         row.label(text=str(getattr(item, 'count')), icon='BONE_DATA')
 
 
-class BoneGroupListItem(PropertyGroup):
+class PSX_PG_bone_group_list_item(PropertyGroup):
     name: StringProperty()
     index: IntProperty()
     count: IntProperty()
@@ -44,7 +44,7 @@ class PSX_PT_ActionPropertyPanel(Panel):
 
 classes = (
     PSX_PG_ActionExportPropertyGroup,
-    BoneGroupListItem,
-    PSX_UL_BoneGroupList,
+    PSX_PG_bone_group_list_item,
+    PSX_UL_bone_group_list,
     PSX_PT_ActionPropertyPanel
 )

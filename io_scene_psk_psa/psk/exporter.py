@@ -7,7 +7,7 @@ from bpy_extras.io_utils import ExportHelper
 from .builder import build_psk, PskBuildOptions, get_psk_input_objects
 from .data import *
 from ..helpers import populate_bone_group_list
-from ..types import BoneGroupListItem
+from ..types import PSX_PG_bone_group_list_item
 
 MAX_WEDGE_COUNT = 65536
 MAX_POINT_COUNT = 4294967296
@@ -202,7 +202,7 @@ class PskExportOperator(Operator, ExportHelper):
         if pg.bone_filter_mode == 'BONE_GROUPS':
             row = layout.row()
             rows = max(3, min(len(pg.bone_group_list), 10))
-            row.template_list('PSX_UL_BoneGroupList', '', pg, 'bone_group_list', pg, 'bone_group_list_index', rows=rows)
+            row.template_list('PSX_UL_bone_group_list', '', pg, 'bone_group_list', pg, 'bone_group_list_index', rows=rows)
 
         layout.separator()
 
@@ -249,7 +249,7 @@ class PskExportPropertyGroup(PropertyGroup):
              'Only bones belonging to the selected bone groups and their ancestors will be exported.')
         )
     )
-    bone_group_list: CollectionProperty(type=BoneGroupListItem)
+    bone_group_list: CollectionProperty(type=PSX_PG_bone_group_list_item)
     bone_group_list_index: IntProperty(default=0)
     use_raw_mesh_data: BoolProperty(default=False, name='Raw Mesh Data', description='No modifiers will be evaluated as part of the exported mesh')
     material_list: CollectionProperty(type=MaterialListItem)
