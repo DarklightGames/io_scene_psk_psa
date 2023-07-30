@@ -38,6 +38,7 @@ class PSA_UL_export_sequences(UIList):
             subrow = row.row(align=True)
             subrow.prop(pg, 'sequence_filter_asset', icon_only=True, icon='ASSET_MANAGER')
             subrow.prop(pg, 'sequence_filter_pose_marker', icon_only=True, icon='PMARKER')
+            subrow.prop(pg, 'sequence_filter_reversed', text="", icon='FRAME_PREV')
 
     def filter_items(self, context, data, prop):
         pg = getattr(context.scene, 'psa_export')

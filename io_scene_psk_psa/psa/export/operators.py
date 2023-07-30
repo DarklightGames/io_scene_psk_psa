@@ -313,7 +313,7 @@ class PSA_OT_export(Operator, ExportHelper):
             layout.template_list('PSX_UL_bone_group_list', '', pg, 'bone_group_list', pg, 'bone_group_list_index',
                                  rows=rows)
 
-        layout.prop(pg, 'should_ignore_bone_name_restrictions')
+        layout.prop(pg, 'should_enforce_bone_name_restrictions')
 
         layout.separator()
 
@@ -397,7 +397,7 @@ class PSA_OT_export(Operator, ExportHelper):
         options.sequences = export_sequences
         options.bone_filter_mode = pg.bone_filter_mode
         options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
-        options.should_ignore_bone_name_restrictions = pg.should_ignore_bone_name_restrictions
+        options.should_ignore_bone_name_restrictions = pg.should_enforce_bone_name_restrictions
         options.sequence_name_prefix = pg.sequence_name_prefix
         options.sequence_name_suffix = pg.sequence_name_suffix
         options.root_motion = pg.root_motion

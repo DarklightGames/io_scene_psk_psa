@@ -1,62 +1,10 @@
-from typing import Type
-
-from bpy.props import BoolProperty, StringProperty, CollectionProperty, IntProperty, EnumProperty
-from bpy.types import Operator, PropertyGroup, UIList
+from bpy.props import StringProperty
+from bpy.types import Operator
 from bpy_extras.io_utils import ExportHelper
 
-from .builder import build_psk, PskBuildOptions, get_psk_input_objects
-from .data import *
-from ..helpers import populate_bone_group_list
-from ..types import PSX_PG_bone_group_list_item
-
-MAX_WEDGE_COUNT = 65536
-MAX_POINT_COUNT = 4294967296
-MAX_BONE_COUNT = 256
-MAX_MATERIAL_COUNT = 256
-
-
-def _write_section(fp, name: bytes, data_type: Type[Structure] = None, data: list = None):
-    section = Section()
-    section.name = name
-    if data_type is not None and data is not None:
-        section.data_size = sizeof(data_type)
-        section.data_count = len(data)
-    fp.write(section)
-    if data is not None:
-        for datum in data:
-            fp.write(datum)
-
-
-def export_psk(psk: Psk, path: str):
-    if len(psk.wedges) > MAX_WEDGE_COUNT:
-        raise RuntimeError(f'Number of wedges ({len(psk.wedges)}) exceeds limit of {MAX_WEDGE_COUNT}')
-    if len(psk.points) > MAX_POINT_COUNT:
-        raise RuntimeError(f'Numbers of vertices ({len(psk.points)}) exceeds limit of {MAX_POINT_COUNT}')
-    if len(psk.materials) > MAX_MATERIAL_COUNT:
-        raise RuntimeError(f'Number of materials ({len(psk.materials)}) exceeds limit of {MAX_MATERIAL_COUNT}')
-    if len(psk.bones) > MAX_BONE_COUNT:
-        raise RuntimeError(f'Number of bones ({len(psk.bones)}) exceeds limit of {MAX_BONE_COUNT}')
-    elif len(psk.bones) == 0:
-        raise RuntimeError(f'At least one bone must be marked for export')
-
-    with open(path, 'wb') as fp:
-        _write_section(fp, b'ACTRHEAD')
-        _write_section(fp, b'PNTS0000', Vector3, psk.points)
-
-        wedges = []
-        for index, w in enumerate(psk.wedges):
-            wedge = Psk.Wedge16()
-            wedge.material_index = w.material_index
-            wedge.u = w.u
-            wedge.v = w.v
-            wedge.point_index = w.point_index
-            wedges.append(wedge)
-
-        _write_section(fp, b'VTXW0000', Psk.Wedge16, wedges)
-        _write_section(fp, b'FACE0000', Psk.Face, psk.faces)
-        _write_section(fp, b'MATT0000', Psk.Material, psk.materials)
-        _write_section(fp, b'REFSKELT', Psk.Bone, psk.bones)
-        _write_section(fp, b'RAWWEIGHTS', Psk.Weight, psk.weights)
+from ..builder import build_psk, PskBuildOptions, get_psk_input_objects
+from ..writer import write_psk
+from ...helpers import populate_bone_group_list
 
 
 def is_bone_filter_mode_item_available(context, identifier):
@@ -67,21 +15,6 @@ def is_bone_filter_mode_item_available(context, identifier):
             return False
     # else if... you can set up other conditions if you add more options
     return True
-
-
-class PSK_UL_MaterialList(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        row = layout.row()
-        row.label(text=str(getattr(item, 'material_name')), icon='MATERIAL')
-
-
-class MaterialListItem(PropertyGroup):
-    material_name: StringProperty()
-    index: IntProperty()
-
-    @property
-    def name(self):
-        return self.material_name
 
 
 def populate_material_list(mesh_objects, material_list):
@@ -102,7 +35,7 @@ def populate_material_list(mesh_objects, material_list):
         m.index = index
 
 
-class PskMaterialListItemMoveUp(Operator):
+class PSK_OT_material_list_move_up(Operator):
     bl_idname = 'psk_export.material_list_item_move_up'
     bl_label = 'Move Up'
     bl_options = {'INTERNAL'}
@@ -120,7 +53,7 @@ class PskMaterialListItemMoveUp(Operator):
         return {"FINISHED"}
 
 
-class PskMaterialListItemMoveDown(Operator):
+class PSK_OT_material_list_move_down(Operator):
     bl_idname = 'psk_export.material_list_item_move_down'
     bl_label = 'Move Down'
     bl_options = {'INTERNAL'}
@@ -138,7 +71,7 @@ class PskMaterialListItemMoveDown(Operator):
         return {"FINISHED"}
 
 
-class PskExportOperator(Operator, ExportHelper):
+class PSK_OT_export(Operator, ExportHelper):
     bl_idname = 'export.psk'
     bl_label = 'Export'
     bl_options = {'INTERNAL', 'UNDO'}
@@ -187,12 +120,16 @@ class PskExportOperator(Operator, ExportHelper):
         layout = self.layout
         pg = getattr(context.scene, 'psk_export')
 
-        layout.prop(pg, 'use_raw_mesh_data')
+        # MESH
+        box = layout.box()
+        box.label(text='Mesh', icon='MESH_DATA')
+        box.prop(pg, 'use_raw_mesh_data')
 
         # BONES
-        layout.label(text='Bones', icon='BONE_DATA')
+        box = layout.box()
+        box.label(text='Bones', icon='BONE_DATA')
         bone_filter_mode_items = pg.bl_rna.properties['bone_filter_mode'].enum_items_static
-        row = layout.row(align=True)
+        row = box.row(align=True)
         for item in bone_filter_mode_items:
             identifier = item.identifier
             item_layout = row.row(align=True)
@@ -200,24 +137,21 @@ class PskExportOperator(Operator, ExportHelper):
             item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
 
         if pg.bone_filter_mode == 'BONE_GROUPS':
-            row = layout.row()
+            row = box.row()
             rows = max(3, min(len(pg.bone_group_list), 10))
             row.template_list('PSX_UL_bone_group_list', '', pg, 'bone_group_list', pg, 'bone_group_list_index', rows=rows)
 
-        layout.separator()
+        box.prop(pg, 'should_enforce_bone_name_restrictions')
 
         # MATERIALS
-        layout.label(text='Materials', icon='MATERIAL')
-        row = layout.row()
+        box = layout.box()
+        box.label(text='Materials', icon='MATERIAL')
+        row = box.row()
         rows = max(3, min(len(pg.bone_group_list), 10))
-        row.template_list('PSK_UL_MaterialList', '', pg, 'material_list', pg, 'material_list_index', rows=rows)
+        row.template_list('PSK_UL_materials', '', pg, 'material_list', pg, 'material_list_index', rows=rows)
         col = row.column(align=True)
-        col.operator(PskMaterialListItemMoveUp.bl_idname, text='', icon='TRIA_UP')
-        col.operator(PskMaterialListItemMoveDown.bl_idname, text='', icon='TRIA_DOWN')
-
-        layout.separator()
-
-        layout.prop(pg, 'should_ignore_bone_name_restrictions')
+        col.operator(PSK_OT_material_list_move_up.bl_idname, text='', icon='TRIA_UP')
+        col.operator(PSK_OT_material_list_move_down.bl_idname, text='', icon='TRIA_DOWN')
 
     def execute(self, context):
         pg = context.scene.psk_export
@@ -226,11 +160,11 @@ class PskExportOperator(Operator, ExportHelper):
         options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
         options.use_raw_mesh_data = pg.use_raw_mesh_data
         options.material_names = [m.material_name for m in pg.material_list]
-        options.should_ignore_bone_name_restrictions = pg.should_ignore_bone_name_restrictions
+        options.should_enforce_bone_name_restrictions = pg.should_enforce_bone_name_restrictions
 
         try:
             psk = build_psk(context, options)
-            export_psk(psk, self.filepath)
+            write_psk(psk, self.filepath)
             self.report({'INFO'}, f'PSK export successful')
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
@@ -238,35 +172,8 @@ class PskExportOperator(Operator, ExportHelper):
         return {'FINISHED'}
 
 
-class PskExportPropertyGroup(PropertyGroup):
-    bone_filter_mode: EnumProperty(
-        name='Bone Filter',
-        options=set(),
-        description='',
-        items=(
-            ('ALL', 'All', 'All bones will be exported.'),
-            ('BONE_GROUPS', 'Bone Groups',
-             'Only bones belonging to the selected bone groups and their ancestors will be exported.')
-        )
-    )
-    bone_group_list: CollectionProperty(type=PSX_PG_bone_group_list_item)
-    bone_group_list_index: IntProperty(default=0)
-    use_raw_mesh_data: BoolProperty(default=False, name='Raw Mesh Data', description='No modifiers will be evaluated as part of the exported mesh')
-    material_list: CollectionProperty(type=MaterialListItem)
-    material_list_index: IntProperty(default=0)
-    should_ignore_bone_name_restrictions: BoolProperty(
-        default=False,
-        name='Ignore Bone Name Restrictions',
-        description='Bone names restrictions will be ignored. Note that bone names without properly formatted names '
-                    'cannot be referenced in scripts'
-    )
-
-
 classes = (
-    MaterialListItem,
-    PSK_UL_MaterialList,
-    PskMaterialListItemMoveUp,
-    PskMaterialListItemMoveDown,
-    PskExportOperator,
-    PskExportPropertyGroup,
+    PSK_OT_material_list_move_up,
+    PSK_OT_material_list_move_down,
+    PSK_OT_export,
 )

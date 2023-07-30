@@ -18,13 +18,13 @@ class PSX_PG_bone_group_list_item(PropertyGroup):
     is_selected: BoolProperty(default=False)
 
 
-class PSX_PG_ActionExportPropertyGroup(PropertyGroup):
+class PSX_PG_action_export(PropertyGroup):
     compression_ratio: FloatProperty(name='Compression Ratio', default=1.0, min=0.0, max=1.0, subtype='FACTOR', description='The key sampling ratio of the exported sequence.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames')
     key_quota: IntProperty(name='Key Quota', default=0, min=1, description='The minimum number of frames to be exported')
 
 
-class PSX_PT_ActionPropertyPanel(Panel):
-    bl_idname = 'PSX_PT_ActionPropertyPanel'
+class PSX_PT_action(Panel):
+    bl_idname = 'PSX_PT_action'
     bl_label = 'PSA Export'
     bl_space_type = 'DOPESHEET_EDITOR'
     bl_region_type = 'UI'
@@ -43,8 +43,8 @@ class PSX_PT_ActionPropertyPanel(Panel):
 
 
 classes = (
-    PSX_PG_ActionExportPropertyGroup,
+    PSX_PG_action_export,
     PSX_PG_bone_group_list_item,
     PSX_UL_bone_group_list,
-    PSX_PT_ActionPropertyPanel
+    PSX_PT_action
 )

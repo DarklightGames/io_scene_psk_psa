@@ -116,10 +116,16 @@ class PSA_PG_export(PropertyGroup):
         options=empty_set,
         description='Show actions that belong to an asset library')
     sequence_filter_pose_marker: BoolProperty(
-        default=False,
+        default=True,
         name='Show pose markers',
         options=empty_set)
     sequence_use_filter_sort_reverse: BoolProperty(default=True, options=empty_set)
+    sequence_filter_reversed: BoolProperty(
+        default=True,
+        options=empty_set,
+        name='Show Reversed',
+        description='Show reversed sequences'
+    )
 
 
 def filter_sequences(pg: PSA_PG_export, sequences) -> List[int]:
@@ -145,6 +151,11 @@ def filter_sequences(pg: PSA_PG_export, sequences) -> List[int]:
     if not pg.sequence_filter_pose_marker:
         for i, sequence in enumerate(sequences):
             if hasattr(sequence, 'is_pose_marker') and sequence.is_pose_marker:
+                flt_flags[i] &= ~bitflag_filter_item
+
+    if not pg.sequence_filter_reversed:
+        for i, sequence in enumerate(sequences):
+            if sequence.frame_start > sequence.frame_end:
                 flt_flags[i] &= ~bitflag_filter_item
 
     return flt_flags

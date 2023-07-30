@@ -27,7 +27,7 @@ class PsaBuildOptions:
         self.sequences: List[PsaBuildSequence] = []
         self.bone_filter_mode: str = 'ALL'
         self.bone_group_indices: List[int] = []
-        self.should_ignore_bone_name_restrictions: bool = False
+        self.should_enforce_bone_name_restrictions: bool = False
         self.sequence_name_prefix: str = ''
         self.sequence_name_suffix: str = ''
         self.root_motion: bool = False

@@ -18,7 +18,7 @@ class PskBuildOptions(object):
         self.bone_group_indices: List[int] = []
         self.use_raw_mesh_data = True
         self.material_names: List[str] = []
-        self.should_ignore_bone_name_restrictions = False
+        self.should_enforce_bone_name_restrictions = False
 
 
 def get_psk_input_objects(context) -> PskInputObjects:
@@ -83,7 +83,7 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
         bones = [armature_data.bones[bone_name] for bone_name in bone_names]
 
         # Check that all bone names are valid.
-        if not options.should_ignore_bone_name_restrictions:
+        if options.should_enforce_bone_name_restrictions:
             check_bone_names(map(lambda x: x.name, bones))
 
         for bone in bones:
