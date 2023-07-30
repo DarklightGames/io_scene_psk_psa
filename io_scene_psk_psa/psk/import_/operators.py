@@ -5,6 +5,7 @@ from bpy.props import StringProperty, BoolProperty, EnumProperty, FloatProperty
 from bpy.types import Operator
 from bpy_extras.io_utils import ImportHelper
 
+from ..importer import PskImportOptions, import_psk
 from ..reader import read_psk
 
 empty_set = set()
