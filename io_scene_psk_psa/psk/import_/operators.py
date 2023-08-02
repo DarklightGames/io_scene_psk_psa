@@ -54,13 +54,12 @@ class PSK_OT_import(Operator, ImportHelper):
     )
     should_import_mesh: BoolProperty(
         default=True,
-        name='Import Mesh',
-        options=empty_set,
-        description='Import mesh'
+        name='Mesh',
+        options=empty_set
     )
     should_import_materials: BoolProperty(
         default=True,
-        name='Import Materials',
+        name='Materials',
         options=empty_set,
     )
     should_reuse_materials: BoolProperty(
@@ -71,9 +70,9 @@ class PSK_OT_import(Operator, ImportHelper):
     )
     should_import_skeleton: BoolProperty(
         default=True,
-        name='Import Skeleton',
+        name='Armature',
         options=empty_set,
-        description='Import skeleton'
+        description='Armature'
     )
     bone_length: FloatProperty(
         default=1.0,
@@ -81,8 +80,8 @@ class PSK_OT_import(Operator, ImportHelper):
         step=100,
         soft_min=1.0,
         name='Bone Length',
-        options=empty_set,
-        description='Length of the bones'
+        subtype='DISTANCE',
+        options=empty_set
     )
     should_import_shape_keys: BoolProperty(
         default=True,

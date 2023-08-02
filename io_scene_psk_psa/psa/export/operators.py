@@ -246,19 +246,24 @@ class PSA_OT_export(Operator, ExportHelper):
         layout = self.layout
         pg = getattr(context.scene, 'psa_export')
 
+        flow = layout.grid_flow()
+        flow.use_property_split = True
+        flow.use_property_decorate = False
+
         # FPS
-        layout.prop(pg, 'fps_source', text='FPS')
+        fps_row = flow.row(align=True)
+        fps_row.prop(pg, 'fps_source', text='FPS')
         if pg.fps_source == 'CUSTOM':
-            layout.prop(pg, 'fps_custom', text='Custom')
+            fps_row.prop(pg, 'fps_custom', text='')
 
         # SOURCE
-        layout.prop(pg, 'sequence_source', text='Source')
+        flow.prop(pg, 'sequence_source', text='Source')
 
         if pg.sequence_source == 'TIMELINE_MARKERS':
             # ANIMDATA SOURCE
-            layout.prop(pg, 'should_override_animation_data')
+            flow.prop(pg, 'should_override_animation_data')
             if pg.should_override_animation_data:
-                layout.prop(pg, 'animation_data_override', text='')
+                flow.prop(pg, 'animation_data_override', text='')
 
         # SELECT ALL/NONE
         row = layout.row(align=True)

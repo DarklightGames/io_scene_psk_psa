@@ -85,7 +85,7 @@ class PSA_PG_export(PropertyGroup):
         options=empty_set,
         description='',
         items=(
-            ('ALL', 'All', 'All bones will be exported.'),
+            ('ALL', 'All', 'All bones will be exported'),
             ('BONE_GROUPS', 'Bone Groups', 'Only bones belonging to the selected bone groups and their ancestors will '
                                            'be exported.'),
         )
@@ -112,18 +112,18 @@ class PSA_PG_export(PropertyGroup):
         description='Invert filtering (show hidden items, and vice versa)')
     sequence_filter_asset: BoolProperty(
         default=False,
-        name='Show assets',
+        name='Assets',
         options=empty_set,
         description='Show actions that belong to an asset library')
     sequence_filter_pose_marker: BoolProperty(
         default=True,
-        name='Show pose markers',
+        name='Pose Markers',
         options=empty_set)
     sequence_use_filter_sort_reverse: BoolProperty(default=True, options=empty_set)
     sequence_filter_reversed: BoolProperty(
         default=True,
         options=empty_set,
-        name='Show Reversed',
+        name='Reversed',
         description='Show reversed sequences'
     )
 

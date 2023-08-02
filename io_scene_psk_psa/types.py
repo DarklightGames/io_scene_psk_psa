@@ -7,7 +7,7 @@ class PSX_UL_bone_group_list(UIList):
     def draw_item(self, context: Context, layout: UILayout, data: AnyType, item: AnyType, icon: int,
                   active_data: AnyType, active_property: str, index: int = 0, flt_flag: int = 0):
         row = layout.row()
-        row.prop(item, 'is_selected', text=getattr(item, 'name'))
+        row.prop(item, 'is_selected', text=item.name, translate=item.name == 'Unassigned')
         row.label(text=str(getattr(item, 'count')), icon='BONE_DATA')
 
 
@@ -19,8 +19,8 @@ class PSX_PG_bone_group_list_item(PropertyGroup):
 
 
 class PSX_PG_action_export(PropertyGroup):
-    compression_ratio: FloatProperty(name='Compression Ratio', default=1.0, min=0.0, max=1.0, subtype='FACTOR', description='The key sampling ratio of the exported sequence.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames')
-    key_quota: IntProperty(name='Key Quota', default=0, min=1, description='The minimum number of frames to be exported')
+    compression_ratio: FloatProperty(name='Compression Ratio', default=1.0, min=0.0, max=1.0, subtype='FACTOR', description='The keyframe sampling ratio of the exported sequence.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames')
+    key_quota: IntProperty(name='Keyframe Quota', default=0, min=1, description='The minimum number of keyframes to be exported')
 
 
 class PSX_PT_action(Panel):

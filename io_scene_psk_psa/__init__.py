@@ -16,6 +16,7 @@ if 'bpy' in locals():
     importlib.reload(psx_data)
     importlib.reload(psx_helpers)
     importlib.reload(psx_types)
+    importlib.reload(psx_i18n)
 
     importlib.reload(psk_data)
     importlib.reload(psk_reader)
@@ -42,6 +43,7 @@ else:
     from . import data as psx_data
     from . import helpers as psx_helpers
     from . import types as psx_types
+    from . import i18n as psx_i18n
     from .psk import data as psk_data
     from .psk import reader as psk_reader
     from .psk import writer as psk_writer
@@ -99,6 +101,7 @@ def psa_import_menu_func(self, context):
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
+
     bpy.types.TOPBAR_MT_file_export.append(psk_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.append(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.append(psa_export_menu_func)
@@ -108,8 +111,11 @@ def register():
     bpy.types.Scene.psk_export = PointerProperty(type=psk_export_properties.PSK_PG_export)
     bpy.types.Action.psa_export = PointerProperty(type=psx_types.PSX_PG_action_export)
 
+    bpy.app.translations.register(__name__, psx_i18n.langs)
+
 
 def unregister():
+    bpy.app.translations.unregister(__name__)
     del bpy.types.Scene.psa_import
     del bpy.types.Scene.psa_export
     del bpy.types.Scene.psk_export

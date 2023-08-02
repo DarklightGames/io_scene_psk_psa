@@ -57,11 +57,11 @@ class PSA_PG_import(PropertyGroup):
                     'Recommended if you do not plan on editing the actions directly'
     )
     bone_mapping_mode: EnumProperty(
-        name='Bone Mapping',
+        name='Bone Name Mapping',
         options=empty_set,
-        description='The method by which bones from the incoming PSA file are mapped to the armature',
+        description='The method by which bones from the PSA file are mapped to the bones of the armature',
         items=(
-            ('EXACT', 'Exact', 'Bone names must match exactly.', 'EXACT', 0),
+            ('EXACT', 'Exact', 'Bone names must match exactly', 'EXACT', 0),
             ('CASE_INSENSITIVE', 'Case Insensitive', 'Bones names must match, ignoring case (e.g., the bone PSA bone '
              '\'root\' can be mapped to the armature bone \'Root\')', 'CASE_INSENSITIVE', 1),
         )
