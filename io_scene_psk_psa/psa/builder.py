@@ -85,9 +85,9 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
         raise RuntimeError('No bones available for export')
 
     # Check that all bone names are valid.
-    if not options.should_ignore_bone_name_restrictions:
+    if options.should_enforce_bone_name_restrictions:
         check_bone_names(map(lambda bone: bone.name, bones))
-
+        
     # Build list of PSA bones.
     for bone in bones:
         psa_bone = Psa.Bone()
