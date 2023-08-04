@@ -28,7 +28,7 @@ class PSK_OT_import(Operator, ImportHelper):
         default=True,
         options=empty_set,
         name='Vertex Colors',
-        description='Import vertex colors from PSKX files, if available'
+        description='Import vertex colors, if available'
     )
     vertex_color_space: EnumProperty(
         name='Vertex Color Space',

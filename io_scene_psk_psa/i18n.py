@@ -14,5 +14,9 @@ langs = {
         ('*', 'The minimum number of keyframes to be exported'): 'エクスポートするキーフレームの最小数',
         ('*', 'Select a PSA file'): 'PSAファイルを選択',
         ('*', 'Case Insensitive'): '大文字小文字を区別しない',
+        ('*', 'All bones will be exported'): 'すべてのボーンがエクスポートされます',
+        ('*', 'Only bones belonging to the selected bone groups and their ancestors will be exported'):
+            '選択したボーングループとその祖先に属するボーンのみがエクスポートされます',
+        ('*', 'Raw Mesh Data'): '生のメッシュデータ',
     }
 }
