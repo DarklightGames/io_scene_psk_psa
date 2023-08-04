@@ -338,6 +338,11 @@ class PSA_OT_export(Operator, ExportHelper):
 
         self.armature_object = context.view_layer.objects.active
 
+        if self.armature_object.animation_data is None:
+            # This is required otherwise the action list will be empty if the armature has never had its animation
+            # data created before (i.e. if no action was ever assigned to it).
+            self.armature_object.animation_data_create()
+
         update_actions_and_timeline_markers(context, self.armature_object.data)
 
         # Populate bone groups list.
