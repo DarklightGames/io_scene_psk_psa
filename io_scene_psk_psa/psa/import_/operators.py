@@ -167,7 +167,7 @@ class PSA_OT_import(Operator, ImportHelper):
         options.should_convert_to_samples = pg.should_convert_to_samples
         options.bone_mapping_mode = pg.bone_mapping_mode
 
-        result = import_psa(psa_reader, context.view_layer.objects.active, options)
+        result = import_psa(context, psa_reader, context.view_layer.objects.active, options)
 
         if len(result.warnings) > 0:
             message = f'Imported {len(sequence_names)} action(s) with {len(result.warnings)} warning(s)\n'

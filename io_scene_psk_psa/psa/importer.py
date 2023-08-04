@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import bpy
 import numpy
-from bpy.types import FCurve, Object
+from bpy.types import FCurve, Object, Context
 from mathutils import Vector, Quaternion
 
 from .data import Psa
@@ -75,9 +75,9 @@ def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_name
     return None
 
 
-def import_psa(psa_reader: PsaReader, armature_object: Object, options: PsaImportOptions) -> PsaImportResult:
+def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object, options: PsaImportOptions) -> PsaImportResult:
     result = PsaImportResult()
-    sequences = map(lambda x: psa_reader.sequences[x], options.sequence_names)
+    sequences = [psa_reader.sequences[x] for x in options.sequence_names]
     armature_data = typing.cast(bpy.types.Armature, armature_object.data)
 
     # Create an index mapping from bones in the PSA to bones in the target armature.
@@ -158,9 +158,11 @@ def import_psa(psa_reader: PsaReader, armature_object: Object, options: PsaImpor
                 import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
             import_bone.post_quat = import_bone.orig_quat.conjugated()
 
+    context.window_manager.progress_begin(0, len(sequences))
+
     # Create and populate the data for new sequences.
     actions = []
-    for sequence in sequences:
+    for sequence_index, sequence in enumerate(sequences):
         # Add the action.
         sequence_name = sequence.name.decode('windows-1252')
         action_name = options.action_name_prefix + sequence_name
@@ -228,6 +230,8 @@ def import_psa(psa_reader: PsaReader, armature_object: Object, options: PsaImpor
 
         actions.append(action)
 
+        context.window_manager.progress_update(sequence_index)
+
     # If the user specifies, store the new animations as strips on a non-contributing NLA track.
     if options.should_stash:
         if armature_object.animation_data is None:
@@ -237,5 +241,7 @@ def import_psa(psa_reader: PsaReader, armature_object: Object, options: PsaImpor
             nla_track.name = action.name
             nla_track.mute = True
             nla_track.strips.new(name=action.name, start=0, action=action)
+
+    context.window_manager.progress_end()
 
     return result
