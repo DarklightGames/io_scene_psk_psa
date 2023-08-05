@@ -11,6 +11,8 @@ ignore_patterns = [
     '*/venv/*',
     '*/.gitignore',
     '*/.gitattributes',
+    '*/build/*',
+    '*/build.py',
 ]
 
 
