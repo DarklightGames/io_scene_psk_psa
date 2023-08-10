@@ -16,8 +16,7 @@ class Psk(object):
 
     class Wedge16(Structure):
         _fields_ = [
-            ('point_index', c_uint16),
-            ('padding1', c_int16),
+            ('point_index', c_uint32),
             ('u', c_float),
             ('v', c_float),
             ('material_index', c_uint8),
