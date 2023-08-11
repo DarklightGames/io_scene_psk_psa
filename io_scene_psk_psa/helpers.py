@@ -34,7 +34,7 @@ def rgb_to_srgb(c: float):
         return 12.92 * c
 
 
-def get_nla_strips_in_timeframe(animation_data: AnimData, frame_min: float, frame_max: float) -> List[NlaStrip]:
+def get_nla_strips_in_frame_range(animation_data: AnimData, frame_min: float, frame_max: float) -> List[NlaStrip]:
     if animation_data is None:
         return []
     strips = []

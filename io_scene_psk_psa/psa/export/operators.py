@@ -8,10 +8,10 @@ from bpy.types import Context, Armature, Action, Object, AnimData, TimelineMarke
 from bpy_extras.io_utils import ExportHelper
 from bpy_types import Operator
 
-from io_scene_psk_psa.helpers import populate_bone_group_list, get_nla_strips_in_timeframe
-from io_scene_psk_psa.psa.builder import build_psa, PsaBuildSequence, PsaBuildOptions
-from io_scene_psk_psa.psa.export.properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_sequences
-from io_scene_psk_psa.psa.writer import write_psa
+from .properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_sequences
+from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
+from ..writer import write_psa
+from ...helpers import populate_bone_group_list, get_nla_strips_in_frame_range
 
 
 def is_action_for_armature(armature: Armature, action: Action):
@@ -150,7 +150,7 @@ def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context:
         if next_marker_index < len(sorted_timeline_markers):
             # There is a next marker. Use that next marker's frame position as the last frame of this sequence.
             frame_end = sorted_timeline_markers[next_marker_index].frame
-            nla_strips = get_nla_strips_in_timeframe(animation_data, marker.frame, frame_end)
+            nla_strips = get_nla_strips_in_frame_range(animation_data, marker.frame, frame_end)
             if len(nla_strips) > 0:
                 frame_end = min(frame_end, max(map(lambda nla_strip: nla_strip.frame_end, nla_strips)))
                 frame_start = max(frame_start, min(map(lambda nla_strip: nla_strip.frame_start, nla_strips)))
@@ -254,11 +254,17 @@ class PSA_OT_export(Operator, ExportHelper):
         # SOURCE
         layout.prop(pg, 'sequence_source', text='Source')
 
-        if pg.sequence_source == 'TIMELINE_MARKERS':
+        if pg.sequence_source in {'TIMELINE_MARKERS', 'NLA_TRACK_STRIPS'}:
             # ANIMDATA SOURCE
             layout.prop(pg, 'should_override_animation_data')
             if pg.should_override_animation_data:
                 layout.prop(pg, 'animation_data_override', text='')
+
+        if pg.sequence_source == 'NLA_TRACK_STRIPS':
+            flow = layout.grid_flow()
+            flow.use_property_split = True
+            flow.use_property_decorate = False
+            flow.prop(pg, 'nla_track')
 
         # SELECT ALL/NONE
         row = layout.row(align=True)
@@ -269,25 +275,19 @@ class PSA_OT_export(Operator, ExportHelper):
         # ACTIONS
         if pg.sequence_source == 'ACTIONS':
             rows = max(3, min(len(pg.action_list), 10))
-
             layout.template_list('PSA_UL_export_sequences', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
-
-            col = layout.column()
-            col.use_property_split = True
-            col.use_property_decorate = False
-            col.prop(pg, 'sequence_name_prefix')
-            col.prop(pg, 'sequence_name_suffix')
-
         elif pg.sequence_source == 'TIMELINE_MARKERS':
             rows = max(3, min(len(pg.marker_list), 10))
-            layout.template_list('PSA_UL_export_sequences', '', pg, 'marker_list', pg, 'marker_list_index',
-                                 rows=rows)
+            layout.template_list('PSA_UL_export_sequences', '', pg, 'marker_list', pg, 'marker_list_index', rows=rows)
+        elif pg.sequence_source == 'NLA_TRACK_STRIPS':
+            rows = max(3, min(len(pg.nla_strip_list), 10))
+            layout.template_list('PSA_UL_export_sequences', '', pg, 'nla_strip_list', pg, 'nla_strip_list_index', rows=rows)
 
-            col = layout.column()
-            col.use_property_split = True
-            col.use_property_decorate = False
-            col.prop(pg, 'sequence_name_prefix')
-            col.prop(pg, 'sequence_name_suffix')
+        col = layout.column()
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(pg, 'sequence_name_prefix')
+        col.prop(pg, 'sequence_name_suffix')
 
         # Determine if there is going to be a naming conflict and display an error, if so.
         selected_items = [x for x in pg.action_list if x.is_selected]
@@ -360,6 +360,8 @@ class PSA_OT_export(Operator, ExportHelper):
             raise RuntimeError('No actions were selected for export')
         elif pg.sequence_source == 'TIMELINE_MARKERS' and len(pg.marker_names) == 0:
             raise RuntimeError('No timeline markers were selected for export')
+        elif pg.sequence_source == 'NLA_TRACK_STRIPS' and len(pg.nla_strip_list) == 0:
+            raise RuntimeError('No NLA track strips were selected for export')
 
         # Populate the export sequence list.
         animation_data_object = get_animation_data_object(context)
@@ -371,28 +373,37 @@ class PSA_OT_export(Operator, ExportHelper):
         export_sequences: List[PsaBuildSequence] = []
 
         if pg.sequence_source == 'ACTIONS':
-            for action in filter(lambda x: x.is_selected, pg.action_list):
-                if len(action.action.fcurves) == 0:
+            for action_item in filter(lambda x: x.is_selected, pg.action_list):
+                if len(action_item.action.fcurves) == 0:
                     continue
                 export_sequence = PsaBuildSequence()
-                export_sequence.nla_state.action = action.action
-                export_sequence.name = action.name
-                export_sequence.nla_state.frame_start = action.frame_start
-                export_sequence.nla_state.frame_end = action.frame_end
-                export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [action.action])
-                export_sequence.compression_ratio = action.action.psa_export.compression_ratio
-                export_sequence.key_quota = action.action.psa_export.key_quota
+                export_sequence.nla_state.action = action_item.action
+                export_sequence.name = action_item.name
+                export_sequence.nla_state.frame_start = action_item.frame_start
+                export_sequence.nla_state.frame_end = action_item.frame_end
+                export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [action_item.action])
+                export_sequence.compression_ratio = action_item.action.psa_export.compression_ratio
+                export_sequence.key_quota = action_item.action.psa_export.key_quota
                 export_sequences.append(export_sequence)
         elif pg.sequence_source == 'TIMELINE_MARKERS':
-            for marker in pg.marker_list:
+            for marker_item in filter(lambda x: x.is_selected, pg.marker_list):
                 export_sequence = PsaBuildSequence()
-                export_sequence.name = marker.name
+                export_sequence.name = marker_item.name
                 export_sequence.nla_state.action = None
-                export_sequence.nla_state.frame_start = marker.frame_start
-                export_sequence.nla_state.frame_end = marker.frame_end
+                export_sequence.nla_state.frame_start = marker_item.frame_start
+                export_sequence.nla_state.frame_end = marker_item.frame_end
                 nla_strips_actions = set(
-                    map(lambda x: x.action, get_nla_strips_in_timeframe(animation_data, marker.frame_start, marker.frame_end)))
+                    map(lambda x: x.action, get_nla_strips_in_frame_range(animation_data, marker_item.frame_start, marker_item.frame_end)))
                 export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, nla_strips_actions)
+                export_sequences.append(export_sequence)
+        elif pg.sequence_source == 'NLA_TRACK_STRIPS':
+            for nla_strip_item in filter(lambda x: x.is_selected, pg.nla_strip_list):
+                export_sequence = PsaBuildSequence()
+                export_sequence.name = nla_strip_item.name
+                export_sequence.nla_state.action = nla_strip_item.action
+                export_sequence.nla_state.frame_start = nla_strip_item.frame_start
+                export_sequence.nla_state.frame_end = nla_strip_item.frame_end
+                export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [nla_strip_item.action])
                 export_sequences.append(export_sequence)
         else:
             raise ValueError(f'Unhandled sequence source: {pg.sequence_source}')
@@ -432,6 +443,8 @@ class PSA_OT_export_actions_select_all(Operator):
             return pg.action_list
         elif pg.sequence_source == 'TIMELINE_MARKERS':
             return pg.marker_list
+        elif pg.sequence_source == 'NLA_TRACK_STRIPS':
+            return pg.nla_strip_list
         return None
 
     @classmethod
@@ -463,6 +476,8 @@ class PSA_OT_export_actions_deselect_all(Operator):
             return pg.action_list
         elif pg.sequence_source == 'TIMELINE_MARKERS':
             return pg.marker_list
+        elif pg.sequence_source == 'NLA_TRACK_STRIPS':
+            return pg.nla_strip_list
         return None
 
     @classmethod
