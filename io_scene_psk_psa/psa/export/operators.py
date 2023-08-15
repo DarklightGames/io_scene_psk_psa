@@ -8,10 +8,10 @@ from bpy.types import Context, Armature, Action, Object, AnimData, TimelineMarke
 from bpy_extras.io_utils import ExportHelper
 from bpy_types import Operator
 
-from io_scene_psk_psa.helpers import populate_bone_group_list, get_nla_strips_in_timeframe
-from io_scene_psk_psa.psa.builder import build_psa, PsaBuildSequence, PsaBuildOptions
-from io_scene_psk_psa.psa.export.properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_sequences
-from io_scene_psk_psa.psa.writer import write_psa
+from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
+from ..export.properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_sequences
+from ..writer import write_psa
+from ...helpers import populate_bone_group_list, get_nla_strips_in_timeframe
 
 
 def is_action_for_armature(armature: Armature, action: Action):
