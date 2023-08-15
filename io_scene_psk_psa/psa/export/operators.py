@@ -358,7 +358,7 @@ class PSA_OT_export(Operator, ExportHelper):
         # Ensure that we actually have items that we are going to be exporting.
         if pg.sequence_source == 'ACTIONS' and len(pg.action_list) == 0:
             raise RuntimeError('No actions were selected for export')
-        elif pg.sequence_source == 'TIMELINE_MARKERS' and len(pg.marker_names) == 0:
+        elif pg.sequence_source == 'TIMELINE_MARKERS' and len(pg.marker_list) == 0:
             raise RuntimeError('No timeline markers were selected for export')
 
         # Populate the export sequence list.
