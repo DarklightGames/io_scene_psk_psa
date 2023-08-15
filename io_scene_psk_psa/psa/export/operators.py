@@ -400,7 +400,7 @@ class PSA_OT_export(Operator, ExportHelper):
             for nla_strip_item in filter(lambda x: x.is_selected, pg.nla_strip_list):
                 export_sequence = PsaBuildSequence()
                 export_sequence.name = nla_strip_item.name
-                export_sequence.nla_state.action = nla_strip_item.action
+                export_sequence.nla_state.action = None
                 export_sequence.nla_state.frame_start = nla_strip_item.frame_start
                 export_sequence.nla_state.frame_end = nla_strip_item.frame_end
                 export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [nla_strip_item.action])
