@@ -95,16 +95,7 @@ def get_sequence_fps(context: Context, fps_source: str, fps_custom: float, actio
         return fps_custom
     elif fps_source == 'ACTION_METADATA':
         # Get the minimum value of action metadata FPS values.
-        fps_list = []
-        for action in filter(lambda x: 'psa_sequence_fps' in x, actions):
-            fps = action['psa_sequence_fps']
-            if type(fps) == int or type(fps) == float:
-                fps_list.append(fps)
-        if len(fps_list) > 0:
-            return min(fps_list)
-        else:
-            # No valid action metadata to use, fallback to scene FPS
-            return context.scene.render.fps
+        return min([action.psa_export.fps for action in actions])
     else:
         raise RuntimeError(f'Invalid FPS source "{fps_source}"')
 

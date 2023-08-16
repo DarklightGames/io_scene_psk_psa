@@ -166,6 +166,8 @@ class PSA_OT_import(Operator, ImportHelper):
         options.should_write_keyframes = pg.should_write_keyframes
         options.should_convert_to_samples = pg.should_convert_to_samples
         options.bone_mapping_mode = pg.bone_mapping_mode
+        options.fps_source = pg.fps_source
+        options.fps_custom = pg.fps_custom
 
         result = import_psa(context, psa_reader, context.view_layer.objects.active, options)
 
@@ -234,6 +236,10 @@ class PSA_OT_import(Operator, ImportHelper):
             col.use_property_decorate = False
             col.prop(pg, 'should_convert_to_samples')
             col.separator()
+            # FPS
+            col.prop(pg, 'fps_source')
+            if pg.fps_source == 'CUSTOM':
+                col.prop(pg, 'fps_custom')
 
         col = layout.column(heading='Options')
         col.use_property_split = True
