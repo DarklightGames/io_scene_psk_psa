@@ -80,12 +80,15 @@ def update_actions_and_timeline_markers(context: Context, armature: Armature):
             continue
         if marker_name.startswith('#'):
             continue
-        item = pg.marker_list.add()
-        item.name = marker_name
-        item.is_selected = False
         frame_start, frame_end = sequence_frame_ranges[marker_name]
-        item.frame_start = frame_start
-        item.frame_end = frame_end
+        sequences = get_sequences_from_name_and_frame_range(marker_name, frame_start, frame_end)
+        for (sequence_name, frame_start, frame_end) in sequences:
+            item = pg.marker_list.add()
+            item.name = sequence_name
+            item.is_selected = False
+            frame_start, frame_end = sequence_frame_ranges[marker_name]
+            item.frame_start = frame_start
+            item.frame_end = frame_end
 
 
 def get_sequence_fps(context: Context, fps_source: str, fps_custom: float, actions: Iterable[Action]) -> float:
@@ -174,11 +177,9 @@ def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context:
     return sequence_frame_ranges
 
 
-def get_sequences_from_action(action: Action) -> List[Tuple[str, int, int]]:
-    frame_start = int(action.frame_range[0])
-    frame_end = int(action.frame_range[1])
+def get_sequences_from_name_and_frame_range(name: str, frame_start: int, frame_end: int) -> List[Tuple[str, int, int]]:
     reversed_pattern = r'(.+)/(.+)'
-    reversed_match = re.match(reversed_pattern, action.name)
+    reversed_match = re.match(reversed_pattern, name)
     if reversed_match:
         forward_name = reversed_match.group(1)
         backwards_name = reversed_match.group(2)
@@ -187,7 +188,13 @@ def get_sequences_from_action(action: Action) -> List[Tuple[str, int, int]]:
             (backwards_name, frame_end, frame_start)
         ]
     else:
-        return [(action.name, frame_start, frame_end)]
+        return [(name, frame_start, frame_end)]
+
+
+def get_sequences_from_action(action: Action) -> List[Tuple[str, int, int]]:
+    frame_start = int(action.frame_range[0])
+    frame_end = int(action.frame_range[1])
+    return get_sequences_from_name_and_frame_range(action.name, frame_start, frame_end)
 
 
 def get_sequences_from_action_pose_marker(action: Action, pose_markers: List[TimelineMarker], pose_marker: TimelineMarker, pose_marker_index: int) -> List[Tuple[str, int, int]]:
@@ -196,17 +203,7 @@ def get_sequences_from_action_pose_marker(action: Action, pose_markers: List[Tim
         frame_end = pose_markers[pose_marker_index + 1].frame
     else:
         frame_end = int(action.frame_range[1])
-    reversed_pattern = r'(.+)/(.+)'
-    reversed_match = re.match(reversed_pattern, pose_marker.name)
-    if reversed_match:
-        forward_name = reversed_match.group(1)
-        backwards_name = reversed_match.group(2)
-        return [
-            (forward_name, frame_start, frame_end),
-            (backwards_name, frame_end, frame_start)
-        ]
-    else:
-        return [(pose_marker.name, frame_start, frame_end)]
+    return get_sequences_from_name_and_frame_range(pose_marker.name, frame_start, frame_end)
 
 
 def get_visible_sequences(pg: PSA_PG_export, sequences) -> List[PSA_PG_export_action_list_item]:
