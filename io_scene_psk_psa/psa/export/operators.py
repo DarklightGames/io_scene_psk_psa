@@ -86,7 +86,6 @@ def update_actions_and_timeline_markers(context: Context, armature: Armature):
             item = pg.marker_list.add()
             item.name = sequence_name
             item.is_selected = False
-            frame_start, frame_end = sequence_frame_ranges[marker_name]
             item.frame_start = frame_start
             item.frame_end = frame_end
 
