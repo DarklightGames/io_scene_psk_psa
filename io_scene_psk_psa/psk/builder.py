@@ -143,7 +143,7 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
     for input_mesh_object in input_objects.mesh_objects:
 
         # MATERIALS
-        material_indices = [material_names.index(material.name) for material in input_mesh_object.data.materials]
+        material_indices = [material_names.index(material_slot.material.name) for material_slot in input_mesh_object.material_slots]
 
         # MESH DATA
         if options.use_raw_mesh_data:
