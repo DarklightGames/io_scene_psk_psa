@@ -88,7 +88,11 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
 
         for bone in bones:
             psk_bone = Psk.Bone()
-            psk_bone.name = bytes(bone.name, encoding='windows-1252')
+            try:
+                psk_bone.name = bytes(bone.name, encoding='windows-1252')
+            except UnicodeEncodeError:
+                raise RuntimeError(
+                    f'Bone name "{bone.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
             psk_bone.flags = 0
             psk_bone.children_count = 0
 
@@ -129,7 +133,10 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
 
     for material_name in material_names:
         psk_material = Psk.Material()
-        psk_material.name = bytes(material_name, encoding='windows-1252')
+        try:
+            psk_material.name = bytes(material_name, encoding='windows-1252')
+        except UnicodeEncodeError:
+            raise RuntimeError(f'Material name "{material_name}" contains characters that cannot be encoded in the Windows-1252 codepage')
         psk_material.texture_index = len(psk.materials)
         psk.materials.append(psk_material)
 
