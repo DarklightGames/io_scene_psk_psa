@@ -131,7 +131,7 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
                     # Material already exists, just re-use it.
                     material = bpy.data.materials[material_name]
                 elif is_bdk_addon_loaded() and psk.has_material_references:
-                    # Material does not yet exist and we have the BDK addon installed.
+                    # Material does not yet exist, and we have the BDK addon installed.
                     # Attempt to load it using BDK addon's operator.
                     material_reference = psk.material_references[material_index]
                     if material_reference and bpy.ops.bdk.link_material(reference=material_reference) == {'FINISHED'}:
