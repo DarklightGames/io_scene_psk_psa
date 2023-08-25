@@ -31,6 +31,7 @@ class PsaBuildOptions:
         self.sequence_name_prefix: str = ''
         self.sequence_name_suffix: str = ''
         self.root_motion: bool = False
+        self.unreal_engine_1_mode: bool = False
 
 
 def _get_pose_bone_location_and_rotation(pose_bone: PoseBone, armature_object: Object, options: PsaBuildOptions):

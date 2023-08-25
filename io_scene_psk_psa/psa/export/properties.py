@@ -184,6 +184,12 @@ class PSA_PG_export(PropertyGroup):
         name='Show Reversed',
         description='Show reversed sequences'
     )
+    should_write_import_commands: BoolProperty(
+        default=True,
+        options=empty_set,
+        name='Write PSA Import Commands',
+        description='Write PSA import commands to a UnrealScript file in the same directory as the exported file'
+    )
 
 
 def filter_sequences(pg: PSA_PG_export, sequences) -> List[int]:

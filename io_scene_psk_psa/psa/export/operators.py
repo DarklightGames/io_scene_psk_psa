@@ -1,3 +1,4 @@
+import os.path
 import re
 from collections import Counter
 from typing import List, Iterable, Dict, Tuple
@@ -10,7 +11,7 @@ from bpy_types import Operator
 
 from .properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_sequences
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
-from ..writer import write_psa
+from ..writer import write_psa, write_psa_import_commands
 from ...helpers import populate_bone_group_list, get_nla_strips_in_frame_range
 
 
@@ -313,8 +314,9 @@ class PSA_OT_export(Operator, ExportHelper):
 
         layout.separator()
 
-        # ROOT MOTION
         layout.prop(pg, 'root_motion', text='Root Motion')
+        layout.prop(pg, 'should_write_import_commands', text='Write Import Commands')
+
 
     @classmethod
     def _check_context(cls, context):
@@ -422,6 +424,12 @@ class PSA_OT_export(Operator, ExportHelper):
             return {'CANCELLED'}
 
         write_psa(psa, self.filepath)
+
+        if pg.should_write_import_commands:
+            # Replace the extension in the file path to be ".uc" instead of ".psa".
+            # This is because the Unreal Engine 1 import command expects the file to have a ".uc" extension.
+            filepath = os.path.splitext(self.filepath)[0] + '.uc'
+            write_psa_import_commands(psa, filepath)
 
         return {'FINISHED'}
 
