@@ -147,8 +147,10 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
 
             # Temporarily force the armature into the rest position.
             # We will undo this later.
-            old_pose_position = armature_object.data.pose_position
-            armature_object.data.pose_position = 'REST'
+            old_pose_position = None
+            if armature_object is not None:
+                old_pose_position = armature_object.data.pose_position
+                armature_object.data.pose_position = 'REST'
 
             depsgraph = context.evaluated_depsgraph_get()
             bm = bmesh.new()
@@ -164,7 +166,8 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
                 mesh_object.vertex_groups.new(name=vertex_group.name)
 
             # Restore the previous pose position on the armature.
-            armature_object.data.pose_position = old_pose_position
+            if old_pose_position is not None:
+                armature_object.data.pose_position = old_pose_position
 
         vertex_offset = len(psk.points)
 
