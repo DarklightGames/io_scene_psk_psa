@@ -167,6 +167,10 @@ class PSA_OT_import(Operator, ImportHelper):
         options.should_convert_to_samples = pg.should_convert_to_samples
         options.bone_mapping_mode = pg.bone_mapping_mode
 
+        if len(sequence_names) == 0:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'No sequences selected')
+            return {'CANCELLED'}
+
         result = import_psa(context, psa_reader, context.view_layer.objects.active, options)
 
         if len(result.warnings) > 0:
