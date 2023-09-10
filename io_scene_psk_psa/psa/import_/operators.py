@@ -175,8 +175,9 @@ class PSA_OT_import(Operator, ImportHelper):
 
         if len(result.warnings) > 0:
             message = f'Imported {len(sequence_names)} action(s) with {len(result.warnings)} warning(s)\n'
-            message += '\n'.join(result.warnings)
             self.report({'WARNING'}, message)
+            for warning in result.warnings:
+                self.report({'WARNING'}, warning)
         else:
             self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
 
