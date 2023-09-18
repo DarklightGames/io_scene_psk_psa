@@ -1,8 +1,8 @@
 bl_info = {
     "name": "PSK/PSA Importer/Exporter",
     "author": "Colin Basnett, Yurii Ti",
-    "version": (5, 0, 5),
-    "blender": (3, 4, 0),
+    "version": (6, 0, 0),
+    "blender": (4, 0, 0),
     "description": "PSK/PSA Import/Export (.psk/.psa)",
     "warning": "",
     "doc_url": "https://github.com/DarklightGames/io_scene_psk_psa",
