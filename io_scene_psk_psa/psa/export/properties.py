@@ -1,10 +1,11 @@
+import re
 import sys
 from fnmatch import fnmatch
-from typing import List
+from typing import List, Optional
 
 from bpy.props import BoolProperty, PointerProperty, EnumProperty, FloatProperty, CollectionProperty, IntProperty, \
     StringProperty
-from bpy.types import PropertyGroup, Object, Action
+from bpy.types import PropertyGroup, Object, Action, AnimData, Context
 
 from ...types import PSX_PG_bone_collection_list_item
 
@@ -25,12 +26,57 @@ class PSA_PG_export_action_list_item(PropertyGroup):
     is_pose_marker: BoolProperty(options={'HIDDEN'})
 
 
-class PSA_PG_export_timeline_markers(PropertyGroup):
+class PSA_PG_export_timeline_markers(PropertyGroup):  # TODO: rename this to singular
     marker_index: IntProperty()
     name: StringProperty()
     is_selected: BoolProperty(default=True)
     frame_start: IntProperty(options={'HIDDEN'})
     frame_end: IntProperty(options={'HIDDEN'})
+
+
+class PSA_PG_export_nla_strip_list_item(PropertyGroup):
+    name: StringProperty()
+    action: PointerProperty(type=Action)
+    frame_start: FloatProperty()
+    frame_end: FloatProperty()
+    is_selected: BoolProperty(default=True)
+
+
+def nla_track_update_cb(self: 'PSA_PG_export', context: Context) -> None:
+    self.nla_strip_list.clear()
+    if context.object is None or context.object.animation_data is None:
+        return
+    match = re.match(r'^(\d+).+$', self.nla_track)
+    self.nla_track_index = int(match.group(1)) if match else -1
+    if self.nla_track_index >= 0:
+        nla_track = context.object.animation_data.nla_tracks[self.nla_track_index]
+        for nla_strip in nla_track.strips:
+            strip: PSA_PG_export_nla_strip_list_item = self.nla_strip_list.add()
+            strip.action = nla_strip.action
+            strip.name = nla_strip.name
+            strip.frame_start = nla_strip.frame_start
+            strip.frame_end = nla_strip.frame_end
+
+
+def get_animation_data(pg: 'PSA_PG_export', context: Context) -> Optional[AnimData]:
+    animation_data_object = context.object
+    if pg.should_override_animation_data:
+        animation_data_object = pg.animation_data_override
+    return animation_data_object.animation_data if animation_data_object else None
+
+
+def nla_track_search_cb(self, context: Context, edit_text: str):
+    pg = getattr(context.scene, 'psa_export')
+    animation_data = get_animation_data(pg, context)
+    if animation_data is None:
+        return
+    for index, nla_track in enumerate(animation_data.nla_tracks):
+        yield f'{index} - {nla_track.name}'
+
+
+def animation_data_override_update_cb(self: 'PSA_PG_export', context: Context):
+    # Reset NLA track selection
+    self.nla_track = ''
 
 
 class PSA_PG_export(PropertyGroup):
@@ -46,10 +92,12 @@ class PSA_PG_export(PropertyGroup):
         name='Override Animation Data',
         options=empty_set,
         default=False,
-        description='Use the animation data from a different object instead of the selected object'
+        description='Use the animation data from a different object instead of the selected object',
+        update=animation_data_override_update_cb,
     )
     animation_data_override: PointerProperty(
         type=Object,
+        update=animation_data_override_update_cb,
         poll=psa_export_property_group_animation_data_override_poll
     )
     sequence_source: EnumProperty(
@@ -58,10 +106,18 @@ class PSA_PG_export(PropertyGroup):
         description='',
         items=(
             ('ACTIONS', 'Actions', 'Sequences will be exported using actions', 'ACTION', 0),
-            ('TIMELINE_MARKERS', 'Timeline Markers', 'Sequences will be exported using timeline markers', 'MARKER_HLT',
-             1),
+            ('TIMELINE_MARKERS', 'Timeline Markers', 'Sequences are delineated by scene timeline markers', 'MARKER_HLT', 1),
+            ('NLA_TRACK_STRIPS', 'NLA Track Strips', 'Sequences are delineated by the start & end times of strips on the selected NLA track', 'NLA', 2)
         )
     )
+    nla_track: StringProperty(
+        name='NLA Track',
+        options=empty_set,
+        description='',
+        search=nla_track_search_cb,
+        update=nla_track_update_cb
+    )
+    nla_track_index: IntProperty(name='NLA Track Index', default=-1)
     fps_source: EnumProperty(
         name='FPS Source',
         options=empty_set,
@@ -80,6 +136,8 @@ class PSA_PG_export(PropertyGroup):
     action_list_index: IntProperty(default=0)
     marker_list: CollectionProperty(type=PSA_PG_export_timeline_markers)
     marker_list_index: IntProperty(default=0)
+    nla_strip_list: CollectionProperty(type=PSA_PG_export_nla_strip_list_item)
+    nla_strip_list_index: IntProperty(default=0)
     bone_filter_mode: EnumProperty(
         name='Bone Filter',
         options=empty_set,
@@ -145,7 +203,7 @@ def filter_sequences(pg: PSA_PG_export, sequences) -> List[int]:
 
     if not pg.sequence_filter_asset:
         for i, sequence in enumerate(sequences):
-            if hasattr(sequence, 'action') and sequence.action.asset_data is not None:
+            if hasattr(sequence, 'action') and sequence.action is not None and sequence.action.asset_data is not None:
                 flt_flags[i] &= ~bitflag_filter_item
 
     if not pg.sequence_filter_pose_marker:
@@ -164,5 +222,6 @@ def filter_sequences(pg: PSA_PG_export, sequences) -> List[int]:
 classes = (
     PSA_PG_export_action_list_item,
     PSA_PG_export_timeline_markers,
+    PSA_PG_export_nla_strip_list_item,
     PSA_PG_export,
 )

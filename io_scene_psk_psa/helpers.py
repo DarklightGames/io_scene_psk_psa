@@ -1,4 +1,3 @@
-import datetime
 import re
 import typing
 from typing import List, Iterable
@@ -8,24 +7,6 @@ import bpy.types
 from bpy.types import NlaStrip, Object, AnimData
 
 
-class Timer:
-    def __enter__(self):
-        self.start = datetime.datetime.now()
-        self.interval = None
-        return self
-
-    def __exit__(self, *args):
-        self.end = datetime.datetime.now()
-        self.interval = self.end - self.start
-
-    @property
-    def duration(self):
-        if self.interval is not None:
-            return self.interval
-        else:
-            return datetime.datetime.now() - self.start
-
-
 def rgb_to_srgb(c: float):
     if c > 0.0031308:
         return 1.055 * (pow(c, (1.0 / 2.4))) - 0.055
@@ -33,7 +14,7 @@ def rgb_to_srgb(c: float):
         return 12.92 * c
 
 
-def get_nla_strips_in_timeframe(animation_data: AnimData, frame_min: float, frame_max: float) -> List[NlaStrip]:
+def get_nla_strips_in_frame_range(animation_data: AnimData, frame_min: float, frame_max: float) -> List[NlaStrip]:
     if animation_data is None:
         return []
     strips = []
@@ -150,7 +131,7 @@ def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_c
 
     # Split out the bone indices and the instigator bone names into separate lists.
     # We use the bone names for the return values because the bone name is a more universal way of referencing them.
-    # For example, users of this function may modify bone lists, which would invalidate the indices and require a
+    # For example, users of this function may modify bone lists, which would invalidate the indices and require an
     # index mapping scheme to resolve it. Using strings is more comfy and results in less code downstream.
     instigator_bone_names = [bones[x[1]].name if x[1] is not None else None for x in bone_indices]
     bone_names = [bones[x[0]].name for x in bone_indices]

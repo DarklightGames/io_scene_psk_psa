@@ -22,10 +22,11 @@ def populate_material_list(mesh_objects, material_list):
 
     material_names = []
     for mesh_object in mesh_objects:
-        for i, material in enumerate(mesh_object.data.materials):
+        for i, material_slot in enumerate(mesh_object.material_slots):
+            material = material_slot.material
             # TODO: put this in the poll arg?
             if material is None:
-                raise RuntimeError('Material cannot be empty (index ' + str(i) + ')')
+                raise RuntimeError('Material slot cannot be empty (index ' + str(i) + ')')
             if material.name not in material_names:
                 material_names.append(material.name)
 

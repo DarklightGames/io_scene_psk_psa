@@ -16,7 +16,7 @@ class PSA_UL_export_sequences(UIList):
         item = cast(PSA_PG_export_action_list_item, item)
         is_pose_marker = hasattr(item, 'is_pose_marker') and item.is_pose_marker
         layout.prop(item, 'is_selected', icon_only=True, text=item.name)
-        if hasattr(item, 'action') and item.action.asset_data is not None:
+        if hasattr(item, 'action') and item.action is not None and item.action.asset_data is not None:
             layout.label(text='', icon='ASSET_MANAGER')
 
         row = layout.row(align=True)
