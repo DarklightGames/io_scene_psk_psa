@@ -39,9 +39,9 @@ class ImportBone:
         self.world_rotation_matrix: Matrix = Matrix()
         self.world_matrix: Matrix = Matrix()
         self.vertex_group = None
-        self.orig_quat: Quaternion = Quaternion()
-        self.orig_loc: Vector = Vector()
-        self.post_quat: Quaternion = Quaternion()
+        self.original_rotation: Quaternion = Quaternion()
+        self.original_location: Vector = Vector()
+        self.post_rotation: Quaternion = Quaternion()
 
 
 class PskImportResult:
@@ -110,12 +110,6 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
             edit_bone_matrix = edit_bone_matrix.to_matrix().to_4x4()
             edit_bone_matrix.translation = import_bone.world_matrix.translation
             edit_bone.matrix = edit_bone_matrix
-
-            # Store bind pose information in the bone's custom properties.
-            # This information is used when importing animations from PSA files.
-            edit_bone['orig_quat'] = import_bone.local_rotation
-            edit_bone['orig_loc'] = import_bone.local_translation
-            edit_bone['post_quat'] = import_bone.local_rotation.conjugated()
 
     # MESH
     if options.should_import_mesh:
