@@ -21,6 +21,7 @@ class PSX_PG_bone_collection_list_item(PropertyGroup):
 class PSX_PG_action_export(PropertyGroup):
     compression_ratio: FloatProperty(name='Compression Ratio', default=1.0, min=0.0, max=1.0, subtype='FACTOR', description='The key sampling ratio of the exported sequence.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames')
     key_quota: IntProperty(name='Key Quota', default=0, min=1, description='The minimum number of frames to be exported')
+    fps: FloatProperty(name='FPS', default=30.0, min=0.0, description='The frame rate of the exported sequence')
 
 
 class PSX_PT_action(Panel):
@@ -38,8 +39,12 @@ class PSX_PT_action(Panel):
     def draw(self, context: 'Context'):
         action = context.active_action
         layout = self.layout
-        layout.prop(action.psa_export, 'compression_ratio')
-        layout.prop(action.psa_export, 'key_quota')
+        flow = layout.grid_flow(columns=1)
+        flow.use_property_split = True
+        flow.use_property_decorate = False
+        flow.prop(action.psa_export, 'compression_ratio')
+        flow.prop(action.psa_export, 'key_quota')
+        flow.prop(action.psa_export, 'fps')
 
 
 classes = (

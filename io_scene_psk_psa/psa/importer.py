@@ -21,6 +21,8 @@ class PsaImportOptions(object):
         self.action_name_prefix = ''
         self.should_convert_to_samples = False
         self.bone_mapping_mode = 'CASE_INSENSITIVE'
+        self.fps_source = 'SEQUENCE'
+        self.fps_custom: float = 30.0
 
 
 class ImportBone(object):
@@ -172,6 +174,19 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
         else:
             action = bpy.data.actions.new(name=action_name)
 
+        # Calculate the target FPS.
+        target_fps = sequence.fps
+        if options.fps_source == 'CUSTOM':
+            target_fps = options.fps_custom
+        elif options.fps_source == 'SCENE':
+            target_fps = context.scene.render.fps
+        elif options.fps_source == 'SEQUENCE':
+            target_fps = sequence.fps
+        else:
+            raise ValueError(f'Unknown FPS source: {options.fps_source}')
+
+        keyframe_time_dilation = target_fps / sequence.fps
+
         if options.should_write_keyframes:
             # Remove existing f-curves (replace with action.fcurves.clear() in Blender 3.2)
             while len(action.fcurves) > 0:
@@ -208,7 +223,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
             # Write the keyframes out.
             fcurve_data = numpy.zeros(2 * sequence.frame_count, dtype=float)
-            fcurve_data[0::2] = range(sequence.frame_count)
+            fcurve_data[0::2] = [x * keyframe_time_dilation for x in range(sequence.frame_count)]
             for bone_index, import_bone in enumerate(import_bones):
                 if import_bone is None:
                     continue
@@ -216,6 +231,8 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
                     fcurve_data[1::2] = sequence_data_matrix[:, bone_index, fcurve_index]
                     fcurve.keyframe_points.add(sequence.frame_count)
                     fcurve.keyframe_points.foreach_set('co', fcurve_data)
+                    for fcurve_keyframe in fcurve.keyframe_points:
+                        fcurve_keyframe.interpolation = 'LINEAR'
 
             if options.should_convert_to_samples:
                 # Bake the curve to samples.
@@ -224,7 +241,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
         # Write meta-data.
         if options.should_write_metadata:
-            action['psa_sequence_fps'] = sequence.fps
+            action.psa_export.fps = target_fps
 
         action.use_fake_user = options.should_use_fake_user
 
