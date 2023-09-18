@@ -15,7 +15,7 @@ class PskInputObjects(object):
 class PskBuildOptions(object):
     def __init__(self):
         self.bone_filter_mode = 'ALL'
-        self.bone_group_indices: List[int] = []
+        self.bone_collection_indices: List[int] = []
         self.use_raw_mesh_data = True
         self.material_names: List[str] = []
         self.should_enforce_bone_name_restrictions = False
@@ -78,7 +78,7 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
         psk_bone.rotation = Quaternion.identity()
         psk.bones.append(psk_bone)
     else:
-        bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_group_indices)
+        bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_collection_indices)
         armature_data = typing.cast(Armature, armature_object.data)
         bones = [armature_data.bones[bone_name] for bone_name in bone_names]
 

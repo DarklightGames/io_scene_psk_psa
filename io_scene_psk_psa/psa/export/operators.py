@@ -11,7 +11,7 @@ from bpy_types import Operator
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from ..export.properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_sequences
 from ..writer import write_psa
-from ...helpers import populate_bone_group_list, get_nla_strips_in_timeframe
+from ...helpers import populate_bone_collection_list, get_nla_strips_in_timeframe
 
 
 def is_action_for_armature(armature: Armature, action: Action):
@@ -126,9 +126,9 @@ def get_animation_data_object(context: Context) -> Object:
 
 
 def is_bone_filter_mode_item_available(context, identifier):
-    if identifier == 'BONE_GROUPS':
-        obj = context.active_object
-        if not obj.pose or not obj.pose.bone_groups:
+    if identifier == 'BONE_COLLECTIONS':
+        armature = context.active_object.data
+        if len(armature.collections) == 0:
             return False
     return True
 
@@ -304,13 +304,13 @@ class PSA_OT_export(Operator, ExportHelper):
         row = layout.row(align=True)
         row.prop(pg, 'bone_filter_mode', text='Bones')
 
-        if pg.bone_filter_mode == 'BONE_GROUPS':
+        if pg.bone_filter_mode == 'BONE_COLLECTIONS':
             row = layout.row(align=True)
             row.label(text='Select')
-            row.operator(PSA_OT_export_bone_groups_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
-            row.operator(PSA_OT_export_bone_groups_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
-            rows = max(3, min(len(pg.bone_group_list), 10))
-            layout.template_list('PSX_UL_bone_group_list', '', pg, 'bone_group_list', pg, 'bone_group_list_index',
+            row.operator(PSA_OT_export_bone_collections_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
+            row.operator(PSA_OT_export_bone_collections_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
+            rows = max(3, min(len(pg.bone_collection_list), 10))
+            layout.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index',
                                  rows=rows)
 
         layout.prop(pg, 'should_enforce_bone_name_restrictions')
@@ -345,8 +345,7 @@ class PSA_OT_export(Operator, ExportHelper):
 
         update_actions_and_timeline_markers(context, self.armature_object.data)
 
-        # Populate bone groups list.
-        populate_bone_group_list(self.armature_object, pg.bone_group_list)
+        populate_bone_collection_list(self.armature_object, pg.bone_collection_list)
 
         context.window_manager.fileselect_add(self)
 
@@ -401,7 +400,7 @@ class PSA_OT_export(Operator, ExportHelper):
         options.animation_data = animation_data
         options.sequences = export_sequences
         options.bone_filter_mode = pg.bone_filter_mode
-        options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
+        options.bone_collection_indices = [x.index for x in pg.bone_collection_list if x.is_selected]
         options.should_ignore_bone_name_restrictions = pg.should_enforce_bone_name_restrictions
         options.sequence_name_prefix = pg.sequence_name_prefix
         options.sequence_name_suffix = pg.sequence_name_suffix
@@ -479,42 +478,42 @@ class PSA_OT_export_actions_deselect_all(Operator):
         return {'FINISHED'}
 
 
-class PSA_OT_export_bone_groups_select_all(Operator):
-    bl_idname = 'psa_export.bone_groups_select_all'
+class PSA_OT_export_bone_collections_select_all(Operator):
+    bl_idname = 'psa_export.bone_collections_select_all'
     bl_label = 'Select All'
-    bl_description = 'Select all bone groups'
+    bl_description = 'Select all bone collections'
     bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
         pg = getattr(context.scene, 'psa_export')
-        item_list = pg.bone_group_list
+        item_list = pg.bone_collection_list
         has_unselected_items = any(map(lambda action: not action.is_selected, item_list))
         return len(item_list) > 0 and has_unselected_items
 
     def execute(self, context):
         pg = getattr(context.scene, 'psa_export')
-        for item in pg.bone_group_list:
+        for item in pg.bone_collection_list:
             item.is_selected = True
         return {'FINISHED'}
 
 
-class PSA_OT_export_bone_groups_deselect_all(Operator):
-    bl_idname = 'psa_export.bone_groups_deselect_all'
+class PSA_OT_export_bone_collections_deselect_all(Operator):
+    bl_idname = 'psa_export.bone_collections_deselect_all'
     bl_label = 'Deselect All'
-    bl_description = 'Deselect all bone groups'
+    bl_description = 'Deselect all bone collections'
     bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
         pg = getattr(context.scene, 'psa_export')
-        item_list = pg.bone_group_list
+        item_list = pg.bone_collection_list
         has_selected_actions = any(map(lambda action: action.is_selected, item_list))
         return len(item_list) > 0 and has_selected_actions
 
     def execute(self, context):
         pg = getattr(context.scene, 'psa_export')
-        for action in pg.bone_group_list:
+        for action in pg.bone_collection_list:
             action.is_selected = False
         return {'FINISHED'}
 
@@ -523,6 +522,6 @@ classes = (
     PSA_OT_export,
     PSA_OT_export_actions_select_all,
     PSA_OT_export_actions_deselect_all,
-    PSA_OT_export_bone_groups_select_all,
-    PSA_OT_export_bone_groups_deselect_all,
+    PSA_OT_export_bone_collections_select_all,
+    PSA_OT_export_bone_collections_deselect_all,
 )

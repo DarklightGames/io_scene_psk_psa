@@ -26,7 +26,7 @@ class PsaBuildOptions:
         self.animation_data: Optional[AnimData] = None
         self.sequences: List[PsaBuildSequence] = []
         self.bone_filter_mode: str = 'ALL'
-        self.bone_group_indices: List[int] = []
+        self.bone_collection_indices: List[int] = []
         self.should_enforce_bone_name_restrictions: bool = False
         self.sequence_name_prefix: str = ''
         self.sequence_name_suffix: str = ''
@@ -73,7 +73,7 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
     pose_bones = [x[1] for x in pose_bones]
 
     # Get a list of all the bone indices and instigator bones for the bone filter settings.
-    export_bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_group_indices)
+    export_bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_collection_indices)
     bone_indices = [bone_names.index(x) for x in export_bone_names]
 
     # Make the bone lists contain only the bones that are going to be exported.

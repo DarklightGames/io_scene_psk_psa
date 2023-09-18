@@ -6,7 +6,7 @@ from bpy.props import BoolProperty, PointerProperty, EnumProperty, FloatProperty
     StringProperty
 from bpy.types import PropertyGroup, Object, Action
 
-from ...types import PSX_PG_bone_group_list_item
+from ...types import PSX_PG_bone_collection_list_item
 
 
 def psa_export_property_group_animation_data_override_poll(_context, obj):
@@ -86,12 +86,12 @@ class PSA_PG_export(PropertyGroup):
         description='',
         items=(
             ('ALL', 'All', 'All bones will be exported.'),
-            ('BONE_GROUPS', 'Bone Groups', 'Only bones belonging to the selected bone groups and their ancestors will '
-                                           'be exported.'),
+            ('BONE_COLLECTIONS', 'Bone Collections', 'Only bones belonging to the selected bone collections and their '
+             'ancestors will be exported.'),
         )
     )
-    bone_group_list: CollectionProperty(type=PSX_PG_bone_group_list_item)
-    bone_group_list_index: IntProperty(default=0, name='', description='')
+    bone_collection_list: CollectionProperty(type=PSX_PG_bone_collection_list_item)
+    bone_collection_list_index: IntProperty(default=0, name='', description='')
     should_enforce_bone_name_restrictions: BoolProperty(
         default=False,
         name='Enforce Bone Name Restrictions',

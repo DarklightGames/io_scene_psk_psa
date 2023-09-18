@@ -4,14 +4,14 @@ from bpy_extras.io_utils import ExportHelper
 
 from ..builder import build_psk, PskBuildOptions, get_psk_input_objects
 from ..writer import write_psk
-from ...helpers import populate_bone_group_list
+from ...helpers import populate_bone_collection_list
 
 
 def is_bone_filter_mode_item_available(context, identifier):
     input_objects = get_psk_input_objects(context)
     armature_object = input_objects.armature_object
-    if identifier == 'BONE_GROUPS':
-        if not armature_object or not armature_object.pose or not armature_object.pose.bone_groups:
+    if identifier == 'BONE_COLLECTIONS':
+        if armature_object is None or armature_object.data is None or len(armature_object.data.collections) == 0:
             return False
     # else if... you can set up other conditions if you add more options
     return True
@@ -94,8 +94,7 @@ class PSK_OT_export(Operator, ExportHelper):
 
         pg = getattr(context.scene, 'psk_export')
 
-        # Populate bone groups list.
-        populate_bone_group_list(input_objects.armature_object, pg.bone_group_list)
+        populate_bone_collection_list(input_objects.armature_object, pg.bone_collection_list)
 
         try:
             populate_material_list(input_objects.mesh_objects, pg.material_list)
@@ -136,10 +135,10 @@ class PSK_OT_export(Operator, ExportHelper):
             item_layout.prop_enum(pg, 'bone_filter_mode', item.identifier)
             item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
 
-        if pg.bone_filter_mode == 'BONE_GROUPS':
+        if pg.bone_filter_mode == 'BONE_COLLECTIONS':
             row = box.row()
-            rows = max(3, min(len(pg.bone_group_list), 10))
-            row.template_list('PSX_UL_bone_group_list', '', pg, 'bone_group_list', pg, 'bone_group_list_index', rows=rows)
+            rows = max(3, min(len(pg.bone_collection_list), 10))
+            row.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index', rows=rows)
 
         box.prop(pg, 'should_enforce_bone_name_restrictions')
 
@@ -147,7 +146,7 @@ class PSK_OT_export(Operator, ExportHelper):
         box = layout.box()
         box.label(text='Materials', icon='MATERIAL')
         row = box.row()
-        rows = max(3, min(len(pg.bone_group_list), 10))
+        rows = max(3, min(len(pg.bone_collection_list), 10))
         row.template_list('PSK_UL_materials', '', pg, 'material_list', pg, 'material_list_index', rows=rows)
         col = row.column(align=True)
         col.operator(PSK_OT_material_list_move_up.bl_idname, text='', icon='TRIA_UP')
@@ -157,7 +156,7 @@ class PSK_OT_export(Operator, ExportHelper):
         pg = context.scene.psk_export
         options = PskBuildOptions()
         options.bone_filter_mode = pg.bone_filter_mode
-        options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
+        options.bone_collection_indices = [x.index for x in pg.bone_collection_list if x.is_selected]
         options.use_raw_mesh_data = pg.use_raw_mesh_data
         options.material_names = [m.material_name for m in pg.material_list]
         options.should_enforce_bone_name_restrictions = pg.should_enforce_bone_name_restrictions
