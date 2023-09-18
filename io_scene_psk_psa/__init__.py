@@ -130,9 +130,8 @@ if __name__ == '__main__':
 
 @persistent
 def load_handler(dummy):
-    print('RUNNING LOAD HANDLER')
     # Convert old `psa_sequence_fps` property to new `psa_export.fps` property.
-    # This is only needed for backwards compatibility with older versions of the addon.
+    # This is only needed for backwards compatibility with files that may have used older versions of the addon.
     for action in bpy.data.actions:
         if 'psa_sequence_fps' in action:
             action.psa_export.fps = action['psa_sequence_fps']
