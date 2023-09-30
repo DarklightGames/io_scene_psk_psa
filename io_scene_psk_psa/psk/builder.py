@@ -58,11 +58,17 @@ def get_psk_input_objects(context) -> PskInputObjects:
     return input_objects
 
 
-def build_psk(context, options: PskBuildOptions) -> Psk:
-    input_objects = get_psk_input_objects(context)
+class PskBuildResult(object):
+    def __init__(self):
+        self.psk = None
+        self.warnings = []
 
+
+def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
+    input_objects = get_psk_input_objects(context)
     armature_object: bpy.types.Object = input_objects.armature_object
 
+    result = PskBuildResult()
     psk = Psk()
     bones = []
 
@@ -167,6 +173,10 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
             del bm
             mesh_object = bpy.data.objects.new('', mesh_data)
             mesh_object.matrix_world = input_mesh_object.matrix_world
+
+            scale = (input_mesh_object.scale.x, input_mesh_object.scale.y, input_mesh_object.scale.z)
+            if any(map(lambda x: x < 0, scale)):
+                result.warnings.append(f'Mesh "{input_mesh_object.name}" has negative scaling which may result in inverted normals.')
 
             # Copy the vertex groups
             for vertex_group in input_mesh_object.vertex_groups:
@@ -278,4 +288,6 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
             bpy.data.meshes.remove(mesh_data)
             del mesh_data
 
-    return psk
+    result.psk = psk
+
+    return result

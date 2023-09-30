@@ -163,12 +163,18 @@ class PSK_OT_export(Operator, ExportHelper):
         options.should_enforce_bone_name_restrictions = pg.should_enforce_bone_name_restrictions
 
         try:
-            psk = build_psk(context, options)
-            write_psk(psk, self.filepath)
-            self.report({'INFO'}, f'PSK export successful')
+            result = build_psk(context, options)
+            for warning in result.warnings:
+                self.report({'WARNING'}, warning)
+            write_psk(result.psk, self.filepath)
+            if len(result.warnings) > 0:
+                self.report({'WARNING'}, f'PSK export successful with {len(result.warnings)} warnings')
+            else:
+                self.report({'INFO'}, f'PSK export successful')
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
+    
         return {'FINISHED'}
 
 
