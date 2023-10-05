@@ -1,8 +1,10 @@
+from bpy.app.handlers import persistent
+
 bl_info = {
     "name": "PSK/PSA Importer/Exporter",
     "author": "Colin Basnett, Yurii Ti",
-    "version": (5, 0, 1),
-    "blender": (3, 4, 0),
+    "version": (6, 0, 0),
+    "blender": (4, 0, 0),
     "description": "PSK/PSA Import/Export (.psk/.psa)",
     "warning": "",
     "doc_url": "https://github.com/DarklightGames/io_scene_psk_psa",
@@ -130,3 +132,16 @@ def unregister():
 
 if __name__ == '__main__':
     register()
+
+
+@persistent
+def load_handler(dummy):
+    # Convert old `psa_sequence_fps` property to new `psa_export.fps` property.
+    # This is only needed for backwards compatibility with files that may have used older versions of the addon.
+    for action in bpy.data.actions:
+        if 'psa_sequence_fps' in action:
+            action.psa_export.fps = action['psa_sequence_fps']
+            del action['psa_sequence_fps']
+
+
+bpy.app.handlers.load_post.append(load_handler)

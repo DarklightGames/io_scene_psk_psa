@@ -2,7 +2,8 @@ import re
 from fnmatch import fnmatch
 from typing import List
 
-from bpy.props import StringProperty, BoolProperty, CollectionProperty, IntProperty, PointerProperty, EnumProperty
+from bpy.props import StringProperty, BoolProperty, CollectionProperty, IntProperty, PointerProperty, EnumProperty, \
+    FloatProperty
 from bpy.types import PropertyGroup, Text
 
 empty_set = set()
@@ -65,6 +66,21 @@ class PSA_PG_import(PropertyGroup):
             ('CASE_INSENSITIVE', 'Case Insensitive', 'Bones names must match, ignoring case (e.g., the bone PSA bone '
              '\'root\' can be mapped to the armature bone \'Root\')', 'CASE_INSENSITIVE', 1),
         )
+    )
+    fps_source: EnumProperty(name='FPS Source', items=(
+        ('SEQUENCE', 'Sequence', 'The sequence frame rate matches the original frame rate', 'ACTION', 0),
+        ('SCENE', 'Scene', 'The sequence frame rate dilates to match that of the scene', 'SCENE_DATA', 1),
+        ('CUSTOM', 'Custom', 'The sequence frame rate dilates to match a custom frame rate', 2),
+    ))
+    fps_custom: FloatProperty(
+        default=30.0,
+        name='Custom FPS',
+        description='The frame rate to which the imported actions will be converted',
+        options=empty_set,
+        min=1.0,
+        soft_min=1.0,
+        soft_max=60.0,
+        step=100,
     )
 
 

@@ -39,9 +39,9 @@ class ImportBone:
         self.world_rotation_matrix: Matrix = Matrix()
         self.world_matrix: Matrix = Matrix()
         self.vertex_group = None
-        self.orig_quat: Quaternion = Quaternion()
-        self.orig_loc: Vector = Vector()
-        self.post_quat: Quaternion = Quaternion()
+        self.original_rotation: Quaternion = Quaternion()
+        self.original_location: Vector = Vector()
+        self.post_rotation: Quaternion = Quaternion()
 
 
 class PskImportResult:
@@ -111,12 +111,6 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
             edit_bone_matrix.translation = import_bone.world_matrix.translation
             edit_bone.matrix = edit_bone_matrix
 
-            # Store bind pose information in the bone's custom properties.
-            # This information is used when importing animations from PSA files.
-            edit_bone['orig_quat'] = import_bone.local_rotation
-            edit_bone['orig_loc'] = import_bone.local_translation
-            edit_bone['post_quat'] = import_bone.local_rotation.conjugated()
-
     # MESH
     if options.should_import_mesh:
         mesh_data = bpy.data.meshes.new(options.name)
@@ -131,7 +125,7 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
                     # Material already exists, just re-use it.
                     material = bpy.data.materials[material_name]
                 elif is_bdk_addon_loaded() and psk.has_material_references:
-                    # Material does not yet exist and we have the BDK addon installed.
+                    # Material does not yet exist, and we have the BDK addon installed.
                     # Attempt to load it using BDK addon's operator.
                     material_reference = psk.material_references[material_index]
                     if material_reference and bpy.ops.bdk.link_material(reference=material_reference) == {'FINISHED'}:
@@ -150,17 +144,22 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
 
         bm.verts.ensure_lookup_table()
 
-        degenerate_face_indices = set()
+        invalid_face_indices = set()
         for face_index, face in enumerate(psk.faces):
-            point_indices = [bm.verts[psk.wedges[i].point_index] for i in reversed(face.wedge_indices)]
+            point_indices = map(lambda i: psk.wedges[i].point_index, reversed(face.wedge_indices))
+            points = [bm.verts[i] for i in point_indices]
             try:
-                bm_face = bm.faces.new(point_indices)
+                bm_face = bm.faces.new(points)
                 bm_face.material_index = face.material_index
             except ValueError:
-                degenerate_face_indices.add(face_index)
+                # This happens for two reasons:
+                # 1. Two or more of the face's points are the same. (i.e, point indices of [0, 0, 1])
+                # 2. The face is a duplicate of another face. (i.e., point indices of [0, 1, 2] and [0, 1, 2])
+                invalid_face_indices.add(face_index)
 
-        if len(degenerate_face_indices) > 0:
-            result.warnings.append(f'Discarded {len(degenerate_face_indices)} degenerate face(s).')
+        # TODO: Handle invalid faces better.
+        if len(invalid_face_indices) > 0:
+            result.warnings.append(f'Discarded {len(invalid_face_indices)} invalid face(s).')
 
         bm.to_mesh(mesh_data)
 
@@ -168,7 +167,7 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
         data_index = 0
         uv_layer = mesh_data.uv_layers.new(name='VTXW0000')
         for face_index, face in enumerate(psk.faces):
-            if face_index in degenerate_face_indices:
+            if face_index in invalid_face_indices:
                 continue
             face_wedges = [psk.wedges[i] for i in reversed(face.wedge_indices)]
             for wedge in face_wedges:
@@ -183,7 +182,7 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
                 data_index = 0
                 uv_layer = mesh_data.uv_layers.new(name=f'EXTRAUV{extra_uv_index}')
                 for face_index, face in enumerate(psk.faces):
-                    if face_index in degenerate_face_indices:
+                    if face_index in invalid_face_indices:
                         continue
                     for wedge_index in reversed(face.wedge_indices):
                         u, v = psk.extra_uvs[wedge_index_offset + wedge_index]

@@ -78,4 +78,16 @@ def read_psk(path: str) -> Psk:
     '''
     psk.material_references = _read_material_references(path)
 
+    '''
+    Tools like UEViewer and CUE4Parse write the point index as a 32-bit integer, exploiting the fact that due to struct
+    alignment, there were 16-bits of padding following the original 16-bit point index in the wedge struct.
+    However, this breaks compatibility with PSK files that were created with older tools that treated the
+    point index as a 16-bit integer and might have junk data written to the padding bits.
+    To work around this, we check if each point is still addressable using a 16-bit index, and if it is, assume the
+    point index is a 16-bit integer and truncate the high bits.
+    '''
+    if len(psk.points) <= 65536:
+        for wedge in psk.wedges:
+            wedge.point_index &= 0xFFFF
+
     return psk

@@ -15,7 +15,7 @@ class PskInputObjects(object):
 class PskBuildOptions(object):
     def __init__(self):
         self.bone_filter_mode = 'ALL'
-        self.bone_group_indices: List[int] = []
+        self.bone_collection_indices: List[int] = []
         self.use_raw_mesh_data = True
         self.material_names: List[str] = []
         self.should_enforce_bone_name_restrictions = False
@@ -58,11 +58,17 @@ def get_psk_input_objects(context) -> PskInputObjects:
     return input_objects
 
 
-def build_psk(context, options: PskBuildOptions) -> Psk:
-    input_objects = get_psk_input_objects(context)
+class PskBuildResult(object):
+    def __init__(self):
+        self.psk = None
+        self.warnings = []
 
+
+def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
+    input_objects = get_psk_input_objects(context)
     armature_object: bpy.types.Object = input_objects.armature_object
 
+    result = PskBuildResult()
     psk = Psk()
     bones = []
 
@@ -78,7 +84,7 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
         psk_bone.rotation = Quaternion.identity()
         psk.bones.append(psk_bone)
     else:
-        bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_group_indices)
+        bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_collection_indices)
         armature_data = typing.cast(Armature, armature_object.data)
         bones = [armature_data.bones[bone_name] for bone_name in bone_names]
 
@@ -88,7 +94,11 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
 
         for bone in bones:
             psk_bone = Psk.Bone()
-            psk_bone.name = bytes(bone.name, encoding='windows-1252')
+            try:
+                psk_bone.name = bytes(bone.name, encoding='windows-1252')
+            except UnicodeEncodeError:
+                raise RuntimeError(
+                    f'Bone name "{bone.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
             psk_bone.flags = 0
             psk_bone.children_count = 0
 
@@ -129,14 +139,17 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
 
     for material_name in material_names:
         psk_material = Psk.Material()
-        psk_material.name = bytes(material_name, encoding='windows-1252')
+        try:
+            psk_material.name = bytes(material_name, encoding='windows-1252')
+        except UnicodeEncodeError:
+            raise RuntimeError(f'Material name "{material_name}" contains characters that cannot be encoded in the Windows-1252 codepage')
         psk_material.texture_index = len(psk.materials)
         psk.materials.append(psk_material)
 
     for input_mesh_object in input_objects.mesh_objects:
 
         # MATERIALS
-        material_indices = [material_names.index(material.name) for material in input_mesh_object.data.materials]
+        material_indices = [material_names.index(material_slot.material.name) for material_slot in input_mesh_object.material_slots]
 
         # MESH DATA
         if options.use_raw_mesh_data:
@@ -147,8 +160,10 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
 
             # Temporarily force the armature into the rest position.
             # We will undo this later.
-            old_pose_position = armature_object.data.pose_position
-            armature_object.data.pose_position = 'REST'
+            old_pose_position = None
+            if armature_object is not None:
+                old_pose_position = armature_object.data.pose_position
+                armature_object.data.pose_position = 'REST'
 
             depsgraph = context.evaluated_depsgraph_get()
             bm = bmesh.new()
@@ -159,12 +174,17 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
             mesh_object = bpy.data.objects.new('', mesh_data)
             mesh_object.matrix_world = input_mesh_object.matrix_world
 
+            scale = (input_mesh_object.scale.x, input_mesh_object.scale.y, input_mesh_object.scale.z)
+            if any(map(lambda x: x < 0, scale)):
+                result.warnings.append(f'Mesh "{input_mesh_object.name}" has negative scaling which may result in inverted normals.')
+
             # Copy the vertex groups
             for vertex_group in input_mesh_object.vertex_groups:
                 mesh_object.vertex_groups.new(name=vertex_group.name)
 
             # Restore the previous pose position on the armature.
-            armature_object.data.pose_position = old_pose_position
+            if old_pose_position is not None:
+                armature_object.data.pose_position = old_pose_position
 
         vertex_offset = len(psk.points)
 
@@ -268,4 +288,6 @@ def build_psk(context, options: PskBuildOptions) -> Psk:
             bpy.data.meshes.remove(mesh_data)
             del mesh_data
 
-    return psk
+    result.psk = psk
+
+    return result

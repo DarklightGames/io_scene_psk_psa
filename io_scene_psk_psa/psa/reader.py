@@ -5,6 +5,24 @@ import numpy as np
 from .data import *
 
 
+def _try_fix_cue4parse_issue_103(sequences) -> bool:
+    # Detect if the file was exported from CUE4Parse prior to the fix for issue #103.
+    # https://github.com/FabianFG/CUE4Parse/issues/103
+    # The issue was that the frame_start_index was not being set correctly, and was always being set to the same value
+    # as the frame_count.
+    # This fix will eventually be deprecated as it is only necessary for files exported prior to the fix.
+    if len(sequences) > 0:
+        if sequences[0].frame_start_index == sequences[0].frame_count:
+            # Manually set the frame_start_index for each sequence. This assumes that the sequences are in order with
+            # no shared frames between sequences (all exporters that I know of do this, so it's a safe assumption).
+            frame_start_index = 0
+            for i, sequence in enumerate(sequences):
+                sequence.frame_start_index = frame_start_index
+                frame_start_index += sequence.frame_count
+            return True
+    return False
+
+
 class PsaReader(object):
     """
     This class reads the sequences and bone information immediately upon instantiation and holds onto a file handle.
@@ -86,14 +104,15 @@ class PsaReader(object):
             elif section.name == b'ANIMINFO':
                 sequences = []
                 PsaReader._read_types(fp, Psa.Sequence, section, sequences)
+                # Try to fix CUE4Parse bug, if necessary.
+                _try_fix_cue4parse_issue_103(sequences)
                 for sequence in sequences:
                     psa.sequences[sequence.name.decode()] = sequence
             elif section.name == b'ANIMKEYS':
                 # Skip keys on this pass. We will keep this file open and read from it as needed.
                 self.keys_data_offset = fp.tell()
                 fp.seek(section.data_size * section.data_count, 1)
-            elif section.name == b'SCALEKEYS':
-                fp.seek(section.data_size * section.data_count, 1)
             else:
-                raise RuntimeError(f'Unrecognized section "{section.name}"')
+                fp.seek(section.data_size * section.data_count, 1)
+                print(f'Unrecognized section in PSA: "{section.name}"')
         return psa

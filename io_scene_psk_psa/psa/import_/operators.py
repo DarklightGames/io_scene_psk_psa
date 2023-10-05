@@ -166,13 +166,20 @@ class PSA_OT_import(Operator, ImportHelper):
         options.should_write_keyframes = pg.should_write_keyframes
         options.should_convert_to_samples = pg.should_convert_to_samples
         options.bone_mapping_mode = pg.bone_mapping_mode
+        options.fps_source = pg.fps_source
+        options.fps_custom = pg.fps_custom
 
-        result = import_psa(psa_reader, context.view_layer.objects.active, options)
+        if len(sequence_names) == 0:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'No sequences selected')
+            return {'CANCELLED'}
+
+        result = import_psa(context, psa_reader, context.view_layer.objects.active, options)
 
         if len(result.warnings) > 0:
             message = f'Imported {len(sequence_names)} action(s) with {len(result.warnings)} warning(s)\n'
-            message += '\n'.join(result.warnings)
             self.report({'WARNING'}, message)
+            for warning in result.warnings:
+                self.report({'WARNING'}, warning)
         else:
             self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
 
@@ -234,6 +241,10 @@ class PSA_OT_import(Operator, ImportHelper):
             col.use_property_decorate = False
             col.prop(pg, 'should_convert_to_samples')
             col.separator()
+            # FPS
+            col.prop(pg, 'fps_source')
+            if pg.fps_source == 'CUSTOM':
+                col.prop(pg, 'fps_custom')
 
         col = layout.column(heading='Options')
         col.use_property_split = True
