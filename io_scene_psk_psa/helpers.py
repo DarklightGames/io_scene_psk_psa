@@ -39,6 +39,9 @@ def populate_bone_collection_list(armature_object: Object, bone_collection_list:
     has_selected_collections = any([g.is_selected for g in bone_collection_list])
     unassigned_collection_is_selected, selected_assigned_collection_names = True, []
 
+    if armature_object is None:
+        return
+
     if has_selected_collections:
         # Preserve group selections before clearing the list.
         # We handle selections for the unassigned group separately to cover the edge case
