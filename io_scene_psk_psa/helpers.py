@@ -59,6 +59,9 @@ def populate_bone_group_list(armature_object: Object, bone_group_list: bpy.props
     has_selected_groups = any([g.is_selected for g in bone_group_list])
     unassigned_group_is_selected, selected_assigned_group_names = True, []
 
+    if armature_object is None:
+        return
+
     if has_selected_groups:
         # Preserve group selections before clearing the list.
         # We handle selections for the unassigned group separately to cover the edge case
