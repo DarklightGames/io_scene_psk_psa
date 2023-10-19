@@ -19,7 +19,7 @@ empty_set = set()
 class PSA_PG_export_action_list_item(PropertyGroup):
     action: PointerProperty(type=Action)
     name: StringProperty()
-    is_selected: BoolProperty(default=False)
+    is_selected: BoolProperty(default=True)
     frame_start: IntProperty(options={'HIDDEN'})
     frame_end: IntProperty(options={'HIDDEN'})
     is_pose_marker: BoolProperty(options={'HIDDEN'})

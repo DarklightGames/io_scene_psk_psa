@@ -10,7 +10,7 @@ empty_set = set()
 
 class PSA_PG_import_action_list_item(PropertyGroup):
     action_name: StringProperty(options=empty_set)
-    is_selected: BoolProperty(default=False, options=empty_set)
+    is_selected: BoolProperty(default=True, options=empty_set)
 
 
 class PSA_PG_bone(PropertyGroup):
