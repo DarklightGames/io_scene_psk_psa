@@ -1,6 +1,8 @@
 from ctypes import Structure, sizeof
 from typing import Type
 
+import bpy.app.translations
+
 from .data import Psk
 from ..data import Section, Vector3
 
@@ -24,15 +26,20 @@ def _write_section(fp, name: bytes, data_type: Type[Structure] = None, data: lis
 
 def write_psk(psk: Psk, path: str):
     if len(psk.wedges) > MAX_WEDGE_COUNT:
-        raise RuntimeError(f'Number of wedges ({len(psk.wedges)}) exceeds limit of {MAX_WEDGE_COUNT}')
+        message = bpy.app.translations.pgettext_iface('Number of wedges ({wedge_count}) exceeds limit of {MAX_WEDGE_COUNT}')
+        raise RuntimeError(message.format(wedge_count=len(psk.wedges), MAX_WEDGE_COUNT=MAX_WEDGE_COUNT))
     if len(psk.points) > MAX_POINT_COUNT:
-        raise RuntimeError(f'Numbers of vertices ({len(psk.points)}) exceeds limit of {MAX_POINT_COUNT}')
+        message = bpy.app.translations.pgettext_iface('Numbers of vertices ({point_count}) exceeds limit of {MAX_POINT_COUNT}')
+        raise RuntimeError(message.format(point_count=len(psk.points), MAX_POINT_COUNT=MAX_POINT_COUNT))
     if len(psk.materials) > MAX_MATERIAL_COUNT:
-        raise RuntimeError(f'Number of materials ({len(psk.materials)}) exceeds limit of {MAX_MATERIAL_COUNT}')
+        message = bpy.app.translations.pgettext_iface('Number of materials ({material_count}) exceeds limit of {MAX_MATERIAL_COUNT}')
+        raise RuntimeError(message.format(material_count=len(psk.materials), MAX_MATERIAL_COUNT=MAX_MATERIAL_COUNT))
     if len(psk.bones) > MAX_BONE_COUNT:
-        raise RuntimeError(f'Number of bones ({len(psk.bones)}) exceeds limit of {MAX_BONE_COUNT}')
+        message = bpy.app.translations.pgettext_iface('Number of bones ({bone_count}) exceeds limit of {MAX_BONE_COUNT}')
+        raise RuntimeError(message.format(bone_count=len(psk.bones), MAX_BONE_COUNT=MAX_BONE_COUNT))
     elif len(psk.bones) == 0:
-        raise RuntimeError(f'At least one bone must be marked for export')
+        message = bpy.app.translations.pgettext_iface('At least one bone must be marked for export')
+        raise RuntimeError(message)
 
     with open(path, 'wb') as fp:
         _write_section(fp, b'ACTRHEAD')
