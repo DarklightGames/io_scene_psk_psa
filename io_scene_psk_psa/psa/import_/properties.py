@@ -41,6 +41,8 @@ class PSA_PG_import(PropertyGroup):
                                    description='If an action with a matching name already exists, the existing action '
                                                'will have it\'s data overwritten instead of a new action being created')
     should_write_keyframes: BoolProperty(default=True, name='Keyframes', options=empty_set)
+    should_write_scale_keys: BoolProperty(default=True, name='Scale Keys', options=empty_set, description=
+                                        'Import scale keys, if available')
     should_write_metadata: BoolProperty(default=True, name='Metadata', options=empty_set,
                                         description='Additional data will be written to the custom properties of the '
                                                     'Action (e.g., frame rate)')

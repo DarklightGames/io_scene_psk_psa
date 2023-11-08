@@ -1,4 +1,5 @@
 import ctypes
+from typing import Optional
 
 import numpy as np
 
@@ -32,6 +33,7 @@ class PsaReader(object):
 
     def __init__(self, path):
         self.keys_data_offset: int = 0
+        self.scale_keys_data_offset: Optional[int] = None
         self.fp = open(path, 'rb')
         self.psa: Psa = self._read(self.fp)
 
@@ -65,9 +67,9 @@ class PsaReader(object):
         Reads and returns the key data for a sequence.
 
         @param sequence_name: The name of the sequence.
-        @return: A list of Psa.Keys.
+        @return: A list of keys for the sequence.
         """
-        # Set the file reader to the beginning of the keys data
+        # Set the file reader to the beginning of the key data.
         sequence = self.psa.sequences[sequence_name]
         data_size = sizeof(Psa.Key)
         bone_count = len(self.psa.bones)
@@ -82,6 +84,49 @@ class PsaReader(object):
             keys.append(key)
             offset += data_size
         return keys
+
+    def read_sequence_scale_key_data_matrix(self, sequence_name: str) -> np.ndarray:
+        """
+        Reads and returns the scale key data matrix for the given sequence.
+        @param sequence_name: The name of the sequence.
+        @return: An FxBx3 matrix where F is the number of frames, B is the number of bones.
+        """
+        sequence = self.psa.sequences[sequence_name]
+        scale_keys = self.read_sequence_scale_keys(sequence_name)
+        bone_count = len(self.bones)
+        matrix_size = sequence.frame_count, bone_count, 3
+        matrix = np.ones(matrix_size)
+        keys_iter = iter(scale_keys)
+        for frame_index in range(sequence.frame_count):
+            for bone_index in range(bone_count):
+                matrix[frame_index, bone_index, :] = iter(next(keys_iter).scale)
+        return matrix
+
+    def read_sequence_scale_keys(self, sequence_name: str) -> List[Psa.ScaleKey]:
+        """
+        Reads and returns the scale key data for a sequence.
+
+        Throws a RuntimeError exception if the sequence does not contain scale keys (use Psa.has_scale_keys to check).
+        @param sequence_name: The name of the sequence.
+        @return: A list of scale keys for the sequence.
+        """
+        if not self.psa.has_scale_keys:
+            raise RuntimeError('The PSA file does not contain scale keys.')
+        # Set the file reader to the beginning of the key data.
+        sequence = self.psa.sequences[sequence_name]
+        data_size = sizeof(Psa.ScaleKey)
+        bone_count = len(self.psa.bones)
+        buffer_length = data_size * bone_count * sequence.frame_count
+        sequence_scale_keys_offset = self.keys_data_offset + (sequence.frame_start_index * bone_count * data_size)
+        self.fp.seek(sequence_scale_keys_offset, 0)
+        buffer = self.fp.read(buffer_length)
+        offset = 0
+        scale_keys = []
+        for _ in range(sequence.frame_count * bone_count):
+            scale_key = Psa.ScaleKey.from_buffer_copy(buffer, offset)
+            scale_keys.append(scale_key)
+            offset += data_size
+        return scale_keys
 
     @staticmethod
     def _read_types(fp, data_class, section: Section, data):
@@ -111,6 +156,10 @@ class PsaReader(object):
             elif section.name == b'ANIMKEYS':
                 # Skip keys on this pass. We will keep this file open and read from it as needed.
                 self.keys_data_offset = fp.tell()
+                fp.seek(section.data_size * section.data_count, 1)
+            elif section.name == b'SCALEKEYS':
+                # Skip scale keys on this pass. We will keep this file open and read from it as needed.
+                self.scale_keys_data_offset = fp.tell()
                 fp.seek(section.data_size * section.data_count, 1)
             else:
                 fp.seek(section.data_size * section.data_count, 1)

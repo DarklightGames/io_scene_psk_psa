@@ -164,6 +164,7 @@ class PSA_OT_import(Operator, ImportHelper):
         options.should_overwrite = pg.should_overwrite
         options.should_write_metadata = pg.should_write_metadata
         options.should_write_keyframes = pg.should_write_keyframes
+        options.should_write_scale_keys = pg.should_write_scale_keys
         options.should_convert_to_samples = pg.should_convert_to_samples
         options.bone_mapping_mode = pg.bone_mapping_mode
         options.fps_source = pg.fps_source
@@ -245,6 +246,8 @@ class PSA_OT_import(Operator, ImportHelper):
             col.prop(pg, 'fps_source')
             if pg.fps_source == 'CUSTOM':
                 col.prop(pg, 'fps_custom')
+            # Scale Keys
+            col.prop(pg, 'should_write_scale_keys')
 
         col = layout.column(heading='Options')
         col.use_property_split = True

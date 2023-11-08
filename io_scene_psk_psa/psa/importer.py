@@ -1,5 +1,5 @@
 import typing
-from typing import List, Optional
+from typing import List, Optional, Iterable
 
 import bpy
 import numpy
@@ -18,6 +18,7 @@ class PsaImportOptions(object):
         self.should_overwrite = False
         self.should_write_keyframes = True
         self.should_write_metadata = True
+        self.should_write_scale_keys = True
         self.action_name_prefix = ''
         self.should_convert_to_samples = False
         self.bone_mapping_mode = 'CASE_INSENSITIVE'
@@ -35,9 +36,10 @@ class ImportBone(object):
         self.original_rotation: Quaternion = Quaternion()
         self.post_rotation: Quaternion = Quaternion()
         self.fcurves: List[FCurve] = []
+        self.scale_fcurves: List[FCurve] = []
 
 
-def _calculate_fcurve_data(import_bone: ImportBone, key_data: typing.Iterable[float]):
+def _calculate_fcurve_data(import_bone: ImportBone, key_data: Iterable[float]):
     # Convert world-space transforms to local-space transforms.
     key_rotation = Quaternion(key_data[0:4])
     key_location = Vector(key_data[4:])
@@ -168,7 +170,6 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             action = bpy.data.actions.new(name=action_name)
 
         # Calculate the target FPS.
-        target_fps = sequence.fps
         if options.fps_source == 'CUSTOM':
             target_fps = options.fps_custom
         elif options.fps_source == 'SCENE':
@@ -200,6 +201,14 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
                     action.fcurves.new(location_data_path, index=1, action_group=pose_bone.name),  # Ly
                     action.fcurves.new(location_data_path, index=2, action_group=pose_bone.name),  # Lz
                 ]
+                
+                if options.should_write_scale_keys:
+                    scale_data_path = pose_bone.path_from_id('scale')
+                    import_bone.fcurves += [
+                        action.fcurves.new(scale_data_path, index=0, action_group=pose_bone.name),  # Sx
+                        action.fcurves.new(scale_data_path, index=1, action_group=pose_bone.name),  # Sy
+                        action.fcurves.new(scale_data_path, index=2, action_group=pose_bone.name),  # Sz
+                    ]
 
             # Read the sequence data matrix from the PSA.
             sequence_data_matrix = psa_reader.read_sequence_data_matrix(sequence_name)
@@ -226,6 +235,22 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
                     fcurve.keyframe_points.foreach_set('co', fcurve_data)
                     for fcurve_keyframe in fcurve.keyframe_points:
                         fcurve_keyframe.interpolation = 'LINEAR'
+
+            if options.should_write_scale_keys:
+                sequence_scale_data_matrix = psa_reader.read_sequence_scale_key_data_matrix(sequence_name)
+                # Write the scale keys out.
+                fcurve_data = numpy.zeros(2 * sequence.frame_count, dtype=float)
+                # Populate the keyframe time data.
+                fcurve_data[0::2] = [x * keyframe_time_dilation for x in range(sequence.frame_count)]
+                for bone_index, import_bone in enumerate(import_bones):
+                    if import_bone is None:
+                        continue
+                    for fcurve_index, fcurve in enumerate(import_bone.scale_fcurves):
+                        fcurve_data[1::2] = sequence_scale_data_matrix[:, bone_index, fcurve_index]
+                        fcurve.keyframe_points.add(sequence.frame_count)
+                        fcurve.keyframe_points.foreach_set('co', fcurve_data)
+                        for fcurve_keyframe in fcurve.keyframe_points:
+                            fcurve_keyframe.interpolation = 'LINEAR'
 
             if options.should_convert_to_samples:
                 # Bake the curve to samples.

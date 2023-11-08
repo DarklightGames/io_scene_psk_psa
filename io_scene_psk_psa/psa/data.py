@@ -58,7 +58,27 @@ class Psa:
         def __repr__(self) -> str:
             return repr((self.location, self.rotation, self.time))
 
+    class ScaleKey(Structure):
+        _fields_ = [
+            ('scale', Vector3),
+            ('time', c_float)
+        ]
+
+        @property
+        def data(self):
+            yield self.scale.x
+            yield self.scale.y
+            yield self.scale.z
+
+        def __repr__(self) -> str:
+            return repr((self.scale, self.time))
+
     def __init__(self):
         self.bones: List[Psa.Bone] = []
         self.sequences: typing.OrderedDict[str, Psa.Sequence] = OrderedDict()
         self.keys: List[Psa.Key] = []
+        self.scale_keys: List[Psa.ScaleKey] = []
+
+    @property
+    def has_scale_keys(self):
+        return len(self.scale_keys) > 0
