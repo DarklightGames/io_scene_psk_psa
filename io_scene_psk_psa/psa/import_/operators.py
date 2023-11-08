@@ -1,10 +1,12 @@
 import os
+from pathlib import Path
 
 from bpy.props import StringProperty
 from bpy.types import Operator, Event, Context
 from bpy_extras.io_utils import ImportHelper
 
 from .properties import get_visible_sequences
+from ..config import read_psa_config
 from ..importer import import_psa, PsaImportOptions
 from ..reader import PsaReader
 
@@ -168,6 +170,11 @@ class PSA_OT_import(Operator, ImportHelper):
         options.bone_mapping_mode = pg.bone_mapping_mode
         options.fps_source = pg.fps_source
         options.fps_custom = pg.fps_custom
+
+        # Read the PSA config file if it exists.
+        config_path = Path(self.filepath).with_suffix('.config')
+        if config_path.exists():
+            options.psa_config = read_psa_config(psa_reader, str(config_path))
 
         if len(sequence_names) == 0:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No sequences selected')
