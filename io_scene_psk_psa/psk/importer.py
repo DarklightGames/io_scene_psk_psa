@@ -227,7 +227,6 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
             for vertex_normal in psk.vertex_normals:
                 normals.append(tuple(vertex_normal))
             mesh_data.normals_split_custom_set_from_vertices(normals)
-            mesh_data.use_auto_smooth = True
 
         bm.normal_update()
         bm.free()
