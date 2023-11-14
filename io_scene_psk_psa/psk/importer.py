@@ -222,11 +222,13 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
 
         # VERTEX NORMALS
         if psk.has_vertex_normals and options.should_import_vertex_normals:
-            mesh_data.polygons.foreach_set("use_smooth", [True] * len(mesh_data.polygons))
+            mesh_data.polygons.foreach_set('use_smooth', [True] * len(mesh_data.polygons))
             normals = []
             for vertex_normal in psk.vertex_normals:
                 normals.append(tuple(vertex_normal))
             mesh_data.normals_split_custom_set_from_vertices(normals)
+        else:
+            mesh_data.shade_smooth()
 
         bm.normal_update()
         bm.free()
