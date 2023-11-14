@@ -5,11 +5,15 @@
 
 This Blender add-on allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats) used in many versions of the Unreal Engine.
 
-| Blender Version | Addon Version | [LTS](https://en.wikipedia.org/wiki/Long-term_support) |
-|-----------------|---------------|-----|
-| 4.0             | [6.0.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/latest) | ✔
-| 3.4 - 3.6       | [5.0.6](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.6) | ✔
-| 2.9 - 3.3       | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) |
+## Compatibility
+
+| Blender Version                                              | Addon Version                                                                  | Long Term Support |
+|--------------------------------------------------------------|--------------------------------------------------------------------------------|-------------------|
+| 4.0+                                                         | [latest](https://github.com/DarklightGames/io_scene_psk_psa/releases/latest)   | TBD               |
+| [3.4 - 3.6](https://www.blender.org/download/lts/3-6/)       | [5.0.5](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.5) | ✅️ June 2025      |
+| [2.93 - 3.3](https://www.blender.org/download/releases/3-3/) | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) | ✅️ September 2024 |
+
+Bug fixes will be issued for legacy addon versions that are under [Blender's LTS maintenance period](https://www.blender.org/download/lts/). Once the LTS period has ended, legacy addon-on versions will no longer be supported by the maintainers of this repository, although we will accept pull requests for bug fixes. 
 
 # Features
 * Full PSK/PSA import and export capabilities.
@@ -19,16 +23,6 @@ This Blender add-on allows you to import and export meshes and animations to and
 * Specific bone collections can be excluded from PSK/PSA export (useful for excluding non-contributing bones such as IK controllers).
 * PSA sequences can be exported directly from actions or delineated using a scene's [timeline markers](https://docs.blender.org/manual/en/latest/animation/markers.html) or NLA track strips, allowing direct use of the [NLA](https://docs.blender.org/manual/en/latest/editors/nla/index.html) when creating sequences.
 * Manual re-ordering of material slots when exporting multiple mesh objects.
-
-## Compatibility
-
-| Blender Version                                              | Addon Version                                                                  | LTS Support       |
-|--------------------------------------------------------------|--------------------------------------------------------------------------------|-------------------|
-| 4.0+                                                         | [latest](https://github.com/DarklightGames/io_scene_psk_psa/releases/latest)   | TBD               |
-| [3.4 - 3.6](https://www.blender.org/download/lts/3-6/)       | [5.0.5](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.5) | ✅️ June 2025      |
-| [2.93 - 3.3](https://www.blender.org/download/releases/3-3/) | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) | ✅️ September 2024 | 
-
-Bug fixes will be issued for legacy addon versions that are under [Blender's LTS maintenance period](https://www.blender.org/download/lts/). Once the LTS period has ended, legacy addon-on versions will no longer be supported by the maintainers of this repository, although we will accept pull requests for bug fixes. 
 
 # Installation
 1. Download the zip file for the latest version from the [releases](https://github.com/DarklightGames/io_export_psk_psa/releases) page.
