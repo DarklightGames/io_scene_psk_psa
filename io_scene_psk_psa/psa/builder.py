@@ -26,7 +26,7 @@ class PsaBuildOptions:
         self.animation_data: Optional[AnimData] = None
         self.sequences: List[PsaBuildSequence] = []
         self.bone_filter_mode: str = 'ALL'
-        self.bone_group_indices: List[int] = []
+        self.bone_collection_indices: List[int] = []
         self.should_enforce_bone_name_restrictions: bool = False
         self.sequence_name_prefix: str = ''
         self.sequence_name_suffix: str = ''
@@ -73,7 +73,7 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
     pose_bones = [x[1] for x in pose_bones]
 
     # Get a list of all the bone indices and instigator bones for the bone filter settings.
-    export_bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_group_indices)
+    export_bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_collection_indices)
     bone_indices = [bone_names.index(x) for x in export_bone_names]
 
     # Make the bone lists contain only the bones that are going to be exported.
@@ -91,7 +91,11 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
     # Build list of PSA bones.
     for bone in bones:
         psa_bone = Psa.Bone()
-        psa_bone.name = bytes(bone.name, encoding='windows-1252')
+
+        try:
+            psa_bone.name = bytes(bone.name, encoding='windows-1252')
+        except UnicodeEncodeError:
+            raise RuntimeError(f'Bone name "{bone.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
 
         try:
             parent_index = bones.index(bone.parent)
@@ -165,7 +169,10 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
             frame_step = -frame_step
 
         psa_sequence = Psa.Sequence()
-        psa_sequence.name = bytes(export_sequence.name, encoding='windows-1252')
+        try:
+            psa_sequence.name = bytes(export_sequence.name, encoding='windows-1252')
+        except UnicodeEncodeError:
+            raise RuntimeError(f'Sequence name "{export_sequence.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
         psa_sequence.frame_count = frame_count
         psa_sequence.frame_start_index = frame_start_index
         psa_sequence.fps = frame_count / sequence_duration

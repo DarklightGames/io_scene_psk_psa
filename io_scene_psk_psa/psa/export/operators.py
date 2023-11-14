@@ -8,10 +8,10 @@ from bpy.types import Context, Armature, Action, Object, AnimData, TimelineMarke
 from bpy_extras.io_utils import ExportHelper
 from bpy_types import Operator
 
+from .properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_sequences
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
-from ..export.properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_sequences
 from ..writer import write_psa
-from ...helpers import populate_bone_group_list, get_nla_strips_in_timeframe
+from ...helpers import populate_bone_collection_list, get_nla_strips_in_frame_range
 
 
 def is_action_for_armature(armature: Armature, action: Action):
@@ -80,12 +80,14 @@ def update_actions_and_timeline_markers(context: Context, armature: Armature):
             continue
         if marker_name.startswith('#'):
             continue
-        item = pg.marker_list.add()
-        item.name = marker_name
-        item.is_selected = False
         frame_start, frame_end = sequence_frame_ranges[marker_name]
-        item.frame_start = frame_start
-        item.frame_end = frame_end
+        sequences = get_sequences_from_name_and_frame_range(marker_name, frame_start, frame_end)
+        for (sequence_name, frame_start, frame_end) in sequences:
+            item = pg.marker_list.add()
+            item.name = sequence_name
+            item.is_selected = False
+            item.frame_start = frame_start
+            item.frame_end = frame_end
 
 
 def get_sequence_fps(context: Context, fps_source: str, fps_custom: float, actions: Iterable[Action]) -> float:
@@ -95,16 +97,7 @@ def get_sequence_fps(context: Context, fps_source: str, fps_custom: float, actio
         return fps_custom
     elif fps_source == 'ACTION_METADATA':
         # Get the minimum value of action metadata FPS values.
-        fps_list = []
-        for action in filter(lambda x: 'psa_sequence_fps' in x, actions):
-            fps = action['psa_sequence_fps']
-            if type(fps) == int or type(fps) == float:
-                fps_list.append(fps)
-        if len(fps_list) > 0:
-            return min(fps_list)
-        else:
-            # No valid action metadata to use, fallback to scene FPS
-            return context.scene.render.fps
+        return min([action.psa_export.fps for action in actions])
     else:
         raise RuntimeError(f'Invalid FPS source "{fps_source}"')
 
@@ -126,9 +119,9 @@ def get_animation_data_object(context: Context) -> Object:
 
 
 def is_bone_filter_mode_item_available(context, identifier):
-    if identifier == 'BONE_GROUPS':
-        obj = context.active_object
-        if not obj.pose or not obj.pose.bone_groups:
+    if identifier == 'BONE_COLLECTIONS':
+        armature = context.active_object.data
+        if len(armature.collections) == 0:
             return False
     return True
 
@@ -150,7 +143,7 @@ def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context:
         if next_marker_index < len(sorted_timeline_markers):
             # There is a next marker. Use that next marker's frame position as the last frame of this sequence.
             frame_end = sorted_timeline_markers[next_marker_index].frame
-            nla_strips = get_nla_strips_in_timeframe(animation_data, marker.frame, frame_end)
+            nla_strips = get_nla_strips_in_frame_range(animation_data, marker.frame, frame_end)
             if len(nla_strips) > 0:
                 frame_end = min(frame_end, max(map(lambda nla_strip: nla_strip.frame_end, nla_strips)))
                 frame_start = max(frame_start, min(map(lambda nla_strip: nla_strip.frame_start, nla_strips)))
@@ -174,11 +167,9 @@ def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context:
     return sequence_frame_ranges
 
 
-def get_sequences_from_action(action: Action) -> List[Tuple[str, int, int]]:
-    frame_start = int(action.frame_range[0])
-    frame_end = int(action.frame_range[1])
+def get_sequences_from_name_and_frame_range(name: str, frame_start: int, frame_end: int) -> List[Tuple[str, int, int]]:
     reversed_pattern = r'(.+)/(.+)'
-    reversed_match = re.match(reversed_pattern, action.name)
+    reversed_match = re.match(reversed_pattern, name)
     if reversed_match:
         forward_name = reversed_match.group(1)
         backwards_name = reversed_match.group(2)
@@ -187,7 +178,13 @@ def get_sequences_from_action(action: Action) -> List[Tuple[str, int, int]]:
             (backwards_name, frame_end, frame_start)
         ]
     else:
-        return [(action.name, frame_start, frame_end)]
+        return [(name, frame_start, frame_end)]
+
+
+def get_sequences_from_action(action: Action) -> List[Tuple[str, int, int]]:
+    frame_start = int(action.frame_range[0])
+    frame_end = int(action.frame_range[1])
+    return get_sequences_from_name_and_frame_range(action.name, frame_start, frame_end)
 
 
 def get_sequences_from_action_pose_marker(action: Action, pose_markers: List[TimelineMarker], pose_marker: TimelineMarker, pose_marker_index: int) -> List[Tuple[str, int, int]]:
@@ -196,17 +193,7 @@ def get_sequences_from_action_pose_marker(action: Action, pose_markers: List[Tim
         frame_end = pose_markers[pose_marker_index + 1].frame
     else:
         frame_end = int(action.frame_range[1])
-    reversed_pattern = r'(.+)/(.+)'
-    reversed_match = re.match(reversed_pattern, pose_marker.name)
-    if reversed_match:
-        forward_name = reversed_match.group(1)
-        backwards_name = reversed_match.group(2)
-        return [
-            (forward_name, frame_start, frame_end),
-            (backwards_name, frame_end, frame_start)
-        ]
-    else:
-        return [(pose_marker.name, frame_start, frame_end)]
+    return get_sequences_from_name_and_frame_range(pose_marker.name, frame_start, frame_end)
 
 
 def get_visible_sequences(pg: PSA_PG_export, sequences) -> List[PSA_PG_export_action_list_item]:
@@ -254,11 +241,17 @@ class PSA_OT_export(Operator, ExportHelper):
         # SOURCE
         layout.prop(pg, 'sequence_source', text='Source')
 
-        if pg.sequence_source == 'TIMELINE_MARKERS':
+        if pg.sequence_source in {'TIMELINE_MARKERS', 'NLA_TRACK_STRIPS'}:
             # ANIMDATA SOURCE
             layout.prop(pg, 'should_override_animation_data')
             if pg.should_override_animation_data:
                 layout.prop(pg, 'animation_data_override', text='')
+
+        if pg.sequence_source == 'NLA_TRACK_STRIPS':
+            flow = layout.grid_flow()
+            flow.use_property_split = True
+            flow.use_property_decorate = False
+            flow.prop(pg, 'nla_track')
 
         # SELECT ALL/NONE
         row = layout.row(align=True)
@@ -269,25 +262,19 @@ class PSA_OT_export(Operator, ExportHelper):
         # ACTIONS
         if pg.sequence_source == 'ACTIONS':
             rows = max(3, min(len(pg.action_list), 10))
-
             layout.template_list('PSA_UL_export_sequences', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
-
-            col = layout.column()
-            col.use_property_split = True
-            col.use_property_decorate = False
-            col.prop(pg, 'sequence_name_prefix')
-            col.prop(pg, 'sequence_name_suffix')
-
         elif pg.sequence_source == 'TIMELINE_MARKERS':
             rows = max(3, min(len(pg.marker_list), 10))
-            layout.template_list('PSA_UL_export_sequences', '', pg, 'marker_list', pg, 'marker_list_index',
-                                 rows=rows)
+            layout.template_list('PSA_UL_export_sequences', '', pg, 'marker_list', pg, 'marker_list_index', rows=rows)
+        elif pg.sequence_source == 'NLA_TRACK_STRIPS':
+            rows = max(3, min(len(pg.nla_strip_list), 10))
+            layout.template_list('PSA_UL_export_sequences', '', pg, 'nla_strip_list', pg, 'nla_strip_list_index', rows=rows)
 
-            col = layout.column()
-            col.use_property_split = True
-            col.use_property_decorate = False
-            col.prop(pg, 'sequence_name_prefix')
-            col.prop(pg, 'sequence_name_suffix')
+        col = layout.column()
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(pg, 'sequence_name_prefix')
+        col.prop(pg, 'sequence_name_suffix')
 
         # Determine if there is going to be a naming conflict and display an error, if so.
         selected_items = [x for x in pg.action_list if x.is_selected]
@@ -304,13 +291,13 @@ class PSA_OT_export(Operator, ExportHelper):
         row = layout.row(align=True)
         row.prop(pg, 'bone_filter_mode', text='Bones')
 
-        if pg.bone_filter_mode == 'BONE_GROUPS':
+        if pg.bone_filter_mode == 'BONE_COLLECTIONS':
             row = layout.row(align=True)
             row.label(text='Select')
-            row.operator(PSA_OT_export_bone_groups_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
-            row.operator(PSA_OT_export_bone_groups_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
-            rows = max(3, min(len(pg.bone_group_list), 10))
-            layout.template_list('PSX_UL_bone_group_list', '', pg, 'bone_group_list', pg, 'bone_group_list_index',
+            row.operator(PSA_OT_export_bone_collections_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
+            row.operator(PSA_OT_export_bone_collections_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
+            rows = max(3, min(len(pg.bone_collection_list), 10))
+            layout.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index',
                                  rows=rows)
 
         layout.prop(pg, 'should_enforce_bone_name_restrictions')
@@ -345,8 +332,7 @@ class PSA_OT_export(Operator, ExportHelper):
 
         update_actions_and_timeline_markers(context, self.armature_object.data)
 
-        # Populate bone groups list.
-        populate_bone_group_list(self.armature_object, pg.bone_group_list)
+        populate_bone_collection_list(self.armature_object, pg.bone_collection_list)
 
         context.window_manager.fileselect_add(self)
 
@@ -360,6 +346,8 @@ class PSA_OT_export(Operator, ExportHelper):
             raise RuntimeError('No actions were selected for export')
         elif pg.sequence_source == 'TIMELINE_MARKERS' and len(pg.marker_list) == 0:
             raise RuntimeError('No timeline markers were selected for export')
+        elif pg.sequence_source == 'NLA_TRACK_STRIPS' and len(pg.nla_strip_list) == 0:
+            raise RuntimeError('No NLA track strips were selected for export')
 
         # Populate the export sequence list.
         animation_data_object = get_animation_data_object(context)
@@ -371,28 +359,37 @@ class PSA_OT_export(Operator, ExportHelper):
         export_sequences: List[PsaBuildSequence] = []
 
         if pg.sequence_source == 'ACTIONS':
-            for action in filter(lambda x: x.is_selected, pg.action_list):
-                if len(action.action.fcurves) == 0:
+            for action_item in filter(lambda x: x.is_selected, pg.action_list):
+                if len(action_item.action.fcurves) == 0:
                     continue
                 export_sequence = PsaBuildSequence()
-                export_sequence.nla_state.action = action.action
-                export_sequence.name = action.name
-                export_sequence.nla_state.frame_start = action.frame_start
-                export_sequence.nla_state.frame_end = action.frame_end
-                export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [action.action])
-                export_sequence.compression_ratio = action.action.psa_export.compression_ratio
-                export_sequence.key_quota = action.action.psa_export.key_quota
+                export_sequence.nla_state.action = action_item.action
+                export_sequence.name = action_item.name
+                export_sequence.nla_state.frame_start = action_item.frame_start
+                export_sequence.nla_state.frame_end = action_item.frame_end
+                export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [action_item.action])
+                export_sequence.compression_ratio = action_item.action.psa_export.compression_ratio
+                export_sequence.key_quota = action_item.action.psa_export.key_quota
                 export_sequences.append(export_sequence)
         elif pg.sequence_source == 'TIMELINE_MARKERS':
-            for marker in pg.marker_list:
+            for marker_item in filter(lambda x: x.is_selected, pg.marker_list):
                 export_sequence = PsaBuildSequence()
-                export_sequence.name = marker.name
+                export_sequence.name = marker_item.name
                 export_sequence.nla_state.action = None
-                export_sequence.nla_state.frame_start = marker.frame_start
-                export_sequence.nla_state.frame_end = marker.frame_end
+                export_sequence.nla_state.frame_start = marker_item.frame_start
+                export_sequence.nla_state.frame_end = marker_item.frame_end
                 nla_strips_actions = set(
-                    map(lambda x: x.action, get_nla_strips_in_timeframe(animation_data, marker.frame_start, marker.frame_end)))
+                    map(lambda x: x.action, get_nla_strips_in_frame_range(animation_data, marker_item.frame_start, marker_item.frame_end)))
                 export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, nla_strips_actions)
+                export_sequences.append(export_sequence)
+        elif pg.sequence_source == 'NLA_TRACK_STRIPS':
+            for nla_strip_item in filter(lambda x: x.is_selected, pg.nla_strip_list):
+                export_sequence = PsaBuildSequence()
+                export_sequence.name = nla_strip_item.name
+                export_sequence.nla_state.action = None
+                export_sequence.nla_state.frame_start = nla_strip_item.frame_start
+                export_sequence.nla_state.frame_end = nla_strip_item.frame_end
+                export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [nla_strip_item.action])
                 export_sequences.append(export_sequence)
         else:
             raise ValueError(f'Unhandled sequence source: {pg.sequence_source}')
@@ -401,7 +398,7 @@ class PSA_OT_export(Operator, ExportHelper):
         options.animation_data = animation_data
         options.sequences = export_sequences
         options.bone_filter_mode = pg.bone_filter_mode
-        options.bone_group_indices = [x.index for x in pg.bone_group_list if x.is_selected]
+        options.bone_collection_indices = [x.index for x in pg.bone_collection_list if x.is_selected]
         options.should_ignore_bone_name_restrictions = pg.should_enforce_bone_name_restrictions
         options.sequence_name_prefix = pg.sequence_name_prefix
         options.sequence_name_suffix = pg.sequence_name_suffix
@@ -432,6 +429,8 @@ class PSA_OT_export_actions_select_all(Operator):
             return pg.action_list
         elif pg.sequence_source == 'TIMELINE_MARKERS':
             return pg.marker_list
+        elif pg.sequence_source == 'NLA_TRACK_STRIPS':
+            return pg.nla_strip_list
         return None
 
     @classmethod
@@ -463,6 +462,8 @@ class PSA_OT_export_actions_deselect_all(Operator):
             return pg.action_list
         elif pg.sequence_source == 'TIMELINE_MARKERS':
             return pg.marker_list
+        elif pg.sequence_source == 'NLA_TRACK_STRIPS':
+            return pg.nla_strip_list
         return None
 
     @classmethod
@@ -479,42 +480,42 @@ class PSA_OT_export_actions_deselect_all(Operator):
         return {'FINISHED'}
 
 
-class PSA_OT_export_bone_groups_select_all(Operator):
-    bl_idname = 'psa_export.bone_groups_select_all'
+class PSA_OT_export_bone_collections_select_all(Operator):
+    bl_idname = 'psa_export.bone_collections_select_all'
     bl_label = 'Select All'
-    bl_description = 'Select all bone groups'
+    bl_description = 'Select all bone collections'
     bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
         pg = getattr(context.scene, 'psa_export')
-        item_list = pg.bone_group_list
+        item_list = pg.bone_collection_list
         has_unselected_items = any(map(lambda action: not action.is_selected, item_list))
         return len(item_list) > 0 and has_unselected_items
 
     def execute(self, context):
         pg = getattr(context.scene, 'psa_export')
-        for item in pg.bone_group_list:
+        for item in pg.bone_collection_list:
             item.is_selected = True
         return {'FINISHED'}
 
 
-class PSA_OT_export_bone_groups_deselect_all(Operator):
-    bl_idname = 'psa_export.bone_groups_deselect_all'
+class PSA_OT_export_bone_collections_deselect_all(Operator):
+    bl_idname = 'psa_export.bone_collections_deselect_all'
     bl_label = 'Deselect All'
-    bl_description = 'Deselect all bone groups'
+    bl_description = 'Deselect all bone collections'
     bl_options = {'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
         pg = getattr(context.scene, 'psa_export')
-        item_list = pg.bone_group_list
+        item_list = pg.bone_collection_list
         has_selected_actions = any(map(lambda action: action.is_selected, item_list))
         return len(item_list) > 0 and has_selected_actions
 
     def execute(self, context):
         pg = getattr(context.scene, 'psa_export')
-        for action in pg.bone_group_list:
+        for action in pg.bone_collection_list:
             action.is_selected = False
         return {'FINISHED'}
 
@@ -523,6 +524,6 @@ classes = (
     PSA_OT_export,
     PSA_OT_export_actions_select_all,
     PSA_OT_export_actions_deselect_all,
-    PSA_OT_export_bone_groups_select_all,
-    PSA_OT_export_bone_groups_deselect_all,
+    PSA_OT_export_bone_collections_select_all,
+    PSA_OT_export_bone_collections_deselect_all,
 )

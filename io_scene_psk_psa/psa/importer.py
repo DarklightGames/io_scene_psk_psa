@@ -21,6 +21,8 @@ class PsaImportOptions(object):
         self.action_name_prefix = ''
         self.should_convert_to_samples = False
         self.bone_mapping_mode = 'CASE_INSENSITIVE'
+        self.fps_source = 'SEQUENCE'
+        self.fps_custom: float = 30.0
 
 
 class ImportBone(object):
@@ -29,9 +31,9 @@ class ImportBone(object):
         self.parent: Optional[ImportBone] = None
         self.armature_bone = None
         self.pose_bone = None
-        self.orig_loc: Vector = Vector()
-        self.orig_quat: Quaternion = Quaternion()
-        self.post_quat: Quaternion = Quaternion()
+        self.original_location: Vector = Vector()
+        self.original_rotation: Quaternion = Quaternion()
+        self.post_rotation: Quaternion = Quaternion()
         self.fcurves: List[FCurve] = []
 
 
@@ -39,17 +41,17 @@ def _calculate_fcurve_data(import_bone: ImportBone, key_data: typing.Iterable[fl
     # Convert world-space transforms to local-space transforms.
     key_rotation = Quaternion(key_data[0:4])
     key_location = Vector(key_data[4:])
-    q = import_bone.post_quat.copy()
-    q.rotate(import_bone.orig_quat)
+    q = import_bone.post_rotation.copy()
+    q.rotate(import_bone.original_rotation)
     quat = q
-    q = import_bone.post_quat.copy()
+    q = import_bone.post_rotation.copy()
     if import_bone.parent is None:
         q.rotate(key_rotation.conjugated())
     else:
         q.rotate(key_rotation)
     quat.rotate(q.conjugated())
-    loc = key_location - import_bone.orig_loc
-    loc.rotate(import_bone.post_quat.conjugated())
+    loc = key_location - import_bone.original_location
+    loc.rotate(import_bone.post_rotation.conjugated())
     return quat.w, quat.x, quat.y, quat.z, loc.x, loc.y, loc.z
 
 
@@ -140,23 +142,16 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
         if armature_bone.parent is not None and armature_bone.parent.name in psa_bone_names:
             import_bone.parent = import_bones_dict[armature_bone.parent.name]
         # Calculate the original location & rotation of each bone (in world-space maybe?)
-        if armature_bone.get('orig_quat') is not None:
-            # TODO: ideally we don't rely on bone auxiliary data like this, the non-aux data path is incorrect
-            # (animations are flipped 180 around Z)
-            import_bone.orig_quat = Quaternion(armature_bone['orig_quat'])
-            import_bone.orig_loc = Vector(armature_bone['orig_loc'])
-            import_bone.post_quat = Quaternion(armature_bone['post_quat'])
+        if import_bone.parent is not None:
+            import_bone.original_location = armature_bone.matrix_local.translation - armature_bone.parent.matrix_local.translation
+            import_bone.original_location.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
+            import_bone.original_rotation = armature_bone.matrix_local.to_quaternion()
+            import_bone.original_rotation.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
+            import_bone.original_rotation.conjugate()
         else:
-            if import_bone.parent is not None:
-                import_bone.orig_loc = armature_bone.matrix_local.translation - armature_bone.parent.matrix_local.translation
-                import_bone.orig_loc.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
-                import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
-                import_bone.orig_quat.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
-                import_bone.orig_quat.conjugate()
-            else:
-                import_bone.orig_loc = armature_bone.matrix_local.translation.copy()
-                import_bone.orig_quat = armature_bone.matrix_local.to_quaternion()
-            import_bone.post_quat = import_bone.orig_quat.conjugated()
+            import_bone.original_location = armature_bone.matrix_local.translation.copy()
+            import_bone.original_rotation = armature_bone.matrix_local.to_quaternion()
+        import_bone.post_rotation = import_bone.original_rotation.conjugated()
 
     context.window_manager.progress_begin(0, len(sequences))
 
@@ -171,6 +166,19 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             action = bpy.data.actions[action_name]
         else:
             action = bpy.data.actions.new(name=action_name)
+
+        # Calculate the target FPS.
+        target_fps = sequence.fps
+        if options.fps_source == 'CUSTOM':
+            target_fps = options.fps_custom
+        elif options.fps_source == 'SCENE':
+            target_fps = context.scene.render.fps
+        elif options.fps_source == 'SEQUENCE':
+            target_fps = sequence.fps
+        else:
+            raise ValueError(f'Unknown FPS source: {options.fps_source}')
+
+        keyframe_time_dilation = target_fps / sequence.fps
 
         if options.should_write_keyframes:
             # Remove existing f-curves (replace with action.fcurves.clear() in Blender 3.2)
@@ -208,7 +216,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
             # Write the keyframes out.
             fcurve_data = numpy.zeros(2 * sequence.frame_count, dtype=float)
-            fcurve_data[0::2] = range(sequence.frame_count)
+            fcurve_data[0::2] = [x * keyframe_time_dilation for x in range(sequence.frame_count)]
             for bone_index, import_bone in enumerate(import_bones):
                 if import_bone is None:
                     continue
@@ -216,6 +224,8 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
                     fcurve_data[1::2] = sequence_data_matrix[:, bone_index, fcurve_index]
                     fcurve.keyframe_points.add(sequence.frame_count)
                     fcurve.keyframe_points.foreach_set('co', fcurve_data)
+                    for fcurve_keyframe in fcurve.keyframe_points:
+                        fcurve_keyframe.interpolation = 'LINEAR'
 
             if options.should_convert_to_samples:
                 # Bake the curve to samples.
@@ -224,7 +234,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
         # Write meta-data.
         if options.should_write_metadata:
-            action['psa_sequence_fps'] = sequence.fps
+            action.psa_export.fps = target_fps
 
         action.use_fake_user = options.should_use_fake_user
 

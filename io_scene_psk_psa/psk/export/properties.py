@@ -1,7 +1,7 @@
 from bpy.props import EnumProperty, CollectionProperty, IntProperty, BoolProperty, StringProperty
 from bpy.types import PropertyGroup
 
-from ...types import PSX_PG_bone_group_list_item
+from ...types import PSX_PG_bone_collection_list_item
 
 
 class PSK_PG_material_list_item(PropertyGroup):
@@ -16,12 +16,12 @@ class PSK_PG_export(PropertyGroup):
         description='',
         items=(
             ('ALL', 'All', 'All bones will be exported'),
-            ('BONE_GROUPS', 'Bone Groups',
-             'Only bones belonging to the selected bone groups and their ancestors will be exported')
+            ('BONE_COLLECTIONS', 'Bone Collections',
+             'Only bones belonging to the selected bone collections and their ancestors will be exported')
         )
     )
-    bone_group_list: CollectionProperty(type=PSX_PG_bone_group_list_item)
-    bone_group_list_index: IntProperty(default=0)
+    bone_collection_list: CollectionProperty(type=PSX_PG_bone_collection_list_item)
+    bone_collection_list_index: IntProperty(default=0)
     use_raw_mesh_data: BoolProperty(default=False, name='Raw Mesh Data', description='No modifiers will be evaluated as part of the exported mesh')
     material_list: CollectionProperty(type=PSK_PG_material_list_item)
     material_list_index: IntProperty(default=0)
