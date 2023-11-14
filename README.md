@@ -1,11 +1,15 @@
-[![Blender](https://img.shields.io/badge/Blender->=3.4-blue?logo=blender&logoColor=white)](https://www.blender.org/download/ "Download Blender")
+[![Blender](https://img.shields.io/badge/Blender->=2.9-blue?logo=blender&logoColor=white)](https://www.blender.org/download/ "Download Blender")
 [![GitHub release](https://img.shields.io/github/release/DarklightGames/io_scene_psk_psa?include_prereleases=&sort=semver&color=blue)](https://github.com/DarklightGames/io_scene_psk_psa/releases/)
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/L4L3853VR)
 
 This Blender add-on allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats) used in many versions of the Unreal Engine.
 
-> **NOTE**: This addon requires Blender 3.4+. If this is not available to you, install version [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0), as it has a minimum Blender version of 2.9, but is no longer receiving new features.
+| Blender Version | Addon Version | [LTS](https://en.wikipedia.org/wiki/Long-term_support) |
+|-----------------|---------------|-----|
+| 4.0             | [6.0.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/latest) | ✔
+| 3.4 - 3.6       | [5.0.6](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.6) | ✔
+| 2.9 - 3.3       | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) |
 
 # Features
 * Full PSK/PSA import and export capabilities.
