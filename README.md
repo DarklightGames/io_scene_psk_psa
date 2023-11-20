@@ -3,7 +3,7 @@
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/L4L3853VR)
 
-This Blender add-on allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats) used in many versions of the Unreal Engine.
+This Blender addon allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats) used in many versions of the Unreal Engine.
 
 ## Compatibility
 
@@ -13,7 +13,7 @@ This Blender add-on allows you to import and export meshes and animations to and
 | [3.4 - 3.6](https://www.blender.org/download/lts/3-6/)       | [5.0.5](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.5) | ✅️ June 2025      |
 | [2.93 - 3.3](https://www.blender.org/download/releases/3-3/) | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) | ✅️ September 2024 |
 
-Bug fixes will be issued for legacy addon versions that are under [Blender's LTS maintenance period](https://www.blender.org/download/lts/). Once the LTS period has ended, legacy addon-on versions will no longer be supported by the maintainers of this repository, although we will accept pull requests for bug fixes. 
+Bug fixes will be issued for legacy addon versions that are under [Blender's LTS maintenance period](https://www.blender.org/download/lts/). Once the LTS period has ended, legacy addon versions will no longer be supported by the maintainers of this repository, although we will accept pull requests for bug fixes. 
 
 # Features
 * Full PSK/PSA import and export capabilities.
