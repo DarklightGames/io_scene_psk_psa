@@ -24,6 +24,7 @@ class PsaImportOptions(object):
         self.bone_mapping_mode = 'CASE_INSENSITIVE'
         self.fps_source = 'SEQUENCE'
         self.fps_custom: float = 30.0
+        self.should_use_config_file = True
         self.psa_config: PsaConfig = PsaConfig()
 
 
