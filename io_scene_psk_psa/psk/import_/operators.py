@@ -2,13 +2,24 @@ import os
 import sys
 
 from bpy.props import StringProperty, BoolProperty, EnumProperty, FloatProperty
-from bpy.types import Operator
+from bpy.types import Operator, FileHandler, Context
 from bpy_extras.io_utils import ImportHelper
 
 from ..importer import PskImportOptions, import_psk
 from ..reader import read_psk
 
 empty_set = set()
+
+
+class PSX_FH_psk(FileHandler):
+    bl_idname = 'PSX_FH_psk'
+    bl_label = 'Unreal PSK/PSKX'
+    bl_import_operator = 'import_scene.psk'
+    bl_file_extensions = '.psk;.pskx'
+
+    @classmethod
+    def poll_drop(cls, context: Context):
+        return context.area.type == 'VIEW_3D'
 
 
 class PSK_OT_import(Operator, ImportHelper):
@@ -141,4 +152,5 @@ class PSK_OT_import(Operator, ImportHelper):
 
 classes = (
     PSK_OT_import,
+    PSX_FH_psk,
 )
