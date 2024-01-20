@@ -1,10 +1,12 @@
 import os
+from pathlib import Path
 
 from bpy.props import StringProperty
 from bpy.types import Operator, Event, Context
 from bpy_extras.io_utils import ImportHelper
 
 from .properties import get_visible_sequences
+from ..config import read_psa_config
 from ..importer import import_psa, PsaImportOptions
 from ..reader import PsaReader
 
@@ -156,6 +158,10 @@ class PSA_OT_import(Operator, ImportHelper):
         psa_reader = PsaReader(self.filepath)
         sequence_names = [x.action_name for x in pg.sequence_list if x.is_selected]
 
+        if len(sequence_names) == 0:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'No sequences selected')
+            return {'CANCELLED'}
+
         options = PsaImportOptions()
         options.sequence_names = sequence_names
         options.should_use_fake_user = pg.should_use_fake_user
@@ -170,9 +176,14 @@ class PSA_OT_import(Operator, ImportHelper):
         options.fps_source = pg.fps_source
         options.fps_custom = pg.fps_custom
 
-        if len(sequence_names) == 0:
-            self.report({'ERROR_INVALID_CONTEXT'}, 'No sequences selected')
-            return {'CANCELLED'}
+        if options.should_use_config_file:
+            # Read the PSA config file if it exists.
+            config_path = Path(self.filepath).with_suffix('.config')
+            if config_path.exists():
+                try:
+                    options.psa_config = read_psa_config(psa_reader, str(config_path))
+                except Exception as e:
+                    self.report({'WARNING'}, f'Failed to read PSA config file: {e}')
 
         result = import_psa(context, psa_reader, context.view_layer.objects.active, options)
 
@@ -254,6 +265,8 @@ class PSA_OT_import(Operator, ImportHelper):
         col.use_property_decorate = False
         col.prop(pg, 'should_use_fake_user')
         col.prop(pg, 'should_stash')
+        col.prop(pg, 'should_use_config_file')
+
         col.prop(pg, 'should_use_action_name_prefix')
 
         if pg.should_use_action_name_prefix:

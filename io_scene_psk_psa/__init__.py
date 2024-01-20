@@ -3,7 +3,7 @@ from bpy.app.handlers import persistent
 bl_info = {
     "name": "PSK/PSA Importer/Exporter",
     "author": "Colin Basnett, Yurii Ti",
-    "version": (6, 0, 0),
+    "version": (6, 1, 1),
     "blender": (4, 0, 0),
     "description": "PSK/PSA Import/Export (.psk/.psa)",
     "warning": "",
@@ -30,6 +30,7 @@ if 'bpy' in locals():
     importlib.reload(psk_import_operators)
 
     importlib.reload(psa_data)
+    importlib.reload(psa_config)
     importlib.reload(psa_reader)
     importlib.reload(psa_writer)
     importlib.reload(psa_builder)
@@ -55,6 +56,7 @@ else:
     from .psk.import_ import operators as psk_import_operators
 
     from .psa import data as psa_data
+    from .psa import config as psa_config
     from .psa import reader as psa_reader
     from .psa import writer as psa_writer
     from .psa import builder as psa_builder

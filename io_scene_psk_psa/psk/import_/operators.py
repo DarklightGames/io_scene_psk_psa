@@ -113,7 +113,7 @@ class PSK_OT_import(Operator, ImportHelper):
             message += '\n'.join(result.warnings)
             self.report({'WARNING'}, message)
         else:
-            self.report({'INFO'}, f'PSK imported')
+            self.report({'INFO'}, f'PSK imported ({options.name})')
 
         return {'FINISHED'}
 

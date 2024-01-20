@@ -146,7 +146,9 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
         psk_material.texture_index = len(psk.materials)
         psk.materials.append(psk_material)
 
-    for input_mesh_object in input_objects.mesh_objects:
+    context.window_manager.progress_begin(0, len(input_objects.mesh_objects))
+
+    for object_index, input_mesh_object in enumerate(input_objects.mesh_objects):
 
         # MATERIALS
         material_indices = [material_names.index(material_slot.material.name) for material_slot in input_mesh_object.material_slots]
@@ -287,6 +289,10 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
             bpy.data.objects.remove(mesh_object)
             bpy.data.meshes.remove(mesh_data)
             del mesh_data
+
+        context.window_manager.progress_update(object_index)
+
+    context.window_manager.progress_end()
 
     result.psk = psk
 

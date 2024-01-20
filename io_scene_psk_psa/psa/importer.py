@@ -6,6 +6,7 @@ import numpy
 from bpy.types import FCurve, Object, Context
 from mathutils import Vector, Quaternion
 
+from .config import PsaConfig, REMOVE_TRACK_LOCATION, REMOVE_TRACK_ROTATION
 from .data import Psa
 from .reader import PsaReader
 
@@ -24,6 +25,8 @@ class PsaImportOptions(object):
         self.bone_mapping_mode = 'CASE_INSENSITIVE'
         self.fps_source = 'SEQUENCE'
         self.fps_custom: float = 30.0
+        self.should_use_config_file = True
+        self.psa_config: PsaConfig = PsaConfig()
 
 
 class ImportBone(object):
@@ -164,6 +167,11 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
         sequence_name = sequence.name.decode('windows-1252')
         action_name = options.action_name_prefix + sequence_name
 
+        # Get the bone track flags for this sequence, or an empty dictionary if none exist.
+        sequence_bone_track_flags = dict()
+        if sequence_name in options.psa_config.sequence_bone_flags.keys():
+            sequence_bone_track_flags = options.psa_config.sequence_bone_flags[sequence_name]
+
         if options.should_overwrite and action_name in bpy.data.actions:
             action = bpy.data.actions[action_name]
         else:
@@ -188,18 +196,21 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
             # Create f-curves for the rotation and location of each bone.
             for psa_bone_index, armature_bone_index in psa_to_armature_bone_indices.items():
+                bone_track_flags = sequence_bone_track_flags.get(psa_bone_index, 0)
                 import_bone = import_bones[psa_bone_index]
                 pose_bone = import_bone.pose_bone
                 rotation_data_path = pose_bone.path_from_id('rotation_quaternion')
                 location_data_path = pose_bone.path_from_id('location')
+                add_rotation_fcurves = (bone_track_flags & REMOVE_TRACK_ROTATION) == 0
+                add_location_fcurves = (bone_track_flags & REMOVE_TRACK_LOCATION) == 0
                 import_bone.fcurves = [
-                    action.fcurves.new(rotation_data_path, index=0, action_group=pose_bone.name),  # Qw
-                    action.fcurves.new(rotation_data_path, index=1, action_group=pose_bone.name),  # Qx
-                    action.fcurves.new(rotation_data_path, index=2, action_group=pose_bone.name),  # Qy
-                    action.fcurves.new(rotation_data_path, index=3, action_group=pose_bone.name),  # Qz
-                    action.fcurves.new(location_data_path, index=0, action_group=pose_bone.name),  # Lx
-                    action.fcurves.new(location_data_path, index=1, action_group=pose_bone.name),  # Ly
-                    action.fcurves.new(location_data_path, index=2, action_group=pose_bone.name),  # Lz
+                    action.fcurves.new(rotation_data_path, index=0, action_group=pose_bone.name) if add_rotation_fcurves else None,  # Qw
+                    action.fcurves.new(rotation_data_path, index=1, action_group=pose_bone.name) if add_rotation_fcurves else None,  # Qx
+                    action.fcurves.new(rotation_data_path, index=2, action_group=pose_bone.name) if add_rotation_fcurves else None,  # Qy
+                    action.fcurves.new(rotation_data_path, index=3, action_group=pose_bone.name) if add_rotation_fcurves else None,  # Qz
+                    action.fcurves.new(location_data_path, index=0, action_group=pose_bone.name) if add_location_fcurves else None,  # Lx
+                    action.fcurves.new(location_data_path, index=1, action_group=pose_bone.name) if add_location_fcurves else None,  # Ly
+                    action.fcurves.new(location_data_path, index=2, action_group=pose_bone.name) if add_location_fcurves else None,  # Lz
                 ]
                 
                 if options.should_write_scale_keys:
@@ -225,11 +236,15 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
             # Write the keyframes out.
             fcurve_data = numpy.zeros(2 * sequence.frame_count, dtype=float)
+
+            # Populate the keyframe time data.
             fcurve_data[0::2] = [x * keyframe_time_dilation for x in range(sequence.frame_count)]
             for bone_index, import_bone in enumerate(import_bones):
                 if import_bone is None:
                     continue
                 for fcurve_index, fcurve in enumerate(import_bone.fcurves):
+                    if fcurve is None:
+                        continue
                     fcurve_data[1::2] = sequence_data_matrix[:, bone_index, fcurve_index]
                     fcurve.keyframe_points.add(sequence.frame_count)
                     fcurve.keyframe_points.foreach_set('co', fcurve_data)
