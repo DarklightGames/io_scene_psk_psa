@@ -51,7 +51,7 @@ class PSK_OT_material_list_move_up(Operator):
         pg = getattr(context.scene, 'psk_export')
         pg.material_list.move(pg.material_list_index, pg.material_list_index - 1)
         pg.material_list_index -= 1
-        return {"FINISHED"}
+        return {'FINISHED'}
 
 
 class PSK_OT_material_list_move_down(Operator):
@@ -69,7 +69,7 @@ class PSK_OT_material_list_move_down(Operator):
         pg = getattr(context.scene, 'psk_export')
         pg.material_list.move(pg.material_list_index, pg.material_list_index + 1)
         pg.material_list_index += 1
-        return {"FINISHED"}
+        return {'FINISHED'}
 
 
 class PSK_OT_export(Operator, ExportHelper):

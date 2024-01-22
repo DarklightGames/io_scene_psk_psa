@@ -23,7 +23,7 @@ def _read_material_references(path: str) -> List[str]:
         return []
     # Do a crude regex match to find the Material list entries.
     contents = property_file_path.read_text()
-    pattern = r"Material\s*=\s*([^\s^,]+)"
+    pattern = r'Material\s*=\s*([^\s^,]+)'
     return re.findall(pattern, contents)
 
 

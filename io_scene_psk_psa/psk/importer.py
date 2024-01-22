@@ -26,9 +26,9 @@ class PskImportOptions:
 
 
 class ImportBone:
-    """
+    '''
     Intermediate bone type for the purpose of construction.
-    """
+    '''
     def __init__(self, index: int, psk_bone: Psk.Bone):
         self.index: int = index
         self.psk_bone: Psk.Bone = psk_bone

@@ -95,15 +95,15 @@ class PSA_OT_import_select_file(Operator):
     bl_options = {'INTERNAL'}
     bl_description = 'Select a PSA file from which to import animations'
     filepath: StringProperty(subtype='FILE_PATH')
-    filter_glob: StringProperty(default="*.psa", options={'HIDDEN'})
+    filter_glob: StringProperty(default='*.psa', options={'HIDDEN'})
 
     def execute(self, context):
         getattr(context.scene, 'psa_import').psa_file_path = self.filepath
-        return {"FINISHED"}
+        return {'FINISHED'}
 
     def invoke(self, context, event):
         context.window_manager.fileselect_add(self)
-        return {"RUNNING_MODAL"}
+        return {'RUNNING_MODAL'}
 
 
 def load_psa_file(context, filepath: str):

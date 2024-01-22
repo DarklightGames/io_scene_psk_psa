@@ -11,24 +11,23 @@ def _try_fix_cue4parse_issue_103(sequences) -> bool:
     # The issue was that the frame_start_index was not being set correctly, and was always being set to the same value
     # as the frame_count.
     # This fix will eventually be deprecated as it is only necessary for files exported prior to the fix.
-    if len(sequences) > 0:
-        if sequences[0].frame_start_index == sequences[0].frame_count:
-            # Manually set the frame_start_index for each sequence. This assumes that the sequences are in order with
-            # no shared frames between sequences (all exporters that I know of do this, so it's a safe assumption).
-            frame_start_index = 0
-            for i, sequence in enumerate(sequences):
-                sequence.frame_start_index = frame_start_index
-                frame_start_index += sequence.frame_count
-            return True
+    if len(sequences) == 0 and sequences[0].frame_start_index == sequences[0].frame_count:
+        # Manually set the frame_start_index for each sequence. This assumes that the sequences are in order with
+        # no shared frames between sequences (all exporters that I know of do this, so it's a safe assumption).
+        frame_start_index = 0
+        for i, sequence in enumerate(sequences):
+            sequence.frame_start_index = frame_start_index
+            frame_start_index += sequence.frame_count
+        return True
     return False
 
 
 class PsaReader(object):
-    """
+    '''
     This class reads the sequences and bone information immediately upon instantiation and holds onto a file handle.
     The keyframe data is not read into memory upon instantiation due to its potentially very large size.
     To read the key data for a particular sequence, call :read_sequence_keys.
-    """
+    '''
 
     def __init__(self, path):
         self.keys_data_offset: int = 0
@@ -44,11 +43,11 @@ class PsaReader(object):
         return self.psa.sequences
 
     def read_sequence_data_matrix(self, sequence_name: str) -> np.ndarray:
-        """
+        '''
         Reads and returns the data matrix for the given sequence.
         @param sequence_name: The name of the sequence.
         @return: An FxBx7 matrix where F is the number of frames, B is the number of bones.
-        """
+        '''
         sequence = self.psa.sequences[sequence_name]
         keys = self.read_sequence_keys(sequence_name)
         bone_count = len(self.bones)
@@ -61,12 +60,12 @@ class PsaReader(object):
         return matrix
 
     def read_sequence_keys(self, sequence_name: str) -> List[Psa.Key]:
-        """
+        '''
         Reads and returns the key data for a sequence.
 
         @param sequence_name: The name of the sequence.
         @return: A list of Psa.Keys.
-        """
+        '''
         # Set the file reader to the beginning of the keys data
         sequence = self.psa.sequences[sequence_name]
         data_size = sizeof(Psa.Key)
