@@ -82,6 +82,7 @@ class PSK_OT_import(Operator, ImportHelper):
         soft_min=1.0,
         name='Bone Length',
         options=empty_set,
+        subtype='DISTANCE',
         description='Length of the bones'
     )
     should_import_shape_keys: BoolProperty(
