@@ -23,6 +23,7 @@ class PskImportOptions:
         self.should_import_shape_keys = True
         self.bone_length = 1.0
         self.should_import_materials = True
+        self.scale = 1.0
 
 
 class ImportBone:
@@ -51,6 +52,10 @@ class PskImportResult:
 def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
     result = PskImportResult()
     armature_object = None
+    mesh_object = None
+
+    if not options.should_import_mesh and not options.should_import_skeleton:
+        raise Exception('Nothing to import')
 
     if options.should_import_skeleton:
         # ARMATURE
@@ -265,6 +270,9 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
             armature_modifier = mesh_object.modifiers.new(name='Armature', type='ARMATURE')
             armature_modifier.object = armature_object
             mesh_object.parent = armature_object
+
+    root_object = armature_object if options.should_import_skeleton else mesh_object
+    root_object.scale = (options.scale, options.scale, options.scale)
 
     try:
         bpy.ops.object.mode_set(mode='OBJECT')

@@ -27,8 +27,8 @@ class PSK_OT_import(Operator, ImportHelper):
     should_import_vertex_colors: BoolProperty(
         default=True,
         options=empty_set,
-        name='Vertex Colors',
-        description='Import vertex colors from PSKX files, if available'
+        name='Import Vertex Colors',
+        description='Import vertex colors, if available'
     )
     vertex_color_space: EnumProperty(
         name='Vertex Color Space',
@@ -42,13 +42,13 @@ class PSK_OT_import(Operator, ImportHelper):
     )
     should_import_vertex_normals: BoolProperty(
         default=True,
-        name='Vertex Normals',
+        name='Import Vertex Normals',
         options=empty_set,
         description='Import vertex normals, if available'
     )
     should_import_extra_uvs: BoolProperty(
         default=True,
-        name='Extra UVs',
+        name='Import Extra UVs',
         options=empty_set,
         description='Import extra UV maps, if available'
     )
@@ -62,12 +62,6 @@ class PSK_OT_import(Operator, ImportHelper):
         default=True,
         name='Import Materials',
         options=empty_set,
-    )
-    should_reuse_materials: BoolProperty(
-        default=True,
-        name='Reuse Materials',
-        options=empty_set,
-        description='Existing materials with matching names will be reused when available'
     )
     should_import_skeleton: BoolProperty(
         default=True,
@@ -87,9 +81,14 @@ class PSK_OT_import(Operator, ImportHelper):
     )
     should_import_shape_keys: BoolProperty(
         default=True,
-        name='Shape Keys',
+        name='Import Shape Keys',
         options=empty_set,
         description='Import shape keys, if available'
+    )
+    scale: FloatProperty(
+        name='Scale',
+        default=1.0,
+        soft_min=0.0,
     )
 
     def execute(self, context):
@@ -106,6 +105,7 @@ class PSK_OT_import(Operator, ImportHelper):
         options.bone_length = self.bone_length
         options.should_import_materials = self.should_import_materials
         options.should_import_shape_keys = self.should_import_shape_keys
+        options.scale = self.scale
 
         result = import_psk(psk, context, options)
 
@@ -120,24 +120,36 @@ class PSK_OT_import(Operator, ImportHelper):
 
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, 'should_import_materials')
+
+        row = layout.row()
+
+        col = row.column()
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(self, 'scale')
+
         layout.prop(self, 'should_import_mesh')
-        row = layout.column()
-        row.use_property_split = True
-        row.use_property_decorate = False
+
         if self.should_import_mesh:
-            row.prop(self, 'should_import_vertex_normals')
-            row.prop(self, 'should_import_extra_uvs')
-            row.prop(self, 'should_import_vertex_colors')
+            row = layout.row()
+            col = row.column()
+            col.use_property_split = True
+            col.use_property_decorate = False
+            col.prop(self, 'should_import_materials', text='Materials')
+            col.prop(self, 'should_import_vertex_normals', text='Vertex Normals')
+            col.prop(self, 'should_import_extra_uvs', text='Extra UVs')
+            col.prop(self, 'should_import_vertex_colors', text='Vertex Colors')
             if self.should_import_vertex_colors:
-                row.prop(self, 'vertex_color_space')
-            row.prop(self, 'should_import_shape_keys')
+                col.prop(self, 'vertex_color_space')
+            col.prop(self, 'should_import_shape_keys', text='Shape Keys')
+
         layout.prop(self, 'should_import_skeleton')
-        row = layout.column()
-        row.use_property_split = True
-        row.use_property_decorate = False
         if self.should_import_skeleton:
-            row.prop(self, 'bone_length')
+            row = layout.row()
+            col = row.column()
+            col.use_property_split = True
+            col.use_property_decorate = False
+            col.prop(self, 'bone_length')
 
 
 classes = (

@@ -176,15 +176,15 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             action = bpy.data.actions.new(name=action_name)
 
         # Calculate the target FPS.
-        target_fps = sequence.fps
-        if options.fps_source == 'CUSTOM':
-            target_fps = options.fps_custom
-        elif options.fps_source == 'SCENE':
-            target_fps = context.scene.render.fps
-        elif options.fps_source == 'SEQUENCE':
-            target_fps = sequence.fps
-        else:
-            raise ValueError(f'Unknown FPS source: {options.fps_source}')
+        match options.fps_source:
+            case 'CUSTOM':
+                target_fps = options.fps_custom
+            case 'SCENE':
+                target_fps = context.scene.render.fps
+            case 'SEQUENCE':
+                target_fps = sequence.fps
+            case _:
+                raise ValueError(f'Unknown FPS source: {options.fps_source}')
 
         keyframe_time_dilation = target_fps / sequence.fps
 
