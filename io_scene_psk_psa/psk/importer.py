@@ -204,9 +204,12 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
                     pass
 
             # Map the PSK vertex colors to the face corners.
-            face_corner_colors = np.full((len(psk.faces * 3), 4), 1.0)
+            face_count = len(psk.faces) - len(invalid_face_indices)
+            face_corner_colors = np.full((face_count * 3, 4), 1.0)
             face_corner_color_index = 0
             for face_index, face in enumerate(psk.faces):
+                if face_index in invalid_face_indices:
+                    continue
                 for wedge_index in reversed(face.wedge_indices):
                     face_corner_colors[face_corner_color_index] = psk_vertex_colors[wedge_index]
                     face_corner_color_index += 1
