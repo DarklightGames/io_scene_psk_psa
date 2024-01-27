@@ -54,9 +54,6 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
     armature_object = None
     mesh_object = None
 
-    if not options.should_import_mesh and not options.should_import_skeleton:
-        raise Exception('Nothing to import')
-
     if options.should_import_skeleton:
         # ARMATURE
         armature_data = bpy.data.armatures.new(options.name)

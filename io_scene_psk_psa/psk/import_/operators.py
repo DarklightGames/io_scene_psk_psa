@@ -107,6 +107,10 @@ class PSK_OT_import(Operator, ImportHelper):
         options.should_import_shape_keys = self.should_import_shape_keys
         options.scale = self.scale
 
+        if not options.should_import_mesh and not options.should_import_skeleton:
+            self.report({'ERROR'}, 'Nothing to import')
+            return {'CANCELLED'}
+
         result = import_psk(psk, context, options)
 
         if len(result.warnings):
