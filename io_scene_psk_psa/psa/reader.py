@@ -11,7 +11,7 @@ def _try_fix_cue4parse_issue_103(sequences) -> bool:
     # The issue was that the frame_start_index was not being set correctly, and was always being set to the same value
     # as the frame_count.
     # This fix will eventually be deprecated as it is only necessary for files exported prior to the fix.
-    if len(sequences) == 0 and sequences[0].frame_start_index == sequences[0].frame_count:
+    if len(sequences) > 0 and sequences[0].frame_start_index == sequences[0].frame_count:
         # Manually set the frame_start_index for each sequence. This assumes that the sequences are in order with
         # no shared frames between sequences (all exporters that I know of do this, so it's a safe assumption).
         frame_start_index = 0
