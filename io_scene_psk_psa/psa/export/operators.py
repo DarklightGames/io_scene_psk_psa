@@ -47,7 +47,7 @@ def update_actions_and_timeline_markers(context: Context, armature: Armature):
         if not is_action_for_armature(armature, action):
             continue
 
-        if not action.name.startswith('#'):
+        if action.name != '' and not action.name.startswith('#'):
             for (name, frame_start, frame_end) in get_sequences_from_action(action):
                 item = pg.action_list.add()
                 item.action = action
@@ -60,7 +60,7 @@ def update_actions_and_timeline_markers(context: Context, armature: Armature):
         # Pose markers are not guaranteed to be in frame-order, so make sure that they are.
         pose_markers = sorted(action.pose_markers, key=lambda x: x.frame)
         for pose_marker_index, pose_marker in enumerate(pose_markers):
-            if pose_marker.name.startswith('#'):
+            if pose_marker.name.strip() == '' or pose_marker.name.startswith('#'):
                 continue
             for (name, frame_start, frame_end) in get_sequences_from_action_pose_marker(action, pose_markers, pose_marker, pose_marker_index):
                 item = pg.action_list.add()
@@ -78,7 +78,7 @@ def update_actions_and_timeline_markers(context: Context, armature: Armature):
     for marker_name in marker_names:
         if marker_name not in sequence_frame_ranges:
             continue
-        if marker_name.startswith('#'):
+        if marker_name.strip() == '' or marker_name.startswith('#'):
             continue
         frame_start, frame_end = sequence_frame_ranges[marker_name]
         sequences = get_sequences_from_name_and_frame_range(marker_name, frame_start, frame_end)
