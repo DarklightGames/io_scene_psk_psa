@@ -5,11 +5,11 @@ from ..data import *
 
 class Psk(object):
     class Wedge(object):
-        def __init__(self):
-            self.point_index: int = 0
-            self.u: float = 0.0
-            self.v: float = 0.0
-            self.material_index: int = 0
+        def __init__(self, point_index: int, u: float, v: float, material_index: int = 0):
+            self.point_index: int = point_index
+            self.u: float = u
+            self.v: float = v
+            self.material_index = material_index
 
         def __hash__(self):
             return hash(f'{self.point_index}-{self.u}-{self.v}-{self.material_index}')

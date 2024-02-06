@@ -166,38 +166,38 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
         bm.to_mesh(mesh_data)
 
         # TEXTURE COORDINATES
-        data_index = 0
+        uv_layer_data_index = 0
         uv_layer = mesh_data.uv_layers.new(name='VTXW0000')
         for face_index, face in enumerate(psk.faces):
             if face_index in invalid_face_indices:
                 continue
             face_wedges = [psk.wedges[i] for i in reversed(face.wedge_indices)]
             for wedge in face_wedges:
-                uv_layer.data[data_index].uv = wedge.u, 1.0 - wedge.v
-                data_index += 1
+                uv_layer.data[uv_layer_data_index].uv = wedge.u, 1.0 - wedge.v
+                uv_layer_data_index += 1
 
         # EXTRA UVS
         if psk.has_extra_uvs and options.should_import_extra_uvs:
             extra_uv_channel_count = int(len(psk.extra_uvs) / len(psk.wedges))
             wedge_index_offset = 0
             for extra_uv_index in range(extra_uv_channel_count):
-                data_index = 0
+                uv_layer_data_index = 0
                 uv_layer = mesh_data.uv_layers.new(name=f'EXTRAUV{extra_uv_index}')
                 for face_index, face in enumerate(psk.faces):
                     if face_index in invalid_face_indices:
                         continue
                     for wedge_index in reversed(face.wedge_indices):
                         u, v = psk.extra_uvs[wedge_index_offset + wedge_index]
-                        uv_layer.data[data_index].uv = u, 1.0 - v
-                        data_index += 1
+                        uv_layer.data[uv_layer_data_index].uv = u, 1.0 - v
+                        uv_layer_data_index += 1
                 wedge_index_offset += len(psk.wedges)
 
         # VERTEX COLORS
         if psk.has_vertex_colors and options.should_import_vertex_colors:
             # Convert vertex colors to sRGB if necessary.
             psk_vertex_colors = np.zeros((len(psk.vertex_colors), 4))
-            for i in range(len(psk.vertex_colors)):
-                psk_vertex_colors[i,:] = psk.vertex_colors[i].normalized()
+            for vertex_color_index in range(len(psk.vertex_colors)):
+                psk_vertex_colors[vertex_color_index,:] = psk.vertex_colors[vertex_color_index].normalized()
             match options.vertex_color_space:
                 case 'SRGBA':
                     for i in range(psk_vertex_colors.shape[0]):

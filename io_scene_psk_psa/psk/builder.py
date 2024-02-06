@@ -1,5 +1,8 @@
+from typing import Optional
+
 import bmesh
 import bpy
+import numpy as np
 from bpy.types import Armature
 
 from .data import *
@@ -9,7 +12,7 @@ from ..helpers import *
 class PskInputObjects(object):
     def __init__(self):
         self.mesh_objects = []
-        self.armature_object = None
+        self.armature_object: Optional[Object] = None
 
 
 class PskBuildOptions(object):
@@ -61,7 +64,7 @@ def get_psk_input_objects(context) -> PskInputObjects:
 class PskBuildResult(object):
     def __init__(self):
         self.psk = None
-        self.warnings = []
+        self.warnings: List[str] = []
 
 
 def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
@@ -217,11 +220,11 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
         # Build a list of non-unique wedges.
         wedges = []
         for loop_index, loop in enumerate(mesh_data.loops):
-            wedge = Psk.Wedge()
-            wedge.point_index = loop.vertex_index + vertex_offset
-            wedge.u, wedge.v = uv_layer[loop_index].uv
-            wedge.v = 1.0 - wedge.v
-            wedges.append(wedge)
+            wedges.append(Psk.Wedge(
+                point_index=loop.vertex_index + vertex_offset,
+                u=uv_layer[loop_index].uv[0],
+                v=1.0 - uv_layer[loop_index].uv[1]
+            ))
 
         # Assign material indices to the wedges.
         for triangle in mesh_data.loop_triangles:
@@ -229,8 +232,8 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
                 wedges[loop_index].material_index = material_indices[triangle.material_index]
 
         # Populate the list of wedges with unique wedges & build a look-up table of loop indices to wedge indices
-        wedge_indices = {}
-        loop_wedge_indices = [-1] * len(mesh_data.loops)
+        wedge_indices = dict()
+        loop_wedge_indices = np.full(len(mesh_data.loops), -1)
         for loop_index, wedge in enumerate(wedges):
             wedge_hash = hash(wedge)
             if wedge_hash in wedge_indices:
