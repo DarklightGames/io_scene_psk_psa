@@ -227,8 +227,6 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
             for vertex_normal in psk.vertex_normals:
                 normals.append(tuple(vertex_normal))
             mesh_data.normals_split_custom_set_from_vertices(normals)
-            # TODO: This has been removed in 4.1!
-            mesh_data.use_auto_smooth = True
         else:
             mesh_data.shade_smooth()
 
