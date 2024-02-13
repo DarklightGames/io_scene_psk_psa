@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from bpy.props import StringProperty
-from bpy.types import Operator, Event, Context
+from bpy.types import Operator, Event, Context, FileHandler
 from bpy_extras.io_utils import ImportHelper
 
 from .properties import get_visible_sequences
@@ -87,23 +87,6 @@ class PSA_OT_import_sequences_deselect_all(Operator):
         for sequence in visible_sequences:
             sequence.is_selected = False
         return {'FINISHED'}
-
-
-class PSA_OT_import_select_file(Operator):
-    bl_idname = 'psa_import.select_file'
-    bl_label = 'Select'
-    bl_options = {'INTERNAL'}
-    bl_description = 'Select a PSA file from which to import animations'
-    filepath: StringProperty(subtype='FILE_PATH')
-    filter_glob: StringProperty(default='*.psa', options={'HIDDEN'})
-
-    def execute(self, context):
-        getattr(context.scene, 'psa_import').psa_file_path = self.filepath
-        return {'FINISHED'}
-
-    def invoke(self, context, event):
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
 
 
 def load_psa_file(context, filepath: str):
@@ -270,10 +253,13 @@ class PSA_OT_import(Operator, ImportHelper):
             col.prop(pg, 'action_name_prefix')
 
 
+class PSA_FH_import(FileHandler):
+
+
+
 classes = (
     PSA_OT_import_sequences_select_all,
     PSA_OT_import_sequences_deselect_all,
     PSA_OT_import_sequences_from_text,
     PSA_OT_import,
-    PSA_OT_import_select_file,
 )

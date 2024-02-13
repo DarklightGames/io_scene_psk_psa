@@ -91,15 +91,16 @@ def update_actions_and_timeline_markers(context: Context, armature: Armature):
 
 
 def get_sequence_fps(context: Context, fps_source: str, fps_custom: float, actions: Iterable[Action]) -> float:
-    if fps_source == 'SCENE':
-        return context.scene.render.fps
-    elif fps_source == 'CUSTOM':
-        return fps_custom
-    elif fps_source == 'ACTION_METADATA':
-        # Get the minimum value of action metadata FPS values.
-        return min([action.psa_export.fps for action in actions])
-    else:
-        raise RuntimeError(f'Invalid FPS source "{fps_source}"')
+    match fps_source:
+        case 'SCENE':
+            return context.scene.render.fps
+        case 'CUSTOM':
+            return fps_custom
+        case 'ACTION_METADATA':
+            # Get the minimum value of action metadata FPS values.
+            return min([action.psa_export.fps for action in actions])
+        case _:
+            raise RuntimeError(f'Invalid FPS source "{fps_source}"')
 
 
 def get_animation_data_object(context: Context) -> Object:

@@ -11,15 +11,15 @@ from ..reader import read_psk
 empty_set = set()
 
 
-class PSX_FH_psk(FileHandler):
-    bl_idname = 'PSX_FH_psk'
-    bl_label = 'Unreal PSK/PSKX'
+class PSK_FH_import(FileHandler):
+    bl_idname = 'PSK_FH_import'
+    bl_label = 'File handler for Unreal PSK/PSKX import'
     bl_import_operator = 'import_scene.psk'
-    bl_file_extensions = '.psk;.pskx'
+    bl_file_extensions = '.psk'
 
     @classmethod
     def poll_drop(cls, context: Context):
-        return context.area.type == 'VIEW_3D'
+        return context.area and context.area.type == 'VIEW_3D'
 
 
 class PSK_OT_import(Operator, ImportHelper):
@@ -143,10 +143,11 @@ class PSK_OT_import(Operator, ImportHelper):
         col.use_property_decorate = False
         col.prop(self, 'scale')
 
-        layout.prop(self, 'should_import_mesh')
+        mesh_header, mesh_panel = layout.panel('mesh_panel_id', default_closed=False)
+        mesh_header.prop(self, 'should_import_mesh')
 
-        if self.should_import_mesh:
-            row = layout.row()
+        if mesh_panel and self.should_import_mesh:
+            row = mesh_panel.row()
             col = row.column()
             col.use_property_split = True
             col.use_property_decorate = False
@@ -158,9 +159,11 @@ class PSK_OT_import(Operator, ImportHelper):
                 col.prop(self, 'vertex_color_space')
             col.prop(self, 'should_import_shape_keys', text='Shape Keys')
 
-        layout.prop(self, 'should_import_skeleton')
-        if self.should_import_skeleton:
-            row = layout.row()
+        skeleton_header, skeleton_panel = layout.panel('skeleton_panel_id', default_closed=False)
+        skeleton_header.prop(self, 'should_import_skeleton')
+
+        if skeleton_panel and self.should_import_skeleton:
+            row = skeleton_panel.row()
             col = row.column()
             col.use_property_split = True
             col.use_property_decorate = False
@@ -169,5 +172,5 @@ class PSK_OT_import(Operator, ImportHelper):
 
 classes = (
     PSK_OT_import,
-    PSX_FH_psk,
+    PSK_FH_import,
 )
