@@ -1,4 +1,3 @@
-from math import inf
 from typing import Optional, List
 
 import bmesh
@@ -17,19 +16,20 @@ class PskImportOptions:
         self.should_import_mesh = True
         self.should_reuse_materials = True
         self.should_import_vertex_colors = True
-        self.vertex_color_space = 'sRGB'
+        self.vertex_color_space = 'SRGB'
         self.should_import_vertex_normals = True
         self.should_import_extra_uvs = True
         self.should_import_skeleton = True
         self.should_import_shape_keys = True
         self.bone_length = 1.0
         self.should_import_materials = True
+        self.scale = 1.0
 
 
 class ImportBone:
-    """
+    '''
     Intermediate bone type for the purpose of construction.
-    """
+    '''
     def __init__(self, index: int, psk_bone: Psk.Bone):
         self.index: int = index
         self.psk_bone: Psk.Bone = psk_bone
@@ -52,6 +52,7 @@ class PskImportResult:
 def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
     result = PskImportResult()
     armature_object = None
+    mesh_object = None
 
     if options.should_import_skeleton:
         # ARMATURE
@@ -144,6 +145,7 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
 
         bm.verts.ensure_lookup_table()
 
+        # FACES
         invalid_face_indices = set()
         for face_index, face in enumerate(psk.faces):
             point_indices = map(lambda i: psk.wedges[i].point_index, reversed(face.wedge_indices))
@@ -164,61 +166,59 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
         bm.to_mesh(mesh_data)
 
         # TEXTURE COORDINATES
-        data_index = 0
+        uv_layer_data_index = 0
         uv_layer = mesh_data.uv_layers.new(name='VTXW0000')
         for face_index, face in enumerate(psk.faces):
             if face_index in invalid_face_indices:
                 continue
             face_wedges = [psk.wedges[i] for i in reversed(face.wedge_indices)]
             for wedge in face_wedges:
-                uv_layer.data[data_index].uv = wedge.u, 1.0 - wedge.v
-                data_index += 1
+                uv_layer.data[uv_layer_data_index].uv = wedge.u, 1.0 - wedge.v
+                uv_layer_data_index += 1
 
         # EXTRA UVS
         if psk.has_extra_uvs and options.should_import_extra_uvs:
             extra_uv_channel_count = int(len(psk.extra_uvs) / len(psk.wedges))
             wedge_index_offset = 0
             for extra_uv_index in range(extra_uv_channel_count):
-                data_index = 0
+                uv_layer_data_index = 0
                 uv_layer = mesh_data.uv_layers.new(name=f'EXTRAUV{extra_uv_index}')
                 for face_index, face in enumerate(psk.faces):
                     if face_index in invalid_face_indices:
                         continue
                     for wedge_index in reversed(face.wedge_indices):
                         u, v = psk.extra_uvs[wedge_index_offset + wedge_index]
-                        uv_layer.data[data_index].uv = u, 1.0 - v
-                        data_index += 1
+                        uv_layer.data[uv_layer_data_index].uv = u, 1.0 - v
+                        uv_layer_data_index += 1
                 wedge_index_offset += len(psk.wedges)
 
         # VERTEX COLORS
         if psk.has_vertex_colors and options.should_import_vertex_colors:
-            size = (len(psk.points), 4)
-            vertex_colors = np.full(size, inf)
-            vertex_color_data = mesh_data.vertex_colors.new(name='VERTEXCOLOR')
-            ambiguous_vertex_color_point_indices = []
+            # Convert vertex colors to sRGB if necessary.
+            psk_vertex_colors = np.zeros((len(psk.vertex_colors), 4))
+            for vertex_color_index in range(len(psk.vertex_colors)):
+                psk_vertex_colors[vertex_color_index,:] = psk.vertex_colors[vertex_color_index].normalized()
+            match options.vertex_color_space:
+                case 'SRGBA':
+                    for i in range(psk_vertex_colors.shape[0]):
+                        psk_vertex_colors[i, :3] = tuple(map(lambda x: rgb_to_srgb(x), psk_vertex_colors[i, :3]))
+                case _:
+                    pass
 
-            for wedge_index, wedge in enumerate(psk.wedges):
-                point_index = wedge.point_index
-                psk_vertex_color = psk.vertex_colors[wedge_index].normalized()
-                if vertex_colors[point_index, 0] != inf and tuple(vertex_colors[point_index]) != psk_vertex_color:
-                    ambiguous_vertex_color_point_indices.append(point_index)
-                else:
-                    vertex_colors[point_index] = psk_vertex_color
+            # Map the PSK vertex colors to the face corners.
+            face_count = len(psk.faces) - len(invalid_face_indices)
+            face_corner_colors = np.full((face_count * 3, 4), 1.0)
+            face_corner_color_index = 0
+            for face_index, face in enumerate(psk.faces):
+                if face_index in invalid_face_indices:
+                    continue
+                for wedge_index in reversed(face.wedge_indices):
+                    face_corner_colors[face_corner_color_index] = psk_vertex_colors[wedge_index]
+                    face_corner_color_index += 1
 
-            if options.vertex_color_space == 'SRGBA':
-                for i in range(vertex_colors.shape[0]):
-                    vertex_colors[i, :3] = tuple(map(lambda x: rgb_to_srgb(x), vertex_colors[i, :3]))
-
-            for loop_index, loop in enumerate(mesh_data.loops):
-                vertex_color = vertex_colors[loop.vertex_index]
-                if vertex_color is not None:
-                    vertex_color_data.data[loop_index].color = vertex_color
-                else:
-                    vertex_color_data.data[loop_index].color = 1.0, 1.0, 1.0, 1.0
-
-            if len(ambiguous_vertex_color_point_indices) > 0:
-                result.warnings.append(
-                    f'{len(ambiguous_vertex_color_point_indices)} vertex(es) with ambiguous vertex colors.')
+            # Create the vertex color attribute.
+            face_corner_color_attribute = mesh_data.attributes.new(name='VERTEXCOLOR', type='FLOAT_COLOR', domain='CORNER')
+            face_corner_color_attribute.data.foreach_set('color', face_corner_colors.flatten())
 
         # VERTEX NORMALS
         if psk.has_vertex_normals and options.should_import_vertex_normals:
@@ -227,6 +227,8 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
             for vertex_normal in psk.vertex_normals:
                 normals.append(tuple(vertex_normal))
             mesh_data.normals_split_custom_set_from_vertices(normals)
+            # TODO: This has been removed in 4.1!
+            mesh_data.use_auto_smooth = True
         else:
             mesh_data.shade_smooth()
 
@@ -265,6 +267,9 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
             armature_modifier = mesh_object.modifiers.new(name='Armature', type='ARMATURE')
             armature_modifier.object = armature_object
             mesh_object.parent = armature_object
+
+    root_object = armature_object if options.should_import_skeleton else mesh_object
+    root_object.scale = (options.scale, options.scale, options.scale)
 
     try:
         bpy.ops.object.mode_set(mode='OBJECT')

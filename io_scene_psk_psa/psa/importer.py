@@ -24,6 +24,7 @@ class PsaImportOptions(object):
         self.bone_mapping_mode = 'CASE_INSENSITIVE'
         self.fps_source = 'SEQUENCE'
         self.fps_custom: float = 30.0
+        self.should_use_config_file = True
         self.psa_config: PsaConfig = PsaConfig()
 
 
@@ -63,12 +64,12 @@ class PsaImportResult:
 
 
 def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_names: List[str], bone_mapping_mode: str = 'EXACT') -> Optional[int]:
-    """
+    '''
     @param psa_bone_name: The name of the PSA bone.
     @param armature_bone_names: The names of the bones in the armature.
     @param bone_mapping_mode: One of 'EXACT' or 'CASE_INSENSITIVE'.
     @return: The index of the armature bone that corresponds to the given PSA bone, or None if no such bone exists.
-    """
+    '''
     for armature_bone_index, armature_bone_name in enumerate(armature_bone_names):
         if bone_mapping_mode == 'CASE_INSENSITIVE':
             if armature_bone_name.lower() == psa_bone_name.lower():
@@ -175,15 +176,15 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             action = bpy.data.actions.new(name=action_name)
 
         # Calculate the target FPS.
-        target_fps = sequence.fps
-        if options.fps_source == 'CUSTOM':
-            target_fps = options.fps_custom
-        elif options.fps_source == 'SCENE':
-            target_fps = context.scene.render.fps
-        elif options.fps_source == 'SEQUENCE':
-            target_fps = sequence.fps
-        else:
-            raise ValueError(f'Unknown FPS source: {options.fps_source}')
+        match options.fps_source:
+            case 'CUSTOM':
+                target_fps = options.fps_custom
+            case 'SCENE':
+                target_fps = context.scene.render.fps
+            case 'SEQUENCE':
+                target_fps = sequence.fps
+            case _:
+                raise ValueError(f'Unknown FPS source: {options.fps_source}')
 
         keyframe_time_dilation = target_fps / sequence.fps
 

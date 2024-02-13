@@ -32,6 +32,12 @@ class PSA_PG_import(PropertyGroup):
                                        description='Assign each imported action a fake user so that the data block is '
                                                    'saved even it has no users',
                                        options=empty_set)
+    should_use_config_file: BoolProperty(default=True, name='Use Config File',
+                                            description='Use the .config file that is sometimes generated when the PSA '
+                                                        'file is exported from UEViewer. This file contains '
+                                                        'options that can be used to filter out certain bones tracks '
+                                                        'from the imported actions',
+                                            options=empty_set)
     should_stash: BoolProperty(default=False, name='Stash',
                                description='Stash each imported action as a strip on a new non-contributing NLA track',
                                options=empty_set)
