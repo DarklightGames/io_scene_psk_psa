@@ -110,7 +110,7 @@ def get_animation_data_object(context: Context) -> Object:
     if active_object.type != 'ARMATURE':
         raise RuntimeError('Selected object must be an Armature')
 
-    if pg.should_override_animation_data:
+    if pg.sequence_source != 'ACTIONS' and pg.should_override_animation_data:
         animation_data_object = pg.animation_data_override
     else:
         animation_data_object = active_object
