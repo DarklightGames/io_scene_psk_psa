@@ -1,11 +1,11 @@
-from bpy.props import EnumProperty, CollectionProperty, IntProperty, BoolProperty, StringProperty
-from bpy.types import PropertyGroup
+from bpy.props import EnumProperty, CollectionProperty, IntProperty, BoolProperty, PointerProperty
+from bpy.types import PropertyGroup, Material
 
 from ...types import PSX_PG_bone_collection_list_item
 
 
 class PSK_PG_material_list_item(PropertyGroup):
-    material_name: StringProperty()
+    material: PointerProperty(type=Material)
     index: IntProperty()
 
 

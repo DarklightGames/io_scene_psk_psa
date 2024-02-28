@@ -24,6 +24,8 @@ if 'bpy' in locals():
     importlib.reload(psk_writer)
     importlib.reload(psk_builder)
     importlib.reload(psk_importer)
+    importlib.reload(psk_properties)
+    importlib.reload(psk_ui)
     importlib.reload(psk_export_properties)
     importlib.reload(psk_export_operators)
     importlib.reload(psk_export_ui)
@@ -50,6 +52,8 @@ else:
     from .psk import writer as psk_writer
     from .psk import builder as psk_builder
     from .psk import importer as psk_importer
+    from .psk import properties as psk_properties
+    from .psk import ui as psk_ui
     from .psk.export import properties as psk_export_properties
     from .psk.export import operators as psk_export_operators
     from .psk.export import ui as psk_export_ui
@@ -72,6 +76,8 @@ import bpy
 from bpy.props import PointerProperty
 
 classes = psx_types.classes +\
+          psk_properties.classes +\
+          psk_ui.classes +\
           psk_import_operators.classes +\
           psk_export_properties.classes +\
           psk_export_operators.classes +\
@@ -107,6 +113,7 @@ def register():
     bpy.types.TOPBAR_MT_file_import.append(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.append(psa_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.append(psa_import_menu_func)
+    bpy.types.Material.psk = PointerProperty(type=psk_properties.PSX_PG_material)
     bpy.types.Scene.psa_import = PointerProperty(type=psa_import_properties.PSA_PG_import)
     bpy.types.Scene.psa_export = PointerProperty(type=psa_export_properties.PSA_PG_export)
     bpy.types.Scene.psk_export = PointerProperty(type=psk_export_properties.PSK_PG_export)
@@ -114,6 +121,7 @@ def register():
 
 
 def unregister():
+    del bpy.types.Material.psk
     del bpy.types.Scene.psa_import
     del bpy.types.Scene.psa_export
     del bpy.types.Scene.psk_export

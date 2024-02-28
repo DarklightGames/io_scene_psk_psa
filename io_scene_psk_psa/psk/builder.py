@@ -3,9 +3,10 @@ from typing import Optional
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import Armature
+from bpy.types import Armature, Material
 
 from .data import *
+from .properties import get_poly_flags
 from ..helpers import *
 
 
@@ -20,7 +21,7 @@ class PskBuildOptions(object):
         self.bone_filter_mode = 'ALL'
         self.bone_collection_indices: List[int] = []
         self.use_raw_mesh_data = True
-        self.material_names: List[str] = []
+        self.materials: List[Material] = []
         self.should_enforce_bone_name_restrictions = False
 
 
@@ -138,18 +139,20 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
             psk.bones.append(psk_bone)
 
     # MATERIALS
-    material_names = options.material_names
-
-    for material_name in material_names:
+    for material in options.materials:
         psk_material = Psk.Material()
         try:
-            psk_material.name = bytes(material_name, encoding='windows-1252')
+            psk_material.name = bytes(material.name, encoding='windows-1252')
         except UnicodeEncodeError:
-            raise RuntimeError(f'Material name "{material_name}" contains characters that cannot be encoded in the Windows-1252 codepage')
+            raise RuntimeError(f'Material name "{material.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
         psk_material.texture_index = len(psk.materials)
+        psk_material.poly_flags = get_poly_flags(material.psk)
+        print(psk_material.name, psk_material.poly_flags)
         psk.materials.append(psk_material)
 
     context.window_manager.progress_begin(0, len(input_objects.mesh_objects))
+
+    material_names = [m.name for m in options.materials]
 
     for object_index, input_mesh_object in enumerate(input_objects.mesh_objects):
 
