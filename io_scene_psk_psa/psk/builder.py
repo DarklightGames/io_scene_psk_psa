@@ -6,7 +6,7 @@ import numpy as np
 from bpy.types import Armature, Material
 
 from .data import *
-from .properties import get_poly_flags
+from .properties import triangle_type_and_bit_flags_to_poly_flags
 from ..helpers import *
 
 
@@ -146,8 +146,8 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
         except UnicodeEncodeError:
             raise RuntimeError(f'Material name "{material.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
         psk_material.texture_index = len(psk.materials)
-        psk_material.poly_flags = get_poly_flags(material.psk)
-        print(psk_material.name, psk_material.poly_flags)
+        psk_material.poly_flags = triangle_type_and_bit_flags_to_poly_flags(material.psk.mesh_triangle_type,
+                                                                            material.psk.mesh_triangle_bit_flags)
         psk.materials.append(psk_material)
 
     context.window_manager.progress_begin(0, len(input_objects.mesh_objects))
