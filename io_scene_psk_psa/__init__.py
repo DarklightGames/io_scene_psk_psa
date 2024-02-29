@@ -3,7 +3,7 @@ from bpy.app.handlers import persistent
 bl_info = {
     'name': 'PSK/PSA Importer/Exporter',
     'author': 'Colin Basnett, Yurii Ti',
-    'version': (6, 1, 2),
+    'version': (6, 2, 0),
     'blender': (4, 0, 0),
     'description': 'PSK/PSA Import/Export (.psk/.psa)',
     'warning': '',
