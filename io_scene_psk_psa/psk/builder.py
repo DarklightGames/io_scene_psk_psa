@@ -76,9 +76,9 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
     psk = Psk()
     bones = []
 
-    if armature_object is None:
-        # If the mesh has no armature object, simply assign it a dummy bone at the root to satisfy the requirement
-        # that a PSK file must have at least one bone.
+    if armature_object is None or len(armature_object.data.bones) == 0:
+        # If the mesh has no armature object or no bones, simply assign it a dummy bone at the root to satisfy the
+        # requirement that a PSK file must have at least one bone.
         psk_bone = Psk.Bone()
         psk_bone.name = bytes('root', encoding='windows-1252')
         psk_bone.flags = 0
