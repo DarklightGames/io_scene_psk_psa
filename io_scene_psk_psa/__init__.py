@@ -36,6 +36,7 @@ if 'bpy' in locals():
     importlib.reload(psa_reader)
     importlib.reload(psa_writer)
     importlib.reload(psa_builder)
+    importlib.reload(psa_importer)
     importlib.reload(psa_export_properties)
     importlib.reload(psa_export_operators)
     importlib.reload(psa_export_ui)
