@@ -254,7 +254,7 @@ class PSA_OT_import(Operator, ImportHelper):
 
 
 class PSA_FH_import(FileHandler):
-
+    pass
 
 
 classes = (
