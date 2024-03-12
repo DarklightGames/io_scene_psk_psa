@@ -7,6 +7,7 @@ from bpy.types import VertexGroup
 from mathutils import Quaternion, Vector, Matrix
 
 from .data import Psk
+from .properties import poly_flags_to_triangle_type_and_bit_flags
 from ..helpers import rgb_to_srgb, is_bdk_addon_loaded
 
 
@@ -134,6 +135,9 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
                 else:
                     # Just create a blank material.
                     material = bpy.data.materials.new(material_name)
+                    mesh_triangle_type, mesh_triangle_bit_flags = poly_flags_to_triangle_type_and_bit_flags(psk_material.poly_flags)
+                    material.psk.mesh_triangle_type = mesh_triangle_type
+                    material.psk.mesh_triangle_bit_flags = mesh_triangle_bit_flags
                     material.use_nodes = True
                 mesh_data.materials.append(material)
 
