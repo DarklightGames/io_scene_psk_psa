@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+import bpy
 from bpy.props import StringProperty
 from bpy.types import Operator, Event, Context, FileHandler
 from bpy_extras.io_utils import ImportHelper
@@ -28,7 +29,7 @@ class PSA_OT_import_sequences_from_text(Operator):
     def draw(self, context):
         layout = self.layout
         pg = getattr(context.scene, 'psa_import')
-        layout.label(icon='INFO', text='Each sequence name should be on a new line.')
+        layout.label(icon='INFO', text='Each sequence name should be on a new line')
         layout.prop(pg, 'select_text', text='')
 
     def execute(self, context):
@@ -43,14 +44,16 @@ class PSA_OT_import_sequences_from_text(Operator):
                 if sequence.action_name == line:
                     sequence.is_selected = True
                     count += 1
-        self.report({'INFO'}, f'Selected {count} sequence(s)')
+        message = bpy.app.translations.pgettext('Selected {count} sequence(s)')
+        message = message.format(count=count)
+        self.report({'INFO'}, message)
         return {'FINISHED'}
 
 
 class PSA_OT_import_sequences_select_all(Operator):
     bl_idname = 'psa_import.sequences_select_all'
     bl_label = 'All'
-    bl_description = 'Select all sequences'
+    bl_description = 'Select all visible sequences'
     bl_options = {'INTERNAL'}
 
     @classmethod
@@ -165,17 +168,22 @@ class PSA_OT_import(Operator, ImportHelper):
                 try:
                     options.psa_config = read_psa_config(psa_reader, str(config_path))
                 except Exception as e:
-                    self.report({'WARNING'}, f'Failed to read PSA config file: {e}')
+                    message = bpy.app.translations.pgettext_iface('Failed to read PSA config file: {error}')
+                    message = message.format(error=str(e))
+                    self.report({'WARNING'}, message)
 
         result = import_psa(context, psa_reader, context.view_layer.objects.active, options)
 
         if len(result.warnings) > 0:
-            message = f'Imported {len(sequence_names)} action(s) with {len(result.warnings)} warning(s)\n'
+            message = bpy.app.translations.pgettext_iface('Imported {action_count} action(s) with {warning_count} warning(s)')
+            message = message.format(action_count=len(sequence_names), warning_count=len(result.warnings))
             self.report({'WARNING'}, message)
             for warning in result.warnings:
                 self.report({'WARNING'}, warning)
         else:
-            self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
+            message = bpy.app.translations.pgettext_iface('Imported {action_count} action(s)')
+            message = message.format(action_count=len(sequence_names))
+            self.report({'INFO'}, message)
 
         return {'FINISHED'}
 
@@ -259,7 +267,7 @@ class PSA_OT_import(Operator, ImportHelper):
 
 class PSA_FH_import(FileHandler):
     bl_idname = 'PSA_FH_import'
-    bl_label = 'File handler for Unreal PSA import'
+    bl_label = ''
     bl_import_operator = 'psa_import.import'
     bl_file_extensions = '.psa'
 

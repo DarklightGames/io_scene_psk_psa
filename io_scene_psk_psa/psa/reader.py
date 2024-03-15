@@ -1,5 +1,7 @@
 import ctypes
+import warnings
 
+import bpy.app.translations
 import numpy as np
 
 from .data import *
@@ -113,5 +115,7 @@ class PsaReader(object):
                 fp.seek(section.data_size * section.data_count, 1)
             else:
                 fp.seek(section.data_size * section.data_count, 1)
-                print(f'Unrecognized section in PSA: "{section.name}"')
+                message = bpy.app.translations.pgettext_iface('Unhandled section "{section_name}" at position {position}')
+                message = message.format(section_name=section.name.decode(), position=fp.tell())
+                warnings.warn(message)
         return psa

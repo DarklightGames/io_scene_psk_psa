@@ -7,7 +7,7 @@ class PSX_UL_bone_collection_list(UIList):
     def draw_item(self, context: Context, layout: UILayout, data: AnyType, item: AnyType, icon: int,
                   active_data: AnyType, active_property: str, index: int = 0, flt_flag: int = 0):
         row = layout.row()
-        row.prop(item, 'is_selected', text=item.name, translate=item.name == 'Unassigned')
+        row.prop(item, 'is_selected', text=item.name, translate=False)
         row.label(text=str(getattr(item, 'count')), icon='BONE_DATA')
 
 

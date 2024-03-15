@@ -30,7 +30,7 @@ class PSA_PG_import(PropertyGroup):
     sequence_list_index: IntProperty(name='', default=0)
     should_use_fake_user: BoolProperty(default=True, name='Fake User',
                                        description='Assign each imported action a fake user so that the data block is '
-                                                   'saved even it has no users',
+                                                   'always saved',
                                        options=empty_set)
     should_use_config_file: BoolProperty(default=True, name='Use Config File',
                                             description='Use the .config file that is sometimes generated when the PSA '
@@ -48,8 +48,8 @@ class PSA_PG_import(PropertyGroup):
                                                'will have it\'s data overwritten instead of a new action being created')
     should_write_keyframes: BoolProperty(default=True, name='Keyframes', options=empty_set)
     should_write_metadata: BoolProperty(default=True, name='Metadata', options=empty_set,
-                                        description='Additional data will be written to the custom properties of the '
-                                                    'Action (e.g., frame rate)')
+                                        description='Additional data will be written to the properties of the Action '
+                                        '(e.g., frame rate)')
     sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
     sequence_filter_is_selected: BoolProperty(default=False, options=empty_set, name='Only Show Selected',
                                               description='Only show selected sequences')
@@ -69,8 +69,8 @@ class PSA_PG_import(PropertyGroup):
         description='The method by which bones from the PSA file are mapped to the bones of the armature',
         items=(
             ('EXACT', 'Exact', 'Bone names must match exactly', 'EXACT', 0),
-            ('CASE_INSENSITIVE', 'Case Insensitive', 'Bones names must match, ignoring case (e.g., the bone PSA bone '
-             '\'root\' can be mapped to the armature bone \'Root\')', 'CASE_INSENSITIVE', 1),
+            ('CASE_INSENSITIVE', 'Case Insensitive', 'Bones names must match, ignoring case (e.g., the PSA bone '
+             '\'aBcDeF\' can be mapped to the armature bone \'ABCDEF\')', 'CASE_INSENSITIVE', 1),
         )
     )
     fps_source: EnumProperty(name='FPS Source', items=(

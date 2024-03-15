@@ -158,16 +158,16 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             psa_bone_name = psa_bone_names[psa_bone_index]
             armature_bone_name = armature_bone_names[armature_bone_index]
             mapped_psa_bone_name = psa_bone_names[mapped_psa_bone_index]
-            result.warnings.append(f'PSA bone {psa_bone_index} ({psa_bone_name}) could not be mapped to armature bone {armature_bone_index} ({armature_bone_name}) because the armature bone is already mapped to PSA bone {mapped_psa_bone_index} ({mapped_psa_bone_name})')
+            message = bpy.app.translations.pgettext_iface('PSA bone {bone_index} ({bone_name}) could not be mapped to armature bone {armature_bone_index} ({armature_bone_name}) because the armature bone is already mapped to PSA bone {mapped_psa_bone_index} ({mapped_psa_bone_name})')
+            message = message.format(bone_index=psa_bone_index, bone_name=psa_bone_name, armature_bone_index=armature_bone_index, armature_bone_name=armature_bone_name, mapped_psa_bone_index=mapped_psa_bone_index, mapped_psa_bone_name=mapped_psa_bone_name)
+            result.warnings.append(message)
 
     # Report if there are missing bones in the target armature.
     missing_bone_names = set(psa_bone_names).difference(set(armature_bone_names))
     if len(missing_bone_names) > 0:
-        result.warnings.append(
-            f'The armature \'{armature_object.name}\' is missing {len(missing_bone_names)} bones that exist in '
-            'the PSA:\n' +
-            str(list(sorted(missing_bone_names)))
-        )
+        message = bpy.app.translations.pgettext_iface('The armature \'{armature_name}\' is missing {count} bones that exist in the PSA:\n{missing_bone_names}')
+        message = message.format(armature_name=armature_object.name, count=len(missing_bone_names), missing_bone_names=str(list(sorted(missing_bone_names))))
+        result.warnings.append(message)
     del armature_bone_names
 
     # Create intermediate bone data for import operations.
@@ -232,7 +232,9 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             case 'SEQUENCE':
                 target_fps = sequence.fps
             case _:
-                raise ValueError(f'Unknown FPS source: {options.fps_source}')
+                message = bpy.app.translations.pgettext_iface('Invalid FPS source: {fps_source}')
+                message = message.format(fps_source=options.fps_source)
+                raise ValueError(message)
 
         if options.should_write_keyframes:
             # Remove existing f-curves.

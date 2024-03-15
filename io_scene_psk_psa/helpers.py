@@ -60,7 +60,7 @@ def populate_bone_collection_list(armature_object: Object, bone_collection_list:
         return
 
     item = bone_collection_list.add()
-    item.name = 'Unassigned'
+    item.name = bpy.app.translations.pgettext_iface('Unassigned')
     item.index = -1
     # Count the number of bones without an assigned bone collection
     item.count = sum(map(lambda bone: 1 if len(bone.collections) == 0 else 0, armature.bones))
@@ -78,9 +78,12 @@ def check_bone_names(bone_names: Iterable[str]):
     pattern = re.compile(r'^[a-zA-Z\d_\- ]+$')
     invalid_bone_names = [x for x in bone_names if pattern.match(x) is None]
     if len(invalid_bone_names) > 0:
-        raise RuntimeError(f'The following bone names are invalid: {invalid_bone_names}.\n'
-                           f'Bone names must only contain letters, numbers, spaces, hyphens and underscores.\n'
-                           f'You can bypass this by disabling "Enforce Bone Name Restrictions" in the export settings.')
+        message = bpy.app.translations.pgettext_iface(
+            'The following bone names are invalid: {invalid_bone_names}.\n'
+            'Bone names must only contain letters, numbers, spaces, hyphens and underscores.\n'
+            'You can bypass this by disabling "Enforce Bone Name Restrictions" in the export settings.'
+        )
+        raise RuntimeError(message.format(invalid_bone_names=str(invalid_bone_names)))
 
 
 def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_collection_indices: List[int]) -> List[str]:
@@ -153,13 +156,18 @@ def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_c
                 # TODO: in future, it would be preferential to have a readout of *all* instigator bones.
                 instigator_bone_name = instigator_bone_names[bone_names.index(bone_name)]
                 if instigator_bone_name is None:
-                    print(f'Root bone "{root_bone_name}" was included because {bone_name} was marked for export')
+                    message = bpy.app.translations.pgettext_iface('Root bone "{root_bone_name}" was included because {bone_name} was marked for export')
+                    message = message.format(root_bone_name=root_bone_name, bone_name=bone_name)
+                    print(message)
                     break
                 bone_name = instigator_bone_name
 
-        raise RuntimeError('Exported bone hierarchy must have a single root bone.\n'
-                           f'The bone hierarchy marked for export has {len(root_bones)} root bones: {root_bone_names}.\n'
-                           f'Additional debugging information has been written to the console.')
+        message = bpy.app.translations.pgettext_iface(
+            'Exported bone hierarchy must have a single root bone.\n'
+            'The bone hierarchy marked for export has {root_bone_count} root bones: {root_bone_names}.\n'
+            'Additional debugging information has been written to the console.'
+        )
+        raise RuntimeError(message.format(root_bone_count=len(root_bones), root_bone_names=str(root_bone_names)))
 
     return bone_names
 

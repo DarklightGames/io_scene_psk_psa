@@ -1,6 +1,7 @@
 import os
 import sys
 
+import bpy.app.translations
 from bpy.props import StringProperty, BoolProperty, EnumProperty, FloatProperty
 from bpy.types import Operator, FileHandler, Context
 from bpy_extras.io_utils import ImportHelper
@@ -13,7 +14,7 @@ empty_set = set()
 
 class PSK_FH_import(FileHandler):
     bl_idname = 'PSK_FH_import'
-    bl_label = 'File handler for Unreal PSK/PSKX import'
+    bl_label = ''
     bl_import_operator = 'import_scene.psk'
     bl_file_extensions = '.psk;.pskx'
 
@@ -61,7 +62,7 @@ class PSK_OT_import(Operator, ImportHelper):
         default=True,
         name='Import Extra UVs',
         options=empty_set,
-        description='Import extra UV maps, if available'
+        description='Import extra UVs, if available'
     )
     should_import_mesh: BoolProperty(
         default=True,
@@ -76,8 +77,7 @@ class PSK_OT_import(Operator, ImportHelper):
     should_import_skeleton: BoolProperty(
         default=True,
         name='Armature',
-        options=empty_set,
-        description='Armature'
+        options=empty_set
     )
     bone_length: FloatProperty(
         default=1.0,
@@ -123,11 +123,14 @@ class PSK_OT_import(Operator, ImportHelper):
         result = import_psk(psk, context, options)
 
         if len(result.warnings):
-            message = f'PSK imported with {len(result.warnings)} warning(s)\n'
+            message = bpy.app.translations.pgettext_iface('PSK imported with {count} warning(s)')
+            message = message.format(count=len(result.warnings))
             message += '\n'.join(result.warnings)
             self.report({'WARNING'}, message)
         else:
-            self.report({'INFO'}, f'PSK imported ({options.name})')
+            message = bpy.app.translations.pgettext_iface('PSK imported ({name})')
+            message = message.format(name=options.name)
+            self.report({'INFO'}, message)
 
         return {'FINISHED'}
 

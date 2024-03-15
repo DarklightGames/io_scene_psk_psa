@@ -15,7 +15,7 @@ class PSA_UL_export_sequences(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         item = cast(PSA_PG_export_action_list_item, item)
         is_pose_marker = hasattr(item, 'is_pose_marker') and item.is_pose_marker
-        layout.prop(item, 'is_selected', icon_only=True, text=item.name)
+        layout.prop(item, 'is_selected', icon_only=True, text=item.name, translate=False)
         if hasattr(item, 'action') and item.action is not None and item.action.asset_data is not None:
             layout.label(text='', icon='ASSET_MANAGER')
 
@@ -24,7 +24,7 @@ class PSA_UL_export_sequences(UIList):
         if item.frame_end < item.frame_start:
             row.label(text='', icon='FRAME_PREV')
         if is_pose_marker:
-            row.label(text=item.action.name, icon='PMARKER')
+            row.label(text=item.action.name, icon='PMARKER', translate=False)
 
     def draw_filter(self, context, layout):
         pg = getattr(context.scene, 'psa_export')

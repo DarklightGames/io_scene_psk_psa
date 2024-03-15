@@ -29,7 +29,8 @@ def get_psk_input_objects(context) -> PskInputObjects:
     input_objects = PskInputObjects()
     for selected_object in context.view_layer.objects.selected:
         if selected_object.type != 'MESH':
-            raise RuntimeError(f'Selected object "{selected_object.name}" is not a mesh')
+            message = bpy.app.translations.pgettext_iface('Selected object "{object_name}" is not a mesh')
+            raise RuntimeError(message.format(object_name=selected_object.name))
 
     input_objects.mesh_objects = context.view_layer.objects.selected
 
@@ -38,7 +39,8 @@ def get_psk_input_objects(context) -> PskInputObjects:
 
     for mesh_object in input_objects.mesh_objects:
         if len(mesh_object.data.materials) == 0:
-            raise RuntimeError(f'Mesh "{mesh_object.name}" must have at least one material')
+            message = bpy.app.translations.pgettext_iface('Mesh "{object_name}" must have at least one material')
+            raise RuntimeError(message.format(object_name=mesh_object.name))
 
     # Ensure that there are either no armature modifiers (static mesh)
     # or that there is exactly one armature modifier object shared between
@@ -50,12 +52,15 @@ def get_psk_input_objects(context) -> PskInputObjects:
         if len(modifiers) == 0:
             continue
         elif len(modifiers) > 1:
-            raise RuntimeError(f'Mesh "{mesh_object.name}" must have only one armature modifier')
+            message = bpy.app.translations.pgettext_iface('Mesh "{object_name}" must have only one armature modifier')
+            raise RuntimeError(message.format(object_name=mesh_object.name))
         armature_modifier_objects.add(modifiers[0].object)
 
     if len(armature_modifier_objects) > 1:
         armature_modifier_names = [x.name for x in armature_modifier_objects]
-        raise RuntimeError(f'All selected meshes must have the same armature modifier, encountered {len(armature_modifier_names)} ({", ".join(armature_modifier_names)})')
+        message = bpy.app.translations.pgettext_iface('All selected meshes must have the same armature modifier, encountered {count} ({names})')
+        message = message.format(count=len(armature_modifier_objects), names=', '.join(armature_modifier_names))
+        raise RuntimeError(message)
     elif len(armature_modifier_objects) == 1:
         input_objects.armature_object = list(armature_modifier_objects)[0]
 
@@ -101,8 +106,8 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
             try:
                 psk_bone.name = bytes(bone.name, encoding='windows-1252')
             except UnicodeEncodeError:
-                raise RuntimeError(
-                    f'Bone name "{bone.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
+                message = bpy.app.translations.pgettext_iface('Bone name "{name}" contains characters that cannot be encoded in the Windows-1252 codepage')
+                raise RuntimeError(message.format(name=bone.name))
             psk_bone.flags = 0
             psk_bone.children_count = 0
 
@@ -144,7 +149,8 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
         try:
             psk_material.name = bytes(material.name, encoding='windows-1252')
         except UnicodeEncodeError:
-            raise RuntimeError(f'Material name "{material.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
+            message = bpy.app.translations.pgettext_iface('Material name "{name}" contains characters that cannot be encoded in the Windows-1252 codepage')
+            raise RuntimeError(message.format(name=material.name))
         psk_material.texture_index = len(psk.materials)
         psk_material.poly_flags = triangle_type_and_bit_flags_to_poly_flags(material.psk.mesh_triangle_type,
                                                                             material.psk.mesh_triangle_bit_flags)

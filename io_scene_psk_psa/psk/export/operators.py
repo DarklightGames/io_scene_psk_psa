@@ -1,3 +1,4 @@
+import bpy
 from bpy.props import StringProperty
 from bpy.types import Operator
 from bpy_extras.io_utils import ExportHelper
@@ -26,11 +27,10 @@ def populate_material_list(mesh_objects, material_list):
             material = material_slot.material
             # TODO: put this in the poll arg?
             if material is None:
-                message = 'Material slot cannot be empty (index {index})'
-                message = bpy.app.translations.pgettext_iface(message.format(index=i))
-                raise RuntimeError(message)
-            if material.name not in material_names:
-                material_names.append(material.name)
+                message = bpy.app.translations.pgettext_iface('Material slot cannot be empty (index {index})')
+                raise RuntimeError(message.format(index=i))
+            if material.name not in materials:
+                materials.append(material)
 
     for index, material in enumerate(materials):
         m = material_list.add()
@@ -123,37 +123,40 @@ class PSK_OT_export(Operator, ExportHelper):
         pg = getattr(context.scene, 'psk_export')
 
         # MESH
-        box = layout.box()
-        box.label(text='Mesh', icon='MESH_DATA')
-        box.prop(pg, 'use_raw_mesh_data')
+        mesh_header, mesh_panel = layout.panel('mesh_panel_id', default_closed=False)
+        mesh_header.label(text='Mesh', icon='MESH_DATA')
+        if mesh_panel is not None:
+            mesh_panel.prop(pg, 'use_raw_mesh_data')
 
         # BONES
-        box = layout.box()
-        box.label(text='Bones', icon='BONE_DATA')
-        bone_filter_mode_items = pg.bl_rna.properties['bone_filter_mode'].enum_items_static
-        row = box.row(align=True)
-        for item in bone_filter_mode_items:
-            identifier = item.identifier
-            item_layout = row.row(align=True)
-            item_layout.prop_enum(pg, 'bone_filter_mode', item.identifier)
-            item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
+        bones_header, bones_panel = layout.panel('bones_panel_id', default_closed=False)
+        bones_header.label(text='Bones', icon='BONE_DATA')
+        if bones_panel is not None:
+            bone_filter_mode_items = pg.bl_rna.properties['bone_filter_mode'].enum_items_static
+            row = bones_panel.row(align=True)
+            for item in bone_filter_mode_items:
+                identifier = item.identifier
+                item_layout = row.row(align=True)
+                item_layout.prop_enum(pg, 'bone_filter_mode', item.identifier)
+                item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
 
-        if pg.bone_filter_mode == 'BONE_COLLECTIONS':
-            row = box.row()
-            rows = max(3, min(len(pg.bone_collection_list), 10))
-            row.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index', rows=rows)
+            if pg.bone_filter_mode == 'BONE_COLLECTIONS':
+                row = bones_panel.row()
+                rows = max(3, min(len(pg.bone_collection_list), 10))
+                row.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index', rows=rows)
 
-        box.prop(pg, 'should_enforce_bone_name_restrictions')
+            bones_panel.prop(pg, 'should_enforce_bone_name_restrictions')
 
         # MATERIALS
-        box = layout.box()
-        box.label(text='Materials', icon='MATERIAL')
-        row = box.row()
-        rows = max(3, min(len(pg.bone_collection_list), 10))
-        row.template_list('PSK_UL_materials', '', pg, 'material_list', pg, 'material_list_index', rows=rows)
-        col = row.column(align=True)
-        col.operator(PSK_OT_material_list_move_up.bl_idname, text='', icon='TRIA_UP')
-        col.operator(PSK_OT_material_list_move_down.bl_idname, text='', icon='TRIA_DOWN')
+        materials_header, materials_panel = layout.panel('materials_panel_id', default_closed=False)
+        materials_header.label(text='Materials', icon='MATERIAL')
+        if materials_panel is not None:
+            row = materials_panel.row()
+            rows = max(3, min(len(pg.bone_collection_list), 10))
+            row.template_list('PSK_UL_materials', '', pg, 'material_list', pg, 'material_list_index', rows=rows)
+            col = row.column(align=True)
+            col.operator(PSK_OT_material_list_move_up.bl_idname, text='', icon='TRIA_UP')
+            col.operator(PSK_OT_material_list_move_down.bl_idname, text='', icon='TRIA_DOWN')
 
     def execute(self, context):
         pg = context.scene.psk_export
@@ -170,7 +173,8 @@ class PSK_OT_export(Operator, ExportHelper):
                 self.report({'WARNING'}, warning)
             write_psk(result.psk, self.filepath)
             if len(result.warnings) > 0:
-                self.report({'WARNING'}, f'PSK export successful with {len(result.warnings)} warnings')
+                message = bpy.app.translations.pgettext_iface('PSK export successful with {warning_count} warnings')
+                self.report({'WARNING'}, message.format(warning_count=len(result.warnings)))
             else:
                 self.report({'INFO'}, f'PSK export successful')
         except RuntimeError as e:

@@ -28,9 +28,9 @@ class PskImportOptions:
 
 
 class ImportBone:
-    '''
+    """
     Intermediate bone type for the purpose of construction.
-    '''
+    """
     def __init__(self, index: int, psk_bone: Psk.Bone):
         self.index: int = index
         self.psk_bone: Psk.Bone = psk_bone
@@ -165,7 +165,8 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
 
         # TODO: Handle invalid faces better.
         if len(invalid_face_indices) > 0:
-            result.warnings.append(f'Discarded {len(invalid_face_indices)} invalid face(s).')
+            message = bpy.app.translations.pgettext_iface('Discarded {count} invalid face(s)')
+            result.warnings.append(message.format(count=len(invalid_face_indices)))
 
         bm.to_mesh(mesh_data)
 

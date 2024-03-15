@@ -1,5 +1,6 @@
 from typing import Optional
 
+import bpy.app.translations
 from bpy.types import Armature, Bone, Action, PoseBone
 
 from .data import *
@@ -95,7 +96,8 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
         try:
             psa_bone.name = bytes(bone.name, encoding='windows-1252')
         except UnicodeEncodeError:
-            raise RuntimeError(f'Bone name "{bone.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
+            message = bpy.app.translations.pgettext_iface('Bone name "{name}" contains characters that cannot be encoded in the Windows-1252 codepage')
+            raise RuntimeError(message.format(name=bone.name))
 
         try:
             parent_index = bones.index(bone.parent)
@@ -172,7 +174,9 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
         try:
             psa_sequence.name = bytes(export_sequence.name, encoding='windows-1252')
         except UnicodeEncodeError:
-            raise RuntimeError(f'Sequence name "{export_sequence.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
+            message = bpy.app.translations.pgettext_iface('Sequence name "{name}" contains characters that cannot be encoded in the Windows-1252 codepage')
+            message = message.format(name=export_sequence.name)
+            raise RuntimeError(message)
         psa_sequence.frame_count = frame_count
         psa_sequence.frame_start_index = frame_start_index
         psa_sequence.fps = frame_count / sequence_duration

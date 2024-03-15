@@ -141,9 +141,9 @@ class PSA_PG_export(PropertyGroup):
         options=empty_set,
         description='',
         items=(
-            ('ALL', 'All', 'All bones will be exported.'),
+            ('ALL', 'All', 'All bones will be exported'),
             ('BONE_COLLECTIONS', 'Bone Collections', 'Only bones belonging to the selected bone collections and their '
-             'ancestors will be exported.'),
+             'ancestors will be exported'),
         )
     )
     bone_collection_list: CollectionProperty(type=PSX_PG_bone_collection_list_item)
@@ -152,7 +152,7 @@ class PSA_PG_export(PropertyGroup):
         default=False,
         name='Enforce Bone Name Restrictions',
         description='Bone names restrictions will be enforced. Note that bone names without properly formatted names '
-                    'may not be able to be referenced in-engine'
+                    'may not be able to be referenced by some versions of the Unreal Engine'
     )
     sequence_name_prefix: StringProperty(name='Prefix', options=empty_set)
     sequence_name_suffix: StringProperty(name='Suffix', options=empty_set)

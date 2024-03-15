@@ -10,8 +10,7 @@ class PSA_UL_sequences(UIList):
         split = row.split(align=True, factor=0.75)
         column = split.row(align=True)
         column.alignment = 'LEFT'
-        column.prop(item, 'is_selected', icon_only=True)
-        column.label(text=getattr(item, 'action_name'), translate=False)
+        column.prop(item, 'is_selected', text=getattr(item, 'action_name'), translate=False)
 
     def draw_filter(self, context, layout):
         pg = getattr(context.scene, 'psa_import')

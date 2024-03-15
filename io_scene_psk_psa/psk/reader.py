@@ -1,8 +1,9 @@
 import ctypes
-import os
 import re
 import warnings
 from pathlib import Path
+
+import bpy.app.translations
 
 from .data import *
 
@@ -69,8 +70,9 @@ def read_psk(path: str) -> Psk:
                 _read_types(fp, Psk.MorphData, section, psk.morph_data)
             else:
                 # Section is not handled, skip it.
-                fp.seek(section.data_size * section.data_count, os.SEEK_CUR)
-                warnings.warn(f'Unrecognized section "{section.name} at position {fp.tell():15}"')
+                message: str = bpy.app.translations.pgettext_iface('Unhandled section "{section_name}" at position {position}')
+                message.format(section_name=section.name, position=f'{fp.tell():15}')
+                warnings.warn(message)
 
     '''
     UEViewer exports a sidecar file (*.props.txt) with fully-qualified reference paths for each material
@@ -78,14 +80,14 @@ def read_psk(path: str) -> Psk:
     '''
     psk.material_references = _read_material_references(path)
 
-    '''
+    """
     Tools like UEViewer and CUE4Parse write the point index as a 32-bit integer, exploiting the fact that due to struct
     alignment, there were 16-bits of padding following the original 16-bit point index in the wedge struct.
     However, this breaks compatibility with PSK files that were created with older tools that treated the
     point index as a 16-bit integer and might have junk data written to the padding bits.
     To work around this, we check if each point is still addressable using a 16-bit index, and if it is, assume the
     point index is a 16-bit integer and truncate the high bits.
-    '''
+    """
     if len(psk.points) <= 65536:
         for wedge in psk.wedges:
             wedge.point_index &= 0xFFFF

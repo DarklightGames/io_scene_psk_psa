@@ -2,19 +2,19 @@ from bpy.props import EnumProperty
 from bpy.types import PropertyGroup
 
 mesh_triangle_types_items = (
-    ('NORMAL', 'Normal', 'Normal one-sided', 0),
-    ('NORMAL_TWO_SIDED', 'Normal Two-Sided', 'Normal but two-sided', 1),
-    ('TRANSLUCENT', 'Translucent', 'Translucent two-sided', 2),
-    ('MASKED', 'Masked', 'Masked two-sided', 3),
-    ('MODULATE', 'Modulate', 'Modulation blended two-sided', 4),
-    ('PLACEHOLDER', 'Placeholder', 'Placeholder triangle for positioning weapon. Invisible', 8),
+    ('NORMAL', 'Normal', '', 0),
+    ('NORMAL_TWO_SIDED', 'Normal Two-Sided', '', 1),
+    ('TRANSLUCENT', 'Translucent', '', 2),
+    ('MASKED', 'Masked', '', 3),
+    ('MODULATE', 'Modulate', '', 4),
+    ('PLACEHOLDER', 'Placeholder', '', 8),
 )
 
 mesh_triangle_bit_flags_items = (
-    ('UNLIT', 'Unlit', 'Full brightness, no lighting', 16),
-    ('FLAT', 'Flat', 'Flat surface, don\'t do bMeshCurvy thing', 32),
-    ('ENVIRONMENT', 'Environment', 'Environment mapped', 64),
-    ('NO_SMOOTH', 'No Smooth', 'No bilinear filtering on this poly\'s texture', 128),
+    ('UNLIT', 'Unlit', '', 16),
+    ('FLAT', 'Flat', '', 32),
+    ('ENVIRONMENT', 'Environment', '', 64),
+    ('NO_SMOOTH', 'No Smooth', '', 128),
 )
 
 class PSX_PG_material(PropertyGroup):

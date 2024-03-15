@@ -100,7 +100,9 @@ def get_sequence_fps(context: Context, fps_source: str, fps_custom: float, actio
             # Get the minimum value of action metadata FPS values.
             return min([action.psa_export.fps for action in actions])
         case _:
-            raise RuntimeError(f'Invalid FPS source "{fps_source}"')
+            message = bpy.app.translations.pgettext_iface('Invalid FPS source: {fps_source}')
+            message = message.format(fps_source=fps_source)
+            raise RuntimeError(message)
 
 
 def get_animation_data_object(context: Context) -> Object:
@@ -234,84 +236,94 @@ class PSA_OT_export(Operator, ExportHelper):
         layout = self.layout
         pg = getattr(context.scene, 'psa_export')
 
-        flow = layout.grid_flow()
-        flow.use_property_split = True
-        flow.use_property_decorate = False
+        sequences_header, sequences_panel = layout.panel('sequences_panel_id', default_closed=False)
+        sequences_header.label(text='Sequences', icon='ACTION')
 
-        # FPS
-        fps_row = flow.row(align=True)
-        fps_row.prop(pg, 'fps_source', text='FPS')
-        if pg.fps_source == 'CUSTOM':
-            fps_row.prop(pg, 'fps_custom', text='')
-
-        # SOURCE
-        flow.prop(pg, 'sequence_source', text='Source')
-
-        if pg.sequence_source in {'TIMELINE_MARKERS', 'NLA_TRACK_STRIPS'}:
-            # ANIMDATA SOURCE
-            flow.prop(pg, 'should_override_animation_data')
-            if pg.should_override_animation_data:
-                flow.prop(pg, 'animation_data_override', text='')
-
-        if pg.sequence_source == 'NLA_TRACK_STRIPS':
-            flow = layout.grid_flow()
+        if sequences_panel is not None:
+            flow = sequences_panel.grid_flow()
             flow.use_property_split = True
             flow.use_property_decorate = False
-            flow.prop(pg, 'nla_track')
 
-        # SELECT ALL/NONE
-        row = layout.row(align=True)
-        row.label(text='Select')
-        row.operator(PSA_OT_export_actions_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
-        row.operator(PSA_OT_export_actions_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
+            # FPS
+            fps_row = flow.row(align=True)
+            fps_row.prop(pg, 'fps_source', text='FPS')
+            if pg.fps_source == 'CUSTOM':
+                fps_row.prop(pg, 'fps_custom', text='')
 
-        # ACTIONS
-        if pg.sequence_source == 'ACTIONS':
-            rows = max(3, min(len(pg.action_list), 10))
-            layout.template_list('PSA_UL_export_sequences', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
-        elif pg.sequence_source == 'TIMELINE_MARKERS':
-            rows = max(3, min(len(pg.marker_list), 10))
-            layout.template_list('PSA_UL_export_sequences', '', pg, 'marker_list', pg, 'marker_list_index', rows=rows)
-        elif pg.sequence_source == 'NLA_TRACK_STRIPS':
-            rows = max(3, min(len(pg.nla_strip_list), 10))
-            layout.template_list('PSA_UL_export_sequences', '', pg, 'nla_strip_list', pg, 'nla_strip_list_index', rows=rows)
+            # SOURCE
+            flow.prop(pg, 'sequence_source', text='Source')
 
-        col = layout.column()
-        col.use_property_split = True
-        col.use_property_decorate = False
-        col.prop(pg, 'sequence_name_prefix')
-        col.prop(pg, 'sequence_name_suffix')
+            if pg.sequence_source in {'TIMELINE_MARKERS', 'NLA_TRACK_STRIPS'}:
+                # ANIMDATA SOURCE
+                flow.prop(pg, 'should_override_animation_data')
+                if pg.should_override_animation_data:
+                    flow.prop(pg, 'animation_data_override', text='')
 
-        # Determine if there is going to be a naming conflict and display an error, if so.
-        selected_items = [x for x in pg.action_list if x.is_selected]
-        action_names = [x.name for x in selected_items]
-        action_name_counts = Counter(action_names)
-        for action_name, count in action_name_counts.items():
-            if count > 1:
-                layout.label(text=f'Duplicate action: {action_name}', icon='ERROR')
-                break
+            if pg.sequence_source == 'NLA_TRACK_STRIPS':
+                flow = sequences_panel.grid_flow()
+                flow.use_property_split = True
+                flow.use_property_decorate = False
+                flow.prop(pg, 'nla_track')
 
-        layout.separator()
+            # SELECT ALL/NONE
+            row = sequences_panel.row(align=True)
+            row.label(text='Select')
+            row.operator(PSA_OT_export_actions_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
+            row.operator(PSA_OT_export_actions_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
+
+            # ACTIONS
+            if pg.sequence_source == 'ACTIONS':
+                rows = max(3, min(len(pg.action_list), 10))
+                sequences_panel.template_list('PSA_UL_export_sequences', '', pg, 'action_list', pg, 'action_list_index', rows=rows)
+            elif pg.sequence_source == 'TIMELINE_MARKERS':
+                rows = max(3, min(len(pg.marker_list), 10))
+                sequences_panel.template_list('PSA_UL_export_sequences', '', pg, 'marker_list', pg, 'marker_list_index', rows=rows)
+            elif pg.sequence_source == 'NLA_TRACK_STRIPS':
+                rows = max(3, min(len(pg.nla_strip_list), 10))
+                sequences_panel.template_list('PSA_UL_export_sequences', '', pg, 'nla_strip_list', pg, 'nla_strip_list_index', rows=rows)
+
+            col = sequences_panel.column()
+            col.use_property_split = True
+            col.use_property_decorate = False
+            col.prop(pg, 'sequence_name_prefix')
+            col.prop(pg, 'sequence_name_suffix')
+
+            # Determine if there is going to be a naming conflict and display an error, if so.
+            selected_items = [x for x in pg.action_list if x.is_selected]
+            action_names = [x.name for x in selected_items]
+            action_name_counts = Counter(action_names)
+            for action_name, count in action_name_counts.items():
+                if count > 1:
+                    text = bpy.app.translations.pgettext_iface('Duplicate action: {action_name}')
+                    text = text.format(action_name=action_name)
+                    sequences_panel.label(text, icon='ERROR')
+                    break
 
         # BONES
-        row = layout.row(align=True)
-        row.prop(pg, 'bone_filter_mode', text='Bones')
+        bones_header, bones_panel = layout.panel('bones_panel_id', default_closed=False)
+        bones_header.label(text='Bones', icon='BONE_DATA')
 
-        if pg.bone_filter_mode == 'BONE_COLLECTIONS':
-            row = layout.row(align=True)
-            row.label(text='Select')
-            row.operator(PSA_OT_export_bone_collections_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
-            row.operator(PSA_OT_export_bone_collections_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
-            rows = max(3, min(len(pg.bone_collection_list), 10))
-            layout.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index',
-                                 rows=rows)
+        if bones_panel is not None:
+            row = bones_panel.row(align=True)
+            row.prop(pg, 'bone_filter_mode', text='Bones')
 
-        layout.prop(pg, 'should_enforce_bone_name_restrictions')
+            if pg.bone_filter_mode == 'BONE_COLLECTIONS':
+                row = bones_panel.row(align=True)
+                row.label(text='Select')
+                row.operator(PSA_OT_export_bone_collections_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
+                row.operator(PSA_OT_export_bone_collections_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
+                rows = max(3, min(len(pg.bone_collection_list), 10))
+                bones_panel.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index',
+                                     rows=rows)
 
-        layout.separator()
+            bones_panel.prop(pg, 'should_enforce_bone_name_restrictions')
 
         # ROOT MOTION
-        layout.prop(pg, 'root_motion', text='Root Motion')
+        advanced_header, advanced_panel = layout.panel('advanced_panel_id', default_closed=False)
+        advanced_header.label(text='Advanced')
+
+        if advanced_panel is not None:
+            advanced_panel.prop(pg, 'root_motion', text='Root Motion')
 
     @classmethod
     def _check_context(cls, context):
@@ -360,7 +372,9 @@ class PSA_OT_export(Operator, ExportHelper):
         animation_data = animation_data_object.animation_data
 
         if animation_data is None:
-            raise RuntimeError(f'No animation data for object \'{animation_data_object.name}\'')
+            message = bpy.app.translations.pgettext_iface('No animation data for object "{name}"')
+            message = message.format(name=animation_data_object.name)
+            raise RuntimeError(message)
 
         export_sequences: List[PsaBuildSequence] = []
 
@@ -398,7 +412,8 @@ class PSA_OT_export(Operator, ExportHelper):
                 export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [nla_strip_item.action])
                 export_sequences.append(export_sequence)
         else:
-            raise ValueError(f'Unhandled sequence source: {pg.sequence_source}')
+            message = bpy.app.translations.pgettext_iface('Unhandled sequence source: {sequence_source}')
+            raise ValueError(message.format(sequence_source=pg.sequence_source))
 
         options = PsaBuildOptions()
         options.animation_data = animation_data
