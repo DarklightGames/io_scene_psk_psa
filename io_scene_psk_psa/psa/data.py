@@ -4,10 +4,10 @@ from typing import List
 
 from ..data import *
 
-"""
+'''
 Note that keys are not stored within the Psa object.
 Use the PsaReader::get_sequence_keys to get the keys for a sequence.
-"""
+'''
 
 
 class Psa:

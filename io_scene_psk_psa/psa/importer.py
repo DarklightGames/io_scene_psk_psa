@@ -2,7 +2,7 @@ import typing
 from typing import List, Optional, Iterable
 
 import bpy
-import numpy
+import numpy as np
 from bpy.types import FCurve, Object, Context
 from mathutils import Vector, Quaternion
 
@@ -48,16 +48,16 @@ def _calculate_fcurve_data(import_bone: ImportBone, key_data: Iterable[float]):
     key_location = Vector(key_data[4:])
     q = import_bone.post_rotation.copy()
     q.rotate(import_bone.original_rotation)
-    quat = q
+    rotation = q
     q = import_bone.post_rotation.copy()
     if import_bone.parent is None:
         q.rotate(key_rotation.conjugated())
     else:
         q.rotate(key_rotation)
-    quat.rotate(q.conjugated())
-    loc = key_location - import_bone.original_location
-    loc.rotate(import_bone.post_rotation.conjugated())
-    return quat.w, quat.x, quat.y, quat.z, loc.x, loc.y, loc.z
+    rotation.rotate(q.conjugated())
+    location = key_location - import_bone.original_location
+    location.rotate(import_bone.post_rotation.conjugated())
+    return rotation.w, rotation.x, rotation.y, rotation.z, location.x, location.y, location.z
 
 
 class PsaImportResult:
@@ -80,6 +80,51 @@ def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_name
             if armature_bone_name == psa_bone_name:
                 return armature_bone_index
     return None
+
+def _get_sample_frame_times(source_frame_count: int, frame_step: float) -> typing.Iterable[float]:
+    # TODO: for correctness, we should also emit the target frame time as well (because the last frame can be a
+    #  fractional frame).
+    time = 0.0
+    while time < source_frame_count - 1:
+        yield time
+        time += frame_step
+    yield source_frame_count - 1
+
+def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, frame_step: float = 1.0) -> np.ndarray:
+    """
+    Resamples the sequence data matrix to the target frame count.
+    @param sequence_data_matrix: FxBx7 matrix where F is the number of frames, B is the number of bones, and X is the
+    number of data elements per bone.
+    @param frame_step: The step between frames in the resampled sequence.
+    @return: The resampled sequence data matrix, or sequence_data_matrix if no resampling is necessary.
+    """
+    if frame_step == 1.0:
+        # No resampling is necessary.
+        return sequence_data_matrix
+
+    source_frame_count, bone_count = sequence_data_matrix.shape[:2]
+    sample_frame_times = list(_get_sample_frame_times(source_frame_count, frame_step))
+    target_frame_count = len(sample_frame_times)
+    resampled_sequence_data_matrix = np.zeros((target_frame_count, bone_count, 7), dtype=float)
+
+    for sample_frame_index, sample_frame_time in enumerate(sample_frame_times):
+        frame_index = int(sample_frame_time)
+        if sample_frame_time % 1.0 == 0.0:
+            # Sample time has no fractional part, so just copy the frame.
+            resampled_sequence_data_matrix[sample_frame_index, :, :] = sequence_data_matrix[frame_index, :, :]
+        else:
+            # Sample time has a fractional part, so interpolate between two frames.
+            next_frame_index = frame_index + 1
+            for bone_index in range(bone_count):
+                source_frame_1_data = sequence_data_matrix[frame_index, bone_index, :]
+                source_frame_2_data = sequence_data_matrix[next_frame_index, bone_index, :]
+                factor = sample_frame_time - frame_index
+                q = Quaternion((source_frame_1_data[:4])).slerp(Quaternion((source_frame_2_data[:4])), factor)
+                q.normalize()
+                l = Vector(source_frame_1_data[4:]).lerp(Vector(source_frame_2_data[4:]), factor)
+                resampled_sequence_data_matrix[sample_frame_index, bone_index, :] = q.w, q.x, q.y, q.z, l.x, l.y, l.z
+
+    return resampled_sequence_data_matrix
 
 
 def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object, options: PsaImportOptions) -> PsaImportResult:
@@ -144,8 +189,10 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
     for import_bone in filter(lambda x: x is not None, import_bones):
         armature_bone = import_bone.armature_bone
+
         if armature_bone.parent is not None and armature_bone.parent.name in psa_bone_names:
             import_bone.parent = import_bones_dict[armature_bone.parent.name]
+
         # Calculate the original location & rotation of each bone (in world-space maybe?)
         if import_bone.parent is not None:
             import_bone.original_location = armature_bone.matrix_local.translation - armature_bone.parent.matrix_local.translation
@@ -155,7 +202,8 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             import_bone.original_rotation.conjugate()
         else:
             import_bone.original_location = armature_bone.matrix_local.translation.copy()
-            import_bone.original_rotation = armature_bone.matrix_local.to_quaternion()
+            import_bone.original_rotation = armature_bone.matrix_local.to_quaternion().conjugated()
+
         import_bone.post_rotation = import_bone.original_rotation.conjugated()
 
     context.window_manager.progress_begin(0, len(sequences))
@@ -178,21 +226,19 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             action = bpy.data.actions.new(name=action_name)
 
         # Calculate the target FPS.
-        if options.fps_source == 'CUSTOM':
-            target_fps = options.fps_custom
-        elif options.fps_source == 'SCENE':
-            target_fps = context.scene.render.fps
-        elif options.fps_source == 'SEQUENCE':
-            target_fps = sequence.fps
-        else:
-            raise ValueError(f'Unknown FPS source: {options.fps_source}')
-
-        keyframe_time_dilation = target_fps / sequence.fps
+        match options.fps_source:
+            case 'CUSTOM':
+                target_fps = options.fps_custom
+            case 'SCENE':
+                target_fps = context.scene.render.fps
+            case 'SEQUENCE':
+                target_fps = sequence.fps
+            case _:
+                raise ValueError(f'Unknown FPS source: {options.fps_source}')
 
         if options.should_write_keyframes:
-            # Remove existing f-curves (replace with action.fcurves.clear() in Blender 3.2)
-            while len(action.fcurves) > 0:
-                action.fcurves.remove(action.fcurves[-1])
+            # Remove existing f-curves.
+            action.fcurves.clear()
 
             # Create f-curves for the rotation and location of each bone.
             for psa_bone_index, armature_bone_index in psa_to_armature_bone_indices.items():
@@ -234,19 +280,25 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
                     # Calculate the local-space key data for the bone.
                     sequence_data_matrix[frame_index, bone_index] = _calculate_fcurve_data(import_bone, key_data)
 
-            # Write the keyframes out.
-            fcurve_data = numpy.zeros(2 * sequence.frame_count, dtype=float)
+            # Resample the sequence data to the target FPS.
+            # If the target frame count is the same as the source frame count, this will be a no-op.
+            resampled_sequence_data_matrix = _resample_sequence_data_matrix(sequence_data_matrix,
+                                                                            frame_step=sequence.fps / target_fps)
 
-            # Populate the keyframe time data.
-            fcurve_data[0::2] = [x * keyframe_time_dilation for x in range(sequence.frame_count)]
+            # Write the keyframes out.
+            # Note that the f-curve data consists of alternating time and value data.
+            target_frame_count = resampled_sequence_data_matrix.shape[0]
+            fcurve_data = np.zeros(2 * target_frame_count, dtype=float)
+            fcurve_data[0::2] = range(0, target_frame_count)
+
             for bone_index, import_bone in enumerate(import_bones):
                 if import_bone is None:
                     continue
                 for fcurve_index, fcurve in enumerate(import_bone.fcurves):
                     if fcurve is None:
                         continue
-                    fcurve_data[1::2] = sequence_data_matrix[:, bone_index, fcurve_index]
-                    fcurve.keyframe_points.add(sequence.frame_count)
+                    fcurve_data[1::2] = resampled_sequence_data_matrix[:, bone_index, fcurve_index]
+                    fcurve.keyframe_points.add(target_frame_count)
                     fcurve.keyframe_points.foreach_set('co', fcurve_data)
                     for fcurve_keyframe in fcurve.keyframe_points:
                         fcurve_keyframe.interpolation = 'LINEAR'

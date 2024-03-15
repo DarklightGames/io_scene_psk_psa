@@ -17,10 +17,10 @@ class PSA_UL_sequences(UIList):
         pg = getattr(context.scene, 'psa_import')
         row = layout.row()
         sub_row = row.row(align=True)
-        sub_row.prop(pg, 'sequence_filter_name', text="")
-        sub_row.prop(pg, 'sequence_use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
-        sub_row.prop(pg, 'sequence_use_filter_regex', text="", icon='SORTBYEXT')
-        sub_row.prop(pg, 'sequence_filter_is_selected', text="", icon='CHECKBOX_HLT')
+        sub_row.prop(pg, 'sequence_filter_name', text='')
+        sub_row.prop(pg, 'sequence_use_filter_invert', text='', icon='ARROW_LEFTRIGHT')
+        sub_row.prop(pg, 'sequence_use_filter_regex', text='', icon='SORTBYEXT')
+        sub_row.prop(pg, 'sequence_filter_is_selected', text='', icon='CHECKBOX_HLT')
 
     def filter_items(self, context, data, property_):
         pg = getattr(context.scene, 'psa_import')

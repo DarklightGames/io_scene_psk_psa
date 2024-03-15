@@ -41,7 +41,7 @@ def _load_config_file(file_path: str) -> ConfigParser:
 def _get_bone_flags_from_value(value: str) -> int:
     match value:
         case 'all':
-            return (REMOVE_TRACK_LOCATION | REMOVE_TRACK_ROTATION)
+            return REMOVE_TRACK_LOCATION | REMOVE_TRACK_ROTATION
         case 'trans':
             return REMOVE_TRACK_LOCATION
         case 'rot':
