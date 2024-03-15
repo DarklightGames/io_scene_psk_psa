@@ -64,12 +64,12 @@ class PsaImportResult:
 
 
 def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_names: List[str], bone_mapping_mode: str = 'EXACT') -> Optional[int]:
-    '''
+    """
     @param psa_bone_name: The name of the PSA bone.
     @param armature_bone_names: The names of the bones in the armature.
     @param bone_mapping_mode: One of 'EXACT' or 'CASE_INSENSITIVE'.
     @return: The index of the armature bone that corresponds to the given PSA bone, or None if no such bone exists.
-    '''
+    """
     for armature_bone_index, armature_bone_name in enumerate(armature_bone_names):
         if bone_mapping_mode == 'CASE_INSENSITIVE':
             if armature_bone_name.lower() == psa_bone_name.lower():

@@ -3,6 +3,7 @@ from bpy.types import PropertyGroup, Material
 
 from ...types import PSX_PG_bone_collection_list_item
 
+empty_set = set()
 
 class PSK_PG_material_list_item(PropertyGroup):
     material: PointerProperty(type=Material)
@@ -12,7 +13,7 @@ class PSK_PG_material_list_item(PropertyGroup):
 class PSK_PG_export(PropertyGroup):
     bone_filter_mode: EnumProperty(
         name='Bone Filter',
-        options=set(),
+        options=empty_set,
         description='',
         items=(
             ('ALL', 'All', 'All bones will be exported'),

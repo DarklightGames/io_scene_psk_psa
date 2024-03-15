@@ -32,7 +32,6 @@ class PSA_UL_export_sequences(UIList):
         subrow = row.row(align=True)
         subrow.prop(pg, 'sequence_filter_name', text='')
         subrow.prop(pg, 'sequence_use_filter_invert', text='', icon='ARROW_LEFTRIGHT')
-        # subrow.prop(pg, 'sequence_use_filter_sort_reverse', text='', icon='SORT_ASC')
 
         if pg.sequence_source == 'ACTIONS':
             subrow = row.row(align=True)
@@ -44,7 +43,6 @@ class PSA_UL_export_sequences(UIList):
         pg = getattr(context.scene, 'psa_export')
         actions = getattr(data, prop)
         flt_flags = filter_sequences(pg, actions)
-        # flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(actions, 'name')
         flt_neworder = list(range(len(actions)))
         return flt_flags, flt_neworder
 

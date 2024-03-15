@@ -14,7 +14,7 @@ class PsaConfig:
 
 
 def _load_config_file(file_path: str) -> ConfigParser:
-    '''
+    """
     UEViewer exports a dialect of INI files that is not compatible with Python's ConfigParser.
     Specifically, it allows values in this format:
 
@@ -24,7 +24,7 @@ def _load_config_file(file_path: str) -> ConfigParser:
 
     This is not allowed in Python's ConfigParser, which requires a '=' character after each key name.
     To work around this, we'll modify the file to add the '=' character after each key name if it is missing.
-    '''
+    """
     with open(file_path, 'r') as f:
         lines = f.read().split('\n')
 
@@ -41,7 +41,7 @@ def _load_config_file(file_path: str) -> ConfigParser:
 def _get_bone_flags_from_value(value: str) -> int:
     match value:
         case 'all':
-            return (REMOVE_TRACK_LOCATION | REMOVE_TRACK_ROTATION)
+            return REMOVE_TRACK_LOCATION | REMOVE_TRACK_ROTATION
         case 'trans':
             return REMOVE_TRACK_LOCATION
         case 'rot':
