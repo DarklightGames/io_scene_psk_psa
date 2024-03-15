@@ -254,7 +254,14 @@ class PSA_OT_import(Operator, ImportHelper):
 
 
 class PSA_FH_import(FileHandler):
-    pass
+    bl_idname = 'PSA_FH_import'
+    bl_label = 'File handler for Unreal PSA import'
+    bl_import_operator = 'psa_import.import'
+    bl_file_extensions = '.psa'
+
+    @classmethod
+    def poll_drop(cls, context: Context):
+        return context.area and context.area.type == 'VIEW_3D'
 
 
 classes = (
@@ -262,4 +269,5 @@ classes = (
     PSA_OT_import_sequences_deselect_all,
     PSA_OT_import_sequences_from_text,
     PSA_OT_import,
+    PSA_FH_import,
 )
