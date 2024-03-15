@@ -153,7 +153,8 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             import_bone.original_rotation.conjugate()
         else:
             import_bone.original_location = armature_bone.matrix_local.translation.copy()
-            import_bone.original_rotation = armature_bone.matrix_local.to_quaternion()
+            import_bone.original_rotation = armature_bone.matrix_local.to_quaternion().conjugated()
+
         import_bone.post_rotation = import_bone.original_rotation.conjugated()
 
     context.window_manager.progress_begin(0, len(sequences))
