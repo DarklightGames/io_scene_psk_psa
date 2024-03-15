@@ -15,7 +15,7 @@ class PSK_FH_import(FileHandler):
     bl_idname = 'PSK_FH_import'
     bl_label = 'File handler for Unreal PSK/PSKX import'
     bl_import_operator = 'import_scene.psk'
-    bl_file_extensions = '.psk'
+    bl_file_extensions = '.psk;.pskx'
 
     @classmethod
     def poll_drop(cls, context: Context):
