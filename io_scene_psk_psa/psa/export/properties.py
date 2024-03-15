@@ -20,7 +20,7 @@ empty_set = set()
 class PSA_PG_export_action_list_item(PropertyGroup):
     action: PointerProperty(type=Action)
     name: StringProperty()
-    is_selected: BoolProperty(default=False)
+    is_selected: BoolProperty(default=True)
     frame_start: IntProperty(options={'HIDDEN'})
     frame_end: IntProperty(options={'HIDDEN'})
     is_pose_marker: BoolProperty(options={'HIDDEN'})
@@ -152,7 +152,7 @@ class PSA_PG_export(PropertyGroup):
         default=False,
         name='Enforce Bone Name Restrictions',
         description='Bone names restrictions will be enforced. Note that bone names without properly formatted names '
-                    'cannot be referenced in scripts'
+                    'may not be able to be referenced in-engine'
     )
     sequence_name_prefix: StringProperty(name='Prefix', options=empty_set)
     sequence_name_suffix: StringProperty(name='Suffix', options=empty_set)

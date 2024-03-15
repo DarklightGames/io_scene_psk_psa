@@ -1,15 +1,19 @@
+from typing import Optional
+
 import bmesh
 import bpy
-from bpy.types import Armature
+import numpy as np
+from bpy.types import Armature, Material
 
 from .data import *
+from .properties import triangle_type_and_bit_flags_to_poly_flags
 from ..helpers import *
 
 
 class PskInputObjects(object):
     def __init__(self):
         self.mesh_objects = []
-        self.armature_object = None
+        self.armature_object: Optional[Object] = None
 
 
 class PskBuildOptions(object):
@@ -17,7 +21,7 @@ class PskBuildOptions(object):
         self.bone_filter_mode = 'ALL'
         self.bone_collection_indices: List[int] = []
         self.use_raw_mesh_data = True
-        self.material_names: List[str] = []
+        self.materials: List[Material] = []
         self.should_enforce_bone_name_restrictions = False
 
 
@@ -61,7 +65,7 @@ def get_psk_input_objects(context) -> PskInputObjects:
 class PskBuildResult(object):
     def __init__(self):
         self.psk = None
-        self.warnings = []
+        self.warnings: List[str] = []
 
 
 def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
@@ -72,9 +76,9 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
     psk = Psk()
     bones = []
 
-    if armature_object is None:
-        # If the mesh has no armature object, simply assign it a dummy bone at the root to satisfy the requirement
-        # that a PSK file must have at least one bone.
+    if armature_object is None or len(armature_object.data.bones) == 0:
+        # If the mesh has no armature object or no bones, simply assign it a dummy bone at the root to satisfy the
+        # requirement that a PSK file must have at least one bone.
         psk_bone = Psk.Bone()
         psk_bone.name = bytes('root', encoding='windows-1252')
         psk_bone.flags = 0
@@ -135,18 +139,24 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
             psk.bones.append(psk_bone)
 
     # MATERIALS
-    material_names = options.material_names
-
-    for material_name in material_names:
+    for material in options.materials:
         psk_material = Psk.Material()
         try:
-            psk_material.name = bytes(material_name, encoding='windows-1252')
+            psk_material.name = bytes(material.name, encoding='windows-1252')
         except UnicodeEncodeError:
-            raise RuntimeError(f'Material name "{material_name}" contains characters that cannot be encoded in the Windows-1252 codepage')
+            raise RuntimeError(f'Material name "{material.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
         psk_material.texture_index = len(psk.materials)
+        psk_material.poly_flags = triangle_type_and_bit_flags_to_poly_flags(material.psk.mesh_triangle_type,
+                                                                            material.psk.mesh_triangle_bit_flags)
         psk.materials.append(psk_material)
 
-    for input_mesh_object in input_objects.mesh_objects:
+    context.window_manager.progress_begin(0, len(input_objects.mesh_objects))
+
+    material_names = [m.name for m in options.materials]
+
+    for object_index, input_mesh_object in enumerate(input_objects.mesh_objects):
+
+        should_flip_normals = False
 
         # MATERIALS
         material_indices = [material_names.index(material_slot.material.name) for material_slot in input_mesh_object.material_slots]
@@ -175,8 +185,16 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
             mesh_object.matrix_world = input_mesh_object.matrix_world
 
             scale = (input_mesh_object.scale.x, input_mesh_object.scale.y, input_mesh_object.scale.z)
-            if any(map(lambda x: x < 0, scale)):
-                result.warnings.append(f'Mesh "{input_mesh_object.name}" has negative scaling which may result in inverted normals.')
+
+            # Negative scaling in Blender results in inverted normals after the scale is applied. However, if the scale
+            # is not applied, the normals will appear unaffected in the viewport. The evaluated mesh data used in the
+            # export will have the scale applied, but this behavior is not obvious to the user.
+            #
+            # In order to have the exporter be as WYSIWYG as possible, we need to check for negative scaling and invert
+            # the normals if necessary. If two axes have negative scaling and the third has positive scaling, the
+            # normals will be correct. We can detect this by checking if the number of negative scaling axes is odd. If
+            # it is, we need to invert the normals of the mesh by swapping the order of the vertices in each face.
+            should_flip_normals = sum(1 for x in scale if x < 0) % 2 == 1
 
             # Copy the vertex groups
             for vertex_group in input_mesh_object.vertex_groups:
@@ -205,11 +223,11 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
         # Build a list of non-unique wedges.
         wedges = []
         for loop_index, loop in enumerate(mesh_data.loops):
-            wedge = Psk.Wedge()
-            wedge.point_index = loop.vertex_index + vertex_offset
-            wedge.u, wedge.v = uv_layer[loop_index].uv
-            wedge.v = 1.0 - wedge.v
-            wedges.append(wedge)
+            wedges.append(Psk.Wedge(
+                point_index=loop.vertex_index + vertex_offset,
+                u=uv_layer[loop_index].uv[0],
+                v=1.0 - uv_layer[loop_index].uv[1]
+            ))
 
         # Assign material indices to the wedges.
         for triangle in mesh_data.loop_triangles:
@@ -217,8 +235,8 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
                 wedges[loop_index].material_index = material_indices[triangle.material_index]
 
         # Populate the list of wedges with unique wedges & build a look-up table of loop indices to wedge indices
-        wedge_indices = {}
-        loop_wedge_indices = [-1] * len(mesh_data.loops)
+        wedge_indices = dict()
+        loop_wedge_indices = np.full(len(mesh_data.loops), -1)
         for loop_index, wedge in enumerate(wedges):
             wedge_hash = hash(wedge)
             if wedge_hash in wedge_indices:
@@ -231,6 +249,7 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
 
         # FACES
         poly_groups, groups = mesh_data.calc_smooth_groups(use_bitflags=True)
+        psk_face_start_index = len(psk.faces)
         for f in mesh_data.loop_triangles:
             face = Psk.Face()
             face.material_index = material_indices[f.material_index]
@@ -239,6 +258,11 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
             face.wedge_indices[2] = loop_wedge_indices[f.loops[0]]
             face.smoothing_groups = poly_groups[f.polygon_index]
             psk.faces.append(face)
+
+        if should_flip_normals:
+            # Invert the normals of the faces.
+            for face in psk.faces[psk_face_start_index:]:
+                face.wedge_indices[0], face.wedge_indices[2] = face.wedge_indices[2], face.wedge_indices[0]
 
         # WEIGHTS
         if armature_object is not None:
@@ -287,6 +311,10 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
             bpy.data.objects.remove(mesh_object)
             bpy.data.meshes.remove(mesh_data)
             del mesh_data
+
+        context.window_manager.progress_update(object_index)
+
+    context.window_manager.progress_end()
 
     result.psk = psk
 

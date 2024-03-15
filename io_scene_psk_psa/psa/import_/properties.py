@@ -11,7 +11,7 @@ empty_set = set()
 
 class PSA_PG_import_action_list_item(PropertyGroup):
     action_name: StringProperty(options=empty_set)
-    is_selected: BoolProperty(default=False, options=empty_set)
+    is_selected: BoolProperty(default=True, options=empty_set)
 
 
 class PSA_PG_bone(PropertyGroup):
@@ -32,6 +32,12 @@ class PSA_PG_import(PropertyGroup):
                                        description='Assign each imported action a fake user so that the data block is '
                                                    'saved even it has no users',
                                        options=empty_set)
+    should_use_config_file: BoolProperty(default=True, name='Use Config File',
+                                            description='Use the .config file that is sometimes generated when the PSA '
+                                                        'file is exported from UEViewer. This file contains '
+                                                        'options that can be used to filter out certain bones tracks '
+                                                        'from the imported actions',
+                                            options=empty_set)
     should_stash: BoolProperty(default=False, name='Stash',
                                description='Stash each imported action as a strip on a new non-contributing NLA track',
                                options=empty_set)
@@ -69,13 +75,13 @@ class PSA_PG_import(PropertyGroup):
     )
     fps_source: EnumProperty(name='FPS Source', items=(
         ('SEQUENCE', 'Sequence', 'The sequence frame rate matches the original frame rate', 'ACTION', 0),
-        ('SCENE', 'Scene', 'The sequence frame rate dilates to match that of the scene', 'SCENE_DATA', 1),
-        ('CUSTOM', 'Custom', 'The sequence frame rate dilates to match a custom frame rate', 2),
+        ('SCENE', 'Scene', 'The sequence is resampled to the frame rate of the scene', 'SCENE_DATA', 1),
+        ('CUSTOM', 'Custom', 'The sequence is resampled to a custom frame rate', 2),
     ))
     fps_custom: FloatProperty(
         default=30.0,
         name='Custom FPS',
-        description='The frame rate to which the imported actions will be converted',
+        description='The frame rate to which the imported sequences will be resampled to',
         options=empty_set,
         min=1.0,
         soft_min=1.0,

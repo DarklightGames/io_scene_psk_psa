@@ -30,21 +30,19 @@ class PSA_UL_export_sequences(UIList):
         pg = getattr(context.scene, 'psa_export')
         row = layout.row()
         subrow = row.row(align=True)
-        subrow.prop(pg, 'sequence_filter_name', text="")
-        subrow.prop(pg, 'sequence_use_filter_invert', text="", icon='ARROW_LEFTRIGHT')
-        # subrow.prop(pg, 'sequence_use_filter_sort_reverse', text='', icon='SORT_ASC')
+        subrow.prop(pg, 'sequence_filter_name', text='')
+        subrow.prop(pg, 'sequence_use_filter_invert', text='', icon='ARROW_LEFTRIGHT')
 
         if pg.sequence_source == 'ACTIONS':
             subrow = row.row(align=True)
             subrow.prop(pg, 'sequence_filter_asset', icon_only=True, icon='ASSET_MANAGER')
             subrow.prop(pg, 'sequence_filter_pose_marker', icon_only=True, icon='PMARKER')
-            subrow.prop(pg, 'sequence_filter_reversed', text="", icon='FRAME_PREV')
+            subrow.prop(pg, 'sequence_filter_reversed', text='', icon='FRAME_PREV')
 
     def filter_items(self, context, data, prop):
         pg = getattr(context.scene, 'psa_export')
         actions = getattr(data, prop)
         flt_flags = filter_sequences(pg, actions)
-        # flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(actions, 'name')
         flt_neworder = list(range(len(actions)))
         return flt_flags, flt_neworder
 

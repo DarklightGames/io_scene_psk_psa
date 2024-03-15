@@ -20,7 +20,7 @@ def is_bone_filter_mode_item_available(context, identifier):
 def populate_material_list(mesh_objects, material_list):
     material_list.clear()
 
-    material_names = []
+    materials = []
     for mesh_object in mesh_objects:
         for i, material_slot in enumerate(mesh_object.material_slots):
             material = material_slot.material
@@ -32,9 +32,9 @@ def populate_material_list(mesh_objects, material_list):
             if material.name not in material_names:
                 material_names.append(material.name)
 
-    for index, material_name in enumerate(material_names):
+    for index, material in enumerate(materials):
         m = material_list.add()
-        m.material_name = material_name
+        m.material = material
         m.index = index
 
 
@@ -53,7 +53,7 @@ class PSK_OT_material_list_move_up(Operator):
         pg = getattr(context.scene, 'psk_export')
         pg.material_list.move(pg.material_list_index, pg.material_list_index - 1)
         pg.material_list_index -= 1
-        return {"FINISHED"}
+        return {'FINISHED'}
 
 
 class PSK_OT_material_list_move_down(Operator):
@@ -71,7 +71,7 @@ class PSK_OT_material_list_move_down(Operator):
         pg = getattr(context.scene, 'psk_export')
         pg.material_list.move(pg.material_list_index, pg.material_list_index + 1)
         pg.material_list_index += 1
-        return {"FINISHED"}
+        return {'FINISHED'}
 
 
 class PSK_OT_export(Operator, ExportHelper):
@@ -161,9 +161,9 @@ class PSK_OT_export(Operator, ExportHelper):
         options.bone_filter_mode = pg.bone_filter_mode
         options.bone_collection_indices = [x.index for x in pg.bone_collection_list if x.is_selected]
         options.use_raw_mesh_data = pg.use_raw_mesh_data
-        options.material_names = [m.material_name for m in pg.material_list]
+        options.materials = [m.material for m in pg.material_list]
         options.should_enforce_bone_name_restrictions = pg.should_enforce_bone_name_restrictions
-
+        
         try:
             result = build_psk(context, options)
             for warning in result.warnings:

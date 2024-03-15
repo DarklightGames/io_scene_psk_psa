@@ -51,5 +51,5 @@ classes = (
     PSX_PG_action_export,
     PSX_PG_bone_collection_list_item,
     PSX_UL_bone_collection_list,
-    PSX_PT_action
+    PSX_PT_action,
 )
