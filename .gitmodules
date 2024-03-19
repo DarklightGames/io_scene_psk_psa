@@ -1,0 +1,3 @@
+[submodule "extern/io_scene_psk_psa-translations"]
+	path = extern/io_scene_psk_psa-translations
+	url = https://github.com/DarklightGames/io_scene_psk_psa-translations.git

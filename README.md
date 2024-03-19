@@ -56,6 +56,19 @@ Bug fixes will be issued for legacy addon versions that are under [Blender's LTS
 
 > Note that in order to see the imported actions applied to your armature, you must use the [Dope Sheet](https://docs.blender.org/manual/en/latest/editors/dope_sheet/introduction.html) or [Nonlinear Animation](https://docs.blender.org/manual/en/latest/editors/nla/introduction.html) editors.
 
+## Localization
+
+The following languages are currently supported:
+
+| Language       | Status | Method |
+|----------------|--------|--------|
+| English        | ✅️     | 🧑     |
+| Japanese (日本語) | ✅️     | 🤖     | 
+
+If you notice any issues with the translations, please feel free to submit a correction on [Weblate](https://weblate.darklightgames.com/projects/io_scene_psk_psa/).
+
+If you would like to see support add for your own native language, please [open an issue](http://github.com/DarklightGames/io_scene_psk_psa/issues) and we will consider adding it.
+
 # FAQ
 
 ## Why can't I see the animations imported from my PSA?
