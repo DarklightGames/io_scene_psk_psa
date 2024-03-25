@@ -98,7 +98,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
         if armature_bone_index is not None:
             # Ensure that no other PSA bone has been mapped to this armature bone yet.
             if armature_bone_index not in armature_to_psa_bone_indices:
-                psa_to_armature_bone_indices[psa_bone_index] = armature_bone_names.index(psa_bone_name)
+                psa_to_armature_bone_indices[psa_bone_index] = armature_bone_index
                 armature_to_psa_bone_indices[armature_bone_index] = psa_bone_index
             else:
                 # This armature bone has already been mapped to a PSA bone.
