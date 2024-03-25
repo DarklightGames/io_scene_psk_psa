@@ -5,7 +5,7 @@
 
 This Blender addon allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats) used in many versions of the Unreal Engine.
 
-## Compatibility
+# Compatibility
 
 | Blender Version                                              | Addon Version                                                                  | Long Term Support |
 |--------------------------------------------------------------|--------------------------------------------------------------------------------|-------------------|

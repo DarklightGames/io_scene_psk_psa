@@ -20,7 +20,6 @@ for file in glob.glob('../io_scene_psk_psa/**/*.py', recursive=True):
                 if isinstance(node, ast.Constant) and isinstance(node.value, str):
                     a = pathlib.Path(file).resolve()
                     filepath = a.relative_to(root_path)
-                    print(filepath)
                     if node.s not in strings:
                         strings[node.s] = filepath, node.lineno, node.col_offset
         except UnicodeDecodeError as e:
@@ -43,8 +42,8 @@ string_keys = set(filter(lambda x: not x.islower() or ' ' in x, string_keys))
 # Remove any strings that are in SCREAMING_SNAKE_CASE.
 string_keys = set(filter(lambda x: not x.isupper(), string_keys))
 
-# Remove any strings that have underscores.
-string_keys = set(filter(lambda x: '_' not in x, string_keys))
+# Remove any strings that have underscores and no spaces.
+string_keys = set(filter(lambda x: '_' not in x or ' ' in x, string_keys))
 
 # Remove any string that starts with a newline.
 string_keys = set(filter(lambda x: not x.startswith('\n'), string_keys))

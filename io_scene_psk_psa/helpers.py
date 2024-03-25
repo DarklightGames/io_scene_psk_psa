@@ -81,7 +81,7 @@ def check_bone_names(bone_names: Iterable[str]):
         message = bpy.app.translations.pgettext_iface(
             'The following bone names are invalid: {invalid_bone_names}.\n'
             'Bone names must only contain letters, numbers, spaces, hyphens and underscores.\n'
-            'You can bypass this by disabling "Enforce Bone Name Restrictions" in the export settings.'
+            'You can bypass this by disabling "Enforce Bone Name Restrictions" in the export settings'
         )
         raise RuntimeError(message.format(invalid_bone_names=str(invalid_bone_names)))
 
