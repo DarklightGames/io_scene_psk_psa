@@ -125,52 +125,6 @@ def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, frame_step:
     return resampled_sequence_data_matrix
 
 
-def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, time_step: float = 1.0) -> np.ndarray:
-    '''
-    Resamples the sequence data matrix to the target frame count.
-    @param sequence_data_matrix: FxBx7 matrix where F is the number of frames, B is the number of bones, and X is the
-    number of data elements per bone.
-    @param target_frame_count: The number of frames to resample to.
-    @return: The resampled sequence data matrix, or sequence_data_matrix if no resampling is necessary.
-    '''
-    def get_sample_times(source_frame_count: int, time_step: float) -> typing.Iterable[float]:
-        # TODO: for correctness, we should also emit the target frame time as well (because the last frame can be a
-        #  fractional frame).
-        time = 0.0
-        while time < source_frame_count - 1:
-            yield time
-            time += time_step
-        yield source_frame_count - 1
-
-    if time_step == 1.0:
-        # No resampling is necessary.
-        return sequence_data_matrix
-
-    source_frame_count, bone_count = sequence_data_matrix.shape[:2]
-    sample_times = list(get_sample_times(source_frame_count, time_step))
-    target_frame_count = len(sample_times)
-    resampled_sequence_data_matrix = np.zeros((target_frame_count, bone_count, 7), dtype=float)
-
-    for sample_index, sample_time in enumerate(sample_times):
-        frame_index = int(sample_time)
-        if sample_time % 1.0 == 0.0:
-            # Sample time has no fractional part, so just copy the frame.
-            resampled_sequence_data_matrix[sample_index, :, :] = sequence_data_matrix[frame_index, :, :]
-        else:
-            # Sample time has a fractional part, so interpolate between two frames.
-            next_frame_index = frame_index + 1
-            for bone_index in range(bone_count):
-                source_frame_1_data = sequence_data_matrix[frame_index, bone_index, :]
-                source_frame_2_data = sequence_data_matrix[next_frame_index, bone_index, :]
-                factor = sample_time - frame_index
-                q = Quaternion((source_frame_1_data[:4])).slerp(Quaternion((source_frame_2_data[:4])), factor)
-                q.normalize()
-                l = Vector(source_frame_1_data[4:]).lerp(Vector(source_frame_2_data[4:]), factor)
-                resampled_sequence_data_matrix[sample_index, bone_index, :] = q.w, q.x, q.y, q.z, l.x, l.y, l.z
-
-    return resampled_sequence_data_matrix
-
-
 def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object, options: PsaImportOptions) -> PsaImportResult:
     result = PsaImportResult()
     sequences = [psa_reader.sequences[x] for x in options.sequence_names]
