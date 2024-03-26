@@ -64,12 +64,12 @@ class PsaImportResult:
 
 
 def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_names: List[str], bone_mapping_mode: str = 'EXACT') -> Optional[int]:
-    '''
+    """
     @param psa_bone_name: The name of the PSA bone.
     @param armature_bone_names: The names of the bones in the armature.
     @param bone_mapping_mode: One of 'EXACT' or 'CASE_INSENSITIVE'.
     @return: The index of the armature bone that corresponds to the given PSA bone, or None if no such bone exists.
-    '''
+    """
     for armature_bone_index, armature_bone_name in enumerate(armature_bone_names):
         if bone_mapping_mode == 'CASE_INSENSITIVE':
             if armature_bone_name.lower() == psa_bone_name.lower():
@@ -173,7 +173,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
     # Create intermediate bone data for import operations.
     import_bones = []
-    import_bones_dict = dict()
+    psa_bone_names_to_import_bones = dict()
 
     for (psa_bone_index, psa_bone), psa_bone_name in zip(enumerate(psa_reader.bones), psa_bone_names):
         if psa_bone_index not in psa_to_armature_bone_indices:
@@ -183,15 +183,22 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
         import_bone = ImportBone(psa_bone)
         import_bone.armature_bone = armature_data.bones[psa_bone_name]
         import_bone.pose_bone = armature_object.pose.bones[psa_bone_name]
-        import_bones_dict[psa_bone_name] = import_bone
+        psa_bone_names_to_import_bones[psa_bone_name] = import_bone
         import_bones.append(import_bone)
+
+    bones_with_missing_parents = []
 
     for import_bone in filter(lambda x: x is not None, import_bones):
         armature_bone = import_bone.armature_bone
-        if armature_bone.parent is not None and armature_bone.parent.name in psa_bone_names:
-            import_bone.parent = import_bones_dict[armature_bone.parent.name]
+        has_parent = armature_bone.parent is not None
+        if has_parent:
+            if armature_bone.parent.name in psa_bone_names:
+                import_bone.parent = psa_bone_names_to_import_bones[armature_bone.parent.name]
+            else:
+                # Add a warning if the parent bone is not in the PSA.
+                bones_with_missing_parents.append(armature_bone)
         # Calculate the original location & rotation of each bone (in world-space maybe?)
-        if import_bone.parent is not None:
+        if has_parent:
             import_bone.original_location = armature_bone.matrix_local.translation - armature_bone.parent.matrix_local.translation
             import_bone.original_location.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
             import_bone.original_rotation = armature_bone.matrix_local.to_quaternion()
@@ -202,6 +209,12 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             import_bone.original_rotation = armature_bone.matrix_local.to_quaternion().conjugated()
 
         import_bone.post_rotation = import_bone.original_rotation.conjugated()
+
+    # Warn about bones with missing parents.
+    if len(bones_with_missing_parents) > 0:
+        count = len(bones_with_missing_parents)
+        message = f'{count} bone(s) have parents that are not present in the PSA:\n' + str([x.name for x in bones_with_missing_parents])
+        result.warnings.append(message)
 
     context.window_manager.progress_begin(0, len(sequences))
 
