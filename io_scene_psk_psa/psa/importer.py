@@ -125,6 +125,52 @@ def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, frame_step:
     return resampled_sequence_data_matrix
 
 
+def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, time_step: float = 1.0) -> np.ndarray:
+    '''
+    Resamples the sequence data matrix to the target frame count.
+    @param sequence_data_matrix: FxBx7 matrix where F is the number of frames, B is the number of bones, and X is the
+    number of data elements per bone.
+    @param target_frame_count: The number of frames to resample to.
+    @return: The resampled sequence data matrix, or sequence_data_matrix if no resampling is necessary.
+    '''
+    def get_sample_times(source_frame_count: int, time_step: float) -> typing.Iterable[float]:
+        # TODO: for correctness, we should also emit the target frame time as well (because the last frame can be a
+        #  fractional frame).
+        time = 0.0
+        while time < source_frame_count - 1:
+            yield time
+            time += time_step
+        yield source_frame_count - 1
+
+    if time_step == 1.0:
+        # No resampling is necessary.
+        return sequence_data_matrix
+
+    source_frame_count, bone_count = sequence_data_matrix.shape[:2]
+    sample_times = list(get_sample_times(source_frame_count, time_step))
+    target_frame_count = len(sample_times)
+    resampled_sequence_data_matrix = np.zeros((target_frame_count, bone_count, 7), dtype=float)
+
+    for sample_index, sample_time in enumerate(sample_times):
+        frame_index = int(sample_time)
+        if sample_time % 1.0 == 0.0:
+            # Sample time has no fractional part, so just copy the frame.
+            resampled_sequence_data_matrix[sample_index, :, :] = sequence_data_matrix[frame_index, :, :]
+        else:
+            # Sample time has a fractional part, so interpolate between two frames.
+            next_frame_index = frame_index + 1
+            for bone_index in range(bone_count):
+                source_frame_1_data = sequence_data_matrix[frame_index, bone_index, :]
+                source_frame_2_data = sequence_data_matrix[next_frame_index, bone_index, :]
+                factor = sample_time - frame_index
+                q = Quaternion((source_frame_1_data[:4])).slerp(Quaternion((source_frame_2_data[:4])), factor)
+                q.normalize()
+                l = Vector(source_frame_1_data[4:]).lerp(Vector(source_frame_2_data[4:]), factor)
+                resampled_sequence_data_matrix[sample_index, bone_index, :] = q.w, q.x, q.y, q.z, l.x, l.y, l.z
+
+    return resampled_sequence_data_matrix
+
+
 def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object, options: PsaImportOptions) -> PsaImportResult:
     result = PsaImportResult()
     sequences = [psa_reader.sequences[x] for x in options.sequence_names]
@@ -143,7 +189,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
         if armature_bone_index is not None:
             # Ensure that no other PSA bone has been mapped to this armature bone yet.
             if armature_bone_index not in armature_to_psa_bone_indices:
-                psa_to_armature_bone_indices[psa_bone_index] = armature_bone_names.index(psa_bone_name)
+                psa_to_armature_bone_indices[psa_bone_index] = armature_bone_index
                 armature_to_psa_bone_indices[armature_bone_index] = psa_bone_index
             else:
                 # This armature bone has already been mapped to a PSA bone.
@@ -172,7 +218,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
     # Create intermediate bone data for import operations.
     import_bones = []
-    import_bones_dict = dict()
+    psa_bone_names_to_import_bones = dict()
 
     for (psa_bone_index, psa_bone), psa_bone_name in zip(enumerate(psa_reader.bones), psa_bone_names):
         if psa_bone_index not in psa_to_armature_bone_indices:
@@ -182,17 +228,22 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
         import_bone = ImportBone(psa_bone)
         import_bone.armature_bone = armature_data.bones[psa_bone_name]
         import_bone.pose_bone = armature_object.pose.bones[psa_bone_name]
-        import_bones_dict[psa_bone_name] = import_bone
+        psa_bone_names_to_import_bones[psa_bone_name] = import_bone
         import_bones.append(import_bone)
+
+    bones_with_missing_parents = []
 
     for import_bone in filter(lambda x: x is not None, import_bones):
         armature_bone = import_bone.armature_bone
-
-        if armature_bone.parent is not None and armature_bone.parent.name in psa_bone_names:
-            import_bone.parent = import_bones_dict[armature_bone.parent.name]
-
+        has_parent = armature_bone.parent is not None
+        if has_parent:
+            if armature_bone.parent.name in psa_bone_names:
+                import_bone.parent = psa_bone_names_to_import_bones[armature_bone.parent.name]
+            else:
+                # Add a warning if the parent bone is not in the PSA.
+                bones_with_missing_parents.append(armature_bone)
         # Calculate the original location & rotation of each bone (in world-space maybe?)
-        if import_bone.parent is not None:
+        if has_parent:
             import_bone.original_location = armature_bone.matrix_local.translation - armature_bone.parent.matrix_local.translation
             import_bone.original_location.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
             import_bone.original_rotation = armature_bone.matrix_local.to_quaternion()
@@ -203,6 +254,12 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             import_bone.original_rotation = armature_bone.matrix_local.to_quaternion().conjugated()
 
         import_bone.post_rotation = import_bone.original_rotation.conjugated()
+
+    # Warn about bones with missing parents.
+    if len(bones_with_missing_parents) > 0:
+        count = len(bones_with_missing_parents)
+        message = f'{count} bone(s) have parents that are not present in the PSA:\n' + str([x.name for x in bones_with_missing_parents])
+        result.warnings.append(message)
 
     context.window_manager.progress_begin(0, len(sequences))
 

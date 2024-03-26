@@ -71,7 +71,8 @@ class PSA_PG_import(PropertyGroup):
             ('EXACT', 'Exact', 'Bone names must match exactly.', 'EXACT', 0),
             ('CASE_INSENSITIVE', 'Case Insensitive', 'Bones names must match, ignoring case (e.g., the bone PSA bone '
              '\'root\' can be mapped to the armature bone \'Root\')', 'CASE_INSENSITIVE', 1),
-        )
+        ),
+        default='CASE_INSENSITIVE'
     )
     fps_source: EnumProperty(name='FPS Source', items=(
         ('SEQUENCE', 'Sequence', 'The sequence frame rate matches the original frame rate', 'ACTION', 0),

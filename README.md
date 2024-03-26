@@ -7,10 +7,11 @@ This Blender addon allows you to import and export meshes and animations to and 
 
 ## Compatibility
 
-| Blender Version                                              | Addon Version                                                                  | Long Term Support |
-|--------------------------------------------------------------|--------------------------------------------------------------------------------|-------------------|
-| 4.0+                                                         | [latest](https://github.com/DarklightGames/io_scene_psk_psa/releases/latest)   | TBD               |
-| [3.4 - 3.6](https://www.blender.org/download/lts/3-6/)       | [5.0.5](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.5) | ✅️ June 2025      |
+| Blender Version                                            | Addon Version                                                                  | Long Term Support |
+|------------------------------------------------------------|--------------------------------------------------------------------------------|-------------------|
+| [4.1](https://www.blender.org/download/releases/4-1/)      | [latest](https://github.com/DarklightGames/io_scene_psk_psa/releases/latest)   | TBD               |
+| [4.0](https://www.blender.org/download/releases/4-0/)      | [6.2.1](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/6.2.1) | TBD               |                                      
+| [3.4 - 3.6](https://www.blender.org/download/lts/3-6/)     | [5.0.6](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.6) | ✅️ June 2025      |
 | [2.93 - 3.3](https://www.blender.org/download/releases/3-3/) | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) | ✅️ September 2024 |
 
 Bug fixes will be issued for legacy addon versions that are under [Blender's LTS maintenance period](https://www.blender.org/download/lts/). Once the LTS period has ended, legacy addon versions will no longer be supported by the maintainers of this repository, although we will accept pull requests for bug fixes. 
