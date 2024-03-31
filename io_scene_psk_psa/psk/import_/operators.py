@@ -33,7 +33,8 @@ class PSK_OT_import(Operator, ImportHelper):
         name='File Path',
         description='File path used for exporting the PSK file',
         maxlen=1024,
-        default='')
+        subtype='FILE_PATH',
+        options={'SKIP_SAVE'})
 
     should_import_vertex_colors: BoolProperty(
         default=True,

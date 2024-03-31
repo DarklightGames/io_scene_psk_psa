@@ -88,6 +88,7 @@ def _get_sample_frame_times(source_frame_count: int, frame_step: float) -> typin
         time += frame_step
     yield source_frame_count - 1
 
+
 def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, frame_step: float = 1.0) -> np.ndarray:
     """
     Resamples the sequence data matrix to the target frame count.

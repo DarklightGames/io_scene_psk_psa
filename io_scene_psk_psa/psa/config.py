@@ -1,6 +1,6 @@
 import re
 from configparser import ConfigParser
-from typing import Dict
+from typing import Dict, List
 
 from .reader import PsaReader
 
@@ -50,7 +50,7 @@ def _get_bone_flags_from_value(value: str) -> int:
             return 0
 
 
-def read_psa_config(psa_reader: PsaReader, file_path: str) -> PsaConfig:
+def read_psa_config(psa_sequence_names: List[str], file_path: str) -> PsaConfig:
     psa_config = PsaConfig()
 
     config = _load_config_file(file_path)
@@ -62,7 +62,6 @@ def read_psa_config(psa_reader: PsaReader, file_path: str) -> PsaConfig:
 
             # Map the sequence name onto the actual sequence name in the PSA file.
             try:
-                psa_sequence_names = list(psa_reader.sequences.keys())
                 lowercase_sequence_names = [sequence_name.lower() for sequence_name in psa_sequence_names]
                 sequence_name = psa_sequence_names[lowercase_sequence_names.index(sequence_name.lower())]
             except ValueError:
