@@ -289,7 +289,7 @@ def draw_psa_import_options_no_panels(layout, pg):
 
 
 def draw_psa_import_options(layout, pg):
-    sequences_header, sequences_panel = layout.panel('sequences_panel_id', default_closed=False)
+    sequences_header, sequences_panel = layout.panel('00_sequences_panel_id', default_closed=False)
     sequences_header.label(text='Sequences')
 
     if sequences_panel:
@@ -323,7 +323,7 @@ def draw_psa_import_options(layout, pg):
         if pg.should_use_action_name_prefix:
             col.prop(pg, 'action_name_prefix')
 
-    data_header, data_panel = layout.panel('data_panel_id', default_closed=False)
+    data_header, data_panel = layout.panel('01_data_panel_id', default_closed=False)
     data_header.label(text='Data')
 
     if data_panel:
@@ -339,7 +339,7 @@ def draw_psa_import_options(layout, pg):
             col.use_property_decorate = False
             col.prop(pg, 'should_convert_to_samples')
 
-    advanced_header, advanced_panel = layout.panel('advanced_panel_id', default_closed=True)
+    advanced_header, advanced_panel = layout.panel('02_advanced_panel_id', default_closed=True)
     advanced_header.label(text='Advanced')
 
     if advanced_panel:
