@@ -121,37 +121,40 @@ class PSK_OT_export(Operator, ExportHelper):
         pg = getattr(context.scene, 'psk_export')
 
         # MESH
-        box = layout.box()
-        box.label(text='Mesh', icon='MESH_DATA')
-        box.prop(pg, 'use_raw_mesh_data')
+        mesh_header, mesh_panel = layout.panel('01_mesh', default_closed=False)
+        mesh_header.label(text='Mesh', icon='MESH_DATA')
+        if mesh_panel:
+            mesh_panel.prop(pg, 'use_raw_mesh_data')
 
         # BONES
-        box = layout.box()
-        box.label(text='Bones', icon='BONE_DATA')
-        bone_filter_mode_items = pg.bl_rna.properties['bone_filter_mode'].enum_items_static
-        row = box.row(align=True)
-        for item in bone_filter_mode_items:
-            identifier = item.identifier
-            item_layout = row.row(align=True)
-            item_layout.prop_enum(pg, 'bone_filter_mode', item.identifier)
-            item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
+        bones_header, bones_panel = layout.panel('02_bones', default_closed=False)
+        bones_header.label(text='Bones', icon='BONE_DATA')
+        if bones_panel:
+            bone_filter_mode_items = pg.bl_rna.properties['bone_filter_mode'].enum_items_static
+            row = bones_panel.row(align=True)
+            for item in bone_filter_mode_items:
+                identifier = item.identifier
+                item_layout = row.row(align=True)
+                item_layout.prop_enum(pg, 'bone_filter_mode', item.identifier)
+                item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
 
-        if pg.bone_filter_mode == 'BONE_COLLECTIONS':
-            row = box.row()
-            rows = max(3, min(len(pg.bone_collection_list), 10))
-            row.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index', rows=rows)
+            if pg.bone_filter_mode == 'BONE_COLLECTIONS':
+                row = bones_panel.row()
+                rows = max(3, min(len(pg.bone_collection_list), 10))
+                row.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index', rows=rows)
 
-        box.prop(pg, 'should_enforce_bone_name_restrictions')
+            bones_panel.prop(pg, 'should_enforce_bone_name_restrictions')
 
         # MATERIALS
-        box = layout.box()
-        box.label(text='Materials', icon='MATERIAL')
-        row = box.row()
-        rows = max(3, min(len(pg.bone_collection_list), 10))
-        row.template_list('PSK_UL_materials', '', pg, 'material_list', pg, 'material_list_index', rows=rows)
-        col = row.column(align=True)
-        col.operator(PSK_OT_material_list_move_up.bl_idname, text='', icon='TRIA_UP')
-        col.operator(PSK_OT_material_list_move_down.bl_idname, text='', icon='TRIA_DOWN')
+        materials_header, materials_panel = layout.panel('03_materials', default_closed=False)
+        materials_header.label(text='Materials', icon='MATERIAL')
+        if materials_panel:
+            row = materials_panel.row()
+            rows = max(3, min(len(pg.bone_collection_list), 10))
+            row.template_list('PSK_UL_materials', '', pg, 'material_list', pg, 'material_list_index', rows=rows)
+            col = row.column(align=True)
+            col.operator(PSK_OT_material_list_move_up.bl_idname, text='', icon='TRIA_UP')
+            col.operator(PSK_OT_material_list_move_down.bl_idname, text='', icon='TRIA_DOWN')
 
     def execute(self, context):
         pg = context.scene.psk_export
