@@ -171,7 +171,7 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
 
         # TEXTURE COORDINATES
         uv_layer_data_index = 0
-        uv_layer = mesh_data.uv_layers.new(name='VTXW0000')
+        uv_layer = mesh_data.uv_layers.new(name='UVMap')
         for face_index, face in enumerate(psk.faces):
             if face_index in invalid_face_indices:
                 continue
