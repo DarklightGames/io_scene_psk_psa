@@ -62,7 +62,7 @@ def update_actions_and_timeline_markers(context: Context, armature: Armature):
         for pose_marker_index, pose_marker in enumerate(pose_markers):
             if pose_marker.name.strip() == '' or pose_marker.name.startswith('#'):
                 continue
-            for (name, frame_start, frame_end) in get_sequences_from_action_pose_marker(action, pose_markers, pose_marker, pose_marker_index):
+            for (name, frame_start, frame_end) in get_sequences_from_action_pose_markers(action, pose_markers, pose_marker, pose_marker_index):
                 item = pg.action_list.add()
                 item.action = action
                 item.name = name
@@ -188,13 +188,18 @@ def get_sequences_from_action(action: Action) -> List[Tuple[str, int, int]]:
     return get_sequences_from_name_and_frame_range(action.name, frame_start, frame_end)
 
 
-def get_sequences_from_action_pose_marker(action: Action, pose_markers: List[TimelineMarker], pose_marker: TimelineMarker, pose_marker_index: int) -> List[Tuple[str, int, int]]:
+def get_sequences_from_action_pose_markers(action: Action, pose_markers: List[TimelineMarker], pose_marker: TimelineMarker, pose_marker_index: int) -> List[Tuple[str, int, int]]:
     frame_start = pose_marker.frame
-    if pose_marker_index + 1 < len(pose_markers):
+    sequence_name = pose_marker.name
+    if pose_marker.name.startswith('!'):
+        # If the pose marker name starts with an exclamation mark, only export the first frame.
+        frame_end = frame_start
+        sequence_name = sequence_name[1:]
+    elif pose_marker_index + 1 < len(pose_markers):
         frame_end = pose_markers[pose_marker_index + 1].frame
     else:
         frame_end = int(action.frame_range[1])
-    return get_sequences_from_name_and_frame_range(pose_marker.name, frame_start, frame_end)
+    return get_sequences_from_name_and_frame_range(sequence_name, frame_start, frame_end)
 
 
 def get_visible_sequences(pg: PSA_PG_export, sequences) -> List[PSA_PG_export_action_list_item]:
