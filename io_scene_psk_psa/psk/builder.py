@@ -12,7 +12,7 @@ from ..helpers import *
 
 class PskInputObjects(object):
     def __init__(self):
-        self.mesh_objects = []
+        self.mesh_objects = set()
         self.armature_object: Optional[Object] = None
 
 
@@ -27,12 +27,21 @@ class PskBuildOptions(object):
 
 def get_psk_input_objects(context) -> PskInputObjects:
     input_objects = PskInputObjects()
-    for selected_object in context.view_layer.objects.selected:
-        if selected_object.type != 'MESH':
-            message = bpy.app.translations.pgettext_iface('Selected object "{object_name}" is not a mesh')
-            raise RuntimeError(message.format(object_name=selected_object.name))
 
-    input_objects.mesh_objects = context.view_layer.objects.selected
+    # Check if the active object is an armature.
+    if context.active_object is not None and context.active_object.type == 'ARMATURE':
+        # Collect all the mesh objects that have an armature modifier referencing the active armature.
+        input_objects.armature_object = context.active_object
+        for obj in filter(lambda x: x.type == 'MESH' and x.visible_get(), context.view_layer.objects):
+            for modifier in obj.modifiers:
+                if modifier.type == 'ARMATURE' and modifier.object == input_objects.armature_object:
+                    input_objects.mesh_objects.add(obj)
+
+    for selected_object in context.view_layer.objects.selected:
+        if selected_object is input_objects.armature_object:
+            continue
+        if selected_object.type == 'MESH':
+            input_objects.mesh_objects.add(selected_object)
 
     if len(input_objects.mesh_objects) == 0:
         raise RuntimeError('At least one mesh must be selected')
