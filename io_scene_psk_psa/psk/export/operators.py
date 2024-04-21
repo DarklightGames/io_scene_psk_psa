@@ -29,9 +29,9 @@ def populate_material_list(mesh_objects, material_list):
             if material is None:
                 message = bpy.app.translations.pgettext_iface('Material slot cannot be empty (index {index})')
                 raise RuntimeError(message.format(index=i))
-            if material.name not in materials:
+            if material not in materials:
                 materials.append(material)
-
+                
     for index, material in enumerate(materials):
         m = material_list.add()
         m.material = material
