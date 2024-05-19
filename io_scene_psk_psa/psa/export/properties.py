@@ -44,12 +44,13 @@ class PSA_PG_export_nla_strip_list_item(PropertyGroup):
 
 def nla_track_update_cb(self: 'PSA_PG_export', context: Context) -> None:
     self.nla_strip_list.clear()
-    if context.object is None or context.object.animation_data is None:
-        return
     match = re.match(r'^(\d+).+$', self.nla_track)
     self.nla_track_index = int(match.group(1)) if match else -1
     if self.nla_track_index >= 0:
-        nla_track = context.object.animation_data.nla_tracks[self.nla_track_index]
+        animation_data = get_animation_data(self, context)
+        if animation_data is None:
+            return
+        nla_track = animation_data.nla_tracks[self.nla_track_index]
         for nla_strip in nla_track.strips:
             strip: PSA_PG_export_nla_strip_list_item = self.nla_strip_list.add()
             strip.action = nla_strip.action
