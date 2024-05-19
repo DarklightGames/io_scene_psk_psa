@@ -396,6 +396,8 @@ class PSA_OT_export(Operator, ExportHelper):
                 export_sequence.nla_state.frame_start = nla_strip_item.frame_start
                 export_sequence.nla_state.frame_end = nla_strip_item.frame_end
                 export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [nla_strip_item.action])
+                export_sequence.compression_ratio = nla_strip_item.action.psa_export.compression_ratio
+                export_sequence.key_quota = nla_strip_item.action.psa_export.key_quota
                 export_sequences.append(export_sequence)
         else:
             raise ValueError(f'Unhandled sequence source: {pg.sequence_source}')
