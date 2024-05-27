@@ -28,10 +28,8 @@ class PskBuildOptions(object):
 def get_psk_input_objects(context) -> PskInputObjects:
     input_objects = PskInputObjects()
     for selected_object in context.view_layer.objects.selected:
-        if selected_object.type != 'MESH':
-            raise RuntimeError(f'Selected object "{selected_object.name}" is not a mesh')
-
-    input_objects.mesh_objects = context.view_layer.objects.selected
+        if selected_object.type == 'MESH':
+            input_objects.mesh_objects.append(selected_object)
 
     if len(input_objects.mesh_objects) == 0:
         raise RuntimeError('At least one mesh must be selected')
