@@ -89,6 +89,20 @@ class PSA_PG_import(PropertyGroup):
         soft_max=60.0,
         step=100,
     )
+    compression_ratio_source: EnumProperty(name='Compression Ratio Source', items=(
+        ('ACTION', 'Action', 'The compression ratio is sourced from the action metadata', 'ACTION', 0),
+        ('CUSTOM', 'Custom', 'The compression ratio is set to a custom value', 1),
+    ))
+    compression_ratio_custom: FloatProperty(
+        default=1.0,
+        name='Custom Compression Ratio',
+        description='The compression ratio to apply to the imported sequences',
+        options=empty_set,
+        min=0.0,
+        soft_min=0.0,
+        soft_max=1.0,
+        step=0.0625,
+    )
 
 
 def filter_sequences(pg: PSA_PG_import, sequences) -> List[int]:

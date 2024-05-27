@@ -1,11 +1,11 @@
 from bpy.app.handlers import persistent
 
 bl_info = {
-    'name': 'PSK/PSA Importer/Exporter',
+    'name': 'Unreal PSK/PSA Importer/Exporter',
     'author': 'Colin Basnett, Yurii Ti',
-    'version': (7, 0, 0),
-    'blender': (4, 1, 0),
-    'description': 'PSK/PSA Import/Export (.psk/.psa)',
+    'version': (7, 1, 0),
+    'blender': (4, 2, 0),
+    'description': 'Unreal PSK/PSA Import/Export (.psk/.psa)',
     'warning': '',
     'doc_url': 'https://github.com/DarklightGames/io_scene_psk_psa',
     'tracker_url': 'https://github.com/DarklightGames/io_scene_psk_psa/issues',
@@ -45,14 +45,7 @@ if 'bpy' in locals():
     importlib.reload(psa_import_ui)
 else:
     # if i remove this line, it can be enabled just fine
-    from . import data as psx_data
-    from . import helpers as psx_helpers
-    from . import types as psx_types
-    from .psk import data as psk_data
-    from .psk import reader as psk_reader
-    from .psk import writer as psk_writer
-    from .psk import builder as psk_builder
-    from .psk import importer as psk_importer
+    from .shared import types as psx_types
     from .psk import properties as psk_properties
     from .psk import ui as psk_ui
     from .psk.export import properties as psk_export_properties
@@ -60,12 +53,6 @@ else:
     from .psk.export import ui as psk_export_ui
     from .psk.import_ import operators as psk_import_operators
 
-    from .psa import data as psa_data
-    from .psa import config as psa_config
-    from .psa import reader as psa_reader
-    from .psa import writer as psa_writer
-    from .psa import builder as psa_builder
-    from .psa import importer as psa_importer
     from .psa.export import properties as psa_export_properties
     from .psa.export import operators as psa_export_operators
     from .psa.export import ui as psa_export_ui

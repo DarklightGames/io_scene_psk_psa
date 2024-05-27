@@ -8,7 +8,7 @@ from mathutils import Quaternion, Vector, Matrix
 
 from .data import Psk
 from .properties import poly_flags_to_triangle_type_and_bit_flags
-from ..helpers import rgb_to_srgb, is_bdk_addon_loaded
+from ..shared.helpers import rgb_to_srgb, is_bdk_addon_loaded
 
 
 class PskImportOptions:

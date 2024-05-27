@@ -11,7 +11,7 @@ from bpy_types import Operator
 from .properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_sequences
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from ..writer import write_psa
-from ...helpers import populate_bone_collection_list, get_nla_strips_in_frame_range
+from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range
 
 
 def is_action_for_armature(armature: Armature, action: Action):

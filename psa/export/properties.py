@@ -7,7 +7,7 @@ from bpy.props import BoolProperty, PointerProperty, EnumProperty, FloatProperty
     StringProperty
 from bpy.types import PropertyGroup, Object, Action, AnimData, Context
 
-from ...types import PSX_PG_bone_collection_list_item
+from ...shared.types import PSX_PG_bone_collection_list_item
 
 
 def psa_export_property_group_animation_data_override_poll(_context, obj):

@@ -7,7 +7,7 @@ from bpy.types import Armature, Material
 
 from .data import *
 from .properties import triangle_type_and_bit_flags_to_poly_flags
-from ..helpers import *
+from ..shared.helpers import *
 
 
 class PskInputObjects(object):

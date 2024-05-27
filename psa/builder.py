@@ -3,7 +3,7 @@ from typing import Optional
 from bpy.types import Armature, Bone, Action, PoseBone
 
 from .data import *
-from ..helpers import *
+from ..shared.helpers import *
 
 
 class PsaBuildSequence:

@@ -4,7 +4,7 @@ from bpy_extras.io_utils import ExportHelper
 
 from ..builder import build_psk, PskBuildOptions, get_psk_input_objects
 from ..writer import write_psk
-from ...helpers import populate_bone_collection_list
+from ...shared.helpers import populate_bone_collection_list
 
 
 def is_bone_filter_mode_item_available(context, identifier):

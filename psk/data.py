@@ -1,6 +1,6 @@
 from typing import List
 
-from ..data import *
+from ..shared.data import *
 
 
 class Psk(object):

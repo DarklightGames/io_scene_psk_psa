@@ -2,7 +2,7 @@ from ctypes import Structure, sizeof
 from typing import Type
 
 from .data import Psk
-from ..data import Section, Vector3
+from ..shared.data import Section, Vector3
 
 MAX_WEDGE_COUNT = 65536
 MAX_POINT_COUNT = 4294967296

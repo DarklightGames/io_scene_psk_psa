@@ -2,7 +2,7 @@ import typing
 from collections import OrderedDict
 from typing import List
 
-from ..data import *
+from ..shared.data import *
 
 '''
 Note that keys are not stored within the Psa object.

@@ -2,7 +2,7 @@ from ctypes import Structure, sizeof
 from typing import Type
 
 from .data import Psa
-from ..data import Section
+from ..shared.data import Section
 
 
 def write_section(fp, name: bytes, data_type: Type[Structure] = None, data: list = None):
