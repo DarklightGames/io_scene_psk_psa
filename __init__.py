@@ -15,9 +15,9 @@ bl_info = {
 if 'bpy' in locals():
     import importlib
 
-    importlib.reload(psx_data)
-    importlib.reload(psx_helpers)
-    importlib.reload(psx_types)
+    importlib.reload(shared_data)
+    importlib.reload(shared_helpers)
+    importlib.reload(shared_types)
 
     importlib.reload(psk_data)
     importlib.reload(psk_reader)
@@ -44,15 +44,27 @@ if 'bpy' in locals():
     importlib.reload(psa_import_operators)
     importlib.reload(psa_import_ui)
 else:
-    # if i remove this line, it can be enabled just fine
-    from .shared import types as psx_types
+    from .shared import data as shared_data
+    from .shared import helpers as shared_helpers
+    from .shared import types as shared_types
+    from .psk import data as psk_data
+    from .psk import reader as psk_reader
+    from .psk import writer as psk_writer
+    from .psk import builder as psk_builder
     from .psk import properties as psk_properties
     from .psk import ui as psk_ui
+    from .psk import importer as psk_importer
     from .psk.export import properties as psk_export_properties
     from .psk.export import operators as psk_export_operators
     from .psk.export import ui as psk_export_ui
     from .psk.import_ import operators as psk_import_operators
 
+    from .psa import data as psa_data
+    from .psa import config as psa_config
+    from .psa import reader as psa_reader
+    from .psa import writer as psa_writer
+    from .psa import builder as psa_builder
+    from .psa import importer as psa_importer
     from .psa.export import properties as psa_export_properties
     from .psa.export import operators as psa_export_operators
     from .psa.export import ui as psa_export_ui
@@ -63,7 +75,12 @@ else:
 import bpy
 from bpy.props import PointerProperty
 
-classes = psx_types.classes +\
+# TODO: just here so that it's not unreferenced and removed on save.
+if [shared_data, shared_helpers, psk_data, psk_reader, psk_writer, psk_builder, psk_importer, psa_data, psa_config,
+    psa_reader, psa_writer, psa_builder, psa_importer]:
+    pass
+
+classes = shared_types.classes +\
           psk_properties.classes +\
           psk_ui.classes +\
           psk_import_operators.classes +\
@@ -105,7 +122,7 @@ def register():
     bpy.types.Scene.psa_import = PointerProperty(type=psa_import_properties.PSA_PG_import)
     bpy.types.Scene.psa_export = PointerProperty(type=psa_export_properties.PSA_PG_export)
     bpy.types.Scene.psk_export = PointerProperty(type=psk_export_properties.PSK_PG_export)
-    bpy.types.Action.psa_export = PointerProperty(type=psx_types.PSX_PG_action_export)
+    bpy.types.Action.psa_export = PointerProperty(type=shared_types.PSX_PG_action_export)
 
 
 def unregister():
