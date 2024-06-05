@@ -4,7 +4,7 @@ from bpy.types import UIList
 from .properties import filter_sequences
 
 
-class PSA_UL_sequences(UIList):
+class PSA_UL_sequences_mixIn(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_property, index, flt_flag):
         row = layout.row(align=True)
         split = row.split(align=True, factor=0.75)
@@ -30,11 +30,15 @@ class PSA_UL_sequences(UIList):
         return flt_flags, flt_neworder
 
 
-class PSA_UL_import_sequences(PSA_UL_sequences, UIList):
+class PSA_UL_sequences(PSA_UL_sequences_mixIn):
     pass
 
 
-class PSA_UL_import_actions(PSA_UL_sequences, UIList):
+class PSA_UL_import_sequences(PSA_UL_sequences_mixIn):
+    pass
+
+
+class PSA_UL_import_actions(PSA_UL_sequences_mixIn):
     pass
 
 
