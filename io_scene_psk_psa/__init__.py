@@ -1,17 +1,5 @@
 from bpy.app.handlers import persistent
 
-bl_info = {
-    'name': 'Unreal PSK/PSA Importer/Exporter',
-    'author': 'Colin Basnett, Yurii Ti',
-    'version': (7, 1, 0),
-    'blender': (4, 2, 0),
-    'description': 'Unreal PSK/PSA Import/Export (.psk/.psa)',
-    'warning': '',
-    'doc_url': 'https://github.com/DarklightGames/io_scene_psk_psa',
-    'tracker_url': 'https://github.com/DarklightGames/io_scene_psk_psa/issues',
-    'category': 'Import-Export'
-}
-
 if 'bpy' in locals():
     import importlib
 
@@ -44,33 +32,20 @@ if 'bpy' in locals():
     importlib.reload(psa_import_operators)
     importlib.reload(psa_import_ui)
 else:
-    from .shared import data as shared_data
-    from .shared import helpers as shared_helpers
-    from .shared import types as shared_types
-    from .psk import data as psk_data
-    from .psk import reader as psk_reader
-    from .psk import writer as psk_writer
-    from .psk import builder as psk_builder
-    from .psk import properties as psk_properties
-    from .psk import ui as psk_ui
-    from .psk import importer as psk_importer
-    from .psk.export import properties as psk_export_properties
-    from .psk.export import operators as psk_export_operators
-    from .psk.export import ui as psk_export_ui
+    from .shared import data as shared_data, types as shared_types, helpers as shared_helpers
+    from .psk import data as psk_data, builder as psk_builder, writer as psk_writer, \
+    importer as psk_importer, properties as psk_properties
+    from .psk import reader as psk_reader, ui as psk_ui
+    from .psk.export import properties as psk_export_properties, ui as psk_export_ui, \
+        operators as psk_export_operators
     from .psk.import_ import operators as psk_import_operators
 
-    from .psa import data as psa_data
-    from .psa import config as psa_config
-    from .psa import reader as psa_reader
-    from .psa import writer as psa_writer
-    from .psa import builder as psa_builder
-    from .psa import importer as psa_importer
-    from .psa.export import properties as psa_export_properties
-    from .psa.export import operators as psa_export_operators
-    from .psa.export import ui as psa_export_ui
-    from .psa.import_ import properties as psa_import_properties
+    from .psa import config as psa_config, data as psa_data, writer as psa_writer, reader as psa_reader, \
+        builder as psa_builder, importer as psa_importer
+    from .psa.export import properties as psa_export_properties, ui as psa_export_ui, \
+        operators as psa_export_operators
     from .psa.import_ import operators as psa_import_operators
-    from .psa.import_ import ui as psa_import_ui
+    from .psa.import_ import ui as psa_import_ui, properties as psa_import_properties
 
 import bpy
 from bpy.props import PointerProperty

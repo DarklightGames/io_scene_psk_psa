@@ -5,13 +5,15 @@
 
 This Blender addon allows you to import and export meshes and animations to and from the [PSK and PSA file formats](https://wiki.beyondunreal.com/PSK_%26_PSA_file_formats) used in many versions of the Unreal Engine.
 
+This software is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html) license.
+
 # Compatibility
 
-| Blender Version                                            | Addon Version                                                                  | Long Term Support |
-|------------------------------------------------------------|--------------------------------------------------------------------------------|-------------------|
-| [4.1](https://www.blender.org/download/releases/4-1/)      | [latest](https://github.com/DarklightGames/io_scene_psk_psa/releases/latest)   | TBD               |
-| [4.0](https://www.blender.org/download/releases/4-0/)      | [6.2.1](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/6.2.1) | TBD               |                                      
-| [3.4 - 3.6](https://www.blender.org/download/lts/3-6/)     | [5.0.6](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.6) | ✅️ June 2025      |
+| Blender Version | Addon Version | Long Term Support |
+|-|-|-|
+| [4.1](https://www.blender.org/download/releases/4-1/) | [latest](https://github.com/DarklightGames/io_scene_psk_psa/releases/latest)   | TBD |
+| [4.0](https://www.blender.org/download/releases/4-0/) | [6.2.1](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/6.2.1) | TBD |
+| [3.4 - 3.6](https://www.blender.org/download/lts/3-6/) | [5.0.6](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.6) | ✅️ June 2025 |
 | [2.93 - 3.3](https://www.blender.org/download/releases/3-3/) | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) | ✅️ September 2024 |
 
 Bug fixes will be issued for legacy addon versions that are under [Blender's LTS maintenance period](https://www.blender.org/download/lts/). Once the LTS period has ended, legacy addon versions will no longer be supported by the maintainers of this repository, although we will accept pull requests for bug fixes. 

@@ -1,0 +1,24 @@
+schema_version = "1.0.0"
+id = "io_scene_psk_psa"
+version = "7.1.0"
+name = "Unreal Mesh & Animation (.psk/.psa)"
+tagline = "Import and export PSK and PSA files used in Unreal Engine"
+maintainer = "Colin Basnett <cmbasnett@gmail.com>"
+type = "add-on"
+website = "https://github.com/DarklightGames/io_scene_psk_psa/"
+tags = ["Game Engine", "Import-Export"]
+blender_version_min = "4.2.0"
+# Optional: maximum supported Blender version
+# blender_version_max = "5.1.0"
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+[build]
+paths_exclude_pattern = [
+  "/.git/",
+  "__pycache__/",
+  "/venv/",
+  "/.github/",
+  ".gitignore",
+]
