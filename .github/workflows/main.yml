@@ -26,10 +26,21 @@ jobs:
           sudo apt-get install libgl1-mesa-glx -y
       - name: Download Blender
         run: |
-          wget $BLENDER_URL
-          ls
+          wget -q $BLENDER_URL
           tar -xf $BLENDER_FILENAME
           rm -rf $BLENDER_FILENAME
-          ls
-          ./${{ env.BLENDER_VERSION }}/blender --version
+          echo "./${{ env.BLENDER_VERSION }}" >> $GITHUB_PATH
+          blender --version
       - uses: actions/checkout@v3
+      - name: Build addon
+        run: |
+          ls -lf
+          pushd ./io_scene_psk_psa
+          blender --command extension build
+          popd
+      - name: Archive addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: addon
+          path: |
+            ./io_scene_psk_psa/io_scene_psk_psa.zip
