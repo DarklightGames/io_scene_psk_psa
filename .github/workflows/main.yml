@@ -9,8 +9,8 @@ on:
 
 env:
   BLENDER_VERSION: blender-4.2.0-beta+v42.d19d23e91f65-linux.x86_64-release
-  BLENDER_FILENAME: ${{ env.BLENDER_VERSION }}.tar.xz
-  BLENDER_URL: https://cdn.builder.blender.org/download/daily/${{ env.BLENDER_FILENAME }}
+  BLENDER_FILENAME: $BLENDER_VERSION.tar.xz
+  BLENDER_URL: https://cdn.builder.blender.org/download/daily/$BLENDER_FILENAME
     
 jobs:
   configurator:
