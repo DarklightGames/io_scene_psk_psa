@@ -6,26 +6,27 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
-env:
-  BLENDER_VERSION: blender-4.2.0-beta+v42.d19d23e91f65-linux.x86_64-release
-  BLENDER_FILENAME: $BLENDER_VERSION.tar.xz
-  BLENDER_URL: https://cdn.builder.blender.org/download/daily/$BLENDER_FILENAME
     
 jobs:
-  configurator:
+  build:
     runs-on: ubuntu-latest
+    env:
+      BLENDER_VERSION: blender-4.2.0-beta+v42.d19d23e91f65-linux.x86_64-release
     steps:
-    - name: Install Blender Dependencies
-      run: |
-        sudo apt-get install libxxf86vm-dev -y
-        sudo apt-get install libxfixes3 -y
-        sudo apt-get install libxi-dev -y
-        sudo apt-get install libxkbcommon-x11-0 -y
-        sudo apt-get install libgl1-mesa-glx -y
-    - name: Download Blender
-      run: |
-        wget ${{ env.BLENDER_URL }}
-        tar -xvzf ${{ env.BLENDER_FILENAME }}
-        rm -rf ${{ env.BLENDER_FILENAME }}
-    - uses: actions/checkout@v3
+      - name: Set derived environment variables
+        run: |
+          echo "BLENDER_FILENAME=${{ env.BLENDER_VERSION }}.tar.xz" >> $GITHUB_ENV
+          echo "BLENDER_URL=https://cdn.builder.blender.org/download/daily/${{ env.BLENDER_VERSION }}.tar.xz" >> $GITHUB_ENV
+      - name: Install Blender Dependencies
+        run: |
+          apt install libxxf86vm-dev -y
+          apt install libxfixes3 -y
+          apt install libxi-dev -y
+          apt install libxkbcommon-x11-0 -y
+          apt install libgl1-mesa-glx -y
+      - name: Download Blender
+        run: |
+          wget $BLENDER_URL
+          tar -xvzf $BLENDER_FILENAME
+          rm -rf $BLENDER_FILENAME
+      - uses: actions/checkout@v3
