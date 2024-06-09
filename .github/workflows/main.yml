@@ -27,6 +27,8 @@ jobs:
       - name: Download Blender
         run: |
           wget $BLENDER_URL
-          tar -xvzf $BLENDER_FILENAME
+          tar -xf $BLENDER_FILENAME
           rm -rf $BLENDER_FILENAME
+          ls
+          ./$BLENDER_FILENAME/blender -version
       - uses: actions/checkout@v3
