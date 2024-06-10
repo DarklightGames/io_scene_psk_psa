@@ -1,4 +1,4 @@
-name: Verify Addon
+name: Build Extension
 
 on:
   workflow_dispatch:
@@ -33,7 +33,7 @@ jobs:
       - name: Add Blender executable to path
         run: |
           echo "${{ github.workspace }}/${{ env.BLENDER_VERSION }}/" >> $GITHUB_PATH
-      - name: Sanity check that Blender is on the path
+      - name: Build extension
         run: |
           pushd ./io_scene_psk_psa
           blender --command extension build
