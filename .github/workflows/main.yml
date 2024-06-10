@@ -37,10 +37,12 @@ jobs:
         run: |
           pushd ./io_scene_psk_psa
           blender --command extension build
+          mkdir artifact
+          unzip -q io_scene_psk_psa.zip -d ./artifact
           popd
       - name: Archive addon
         uses: actions/upload-artifact@v4
         with:
-          name: addon
+          name: io_scene_psk_psa-${{ github.ref_name }}-${{ github.sha }}
           path: |
-            ./io_scene_psk_psa/io_scene_psk_psa.zip
+            ./io_scene_psk_psa/artifact/*
