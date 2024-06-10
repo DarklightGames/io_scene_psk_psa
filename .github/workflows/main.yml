@@ -38,8 +38,9 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build addon
         run: |
-          ls -lf
           pushd ./io_scene_psk_psa
+          ls -lf
+          echo $GITHUB_PATH
           blender --command extension build
           popd
       - name: Archive addon
