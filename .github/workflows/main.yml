@@ -13,6 +13,7 @@ jobs:
     env:
       BLENDER_VERSION: blender-4.2.0-beta+v42.d19d23e91f65-linux.x86_64-release
     steps:
+      - uses: actions/checkout@v3
       - name: Set derived environment variables
         run: |
           echo "BLENDER_FILENAME=${{ env.BLENDER_VERSION }}.tar.xz" >> $GITHUB_ENV
@@ -34,12 +35,8 @@ jobs:
           echo "${{ github.workspace }}/${{ env.BLENDER_VERSION }}/" >> $GITHUB_PATH
       - name: Sanity check that Blender is on the path
         run: |
-          blender --version
-      - uses: actions/checkout@v3
-      - name: Build addon
-        run: |
           pushd ./io_scene_psk_psa
-          ${{ github.workspace }}/${{ env.BLENDER_VERSION }}/blender --command extension build
+          blender --command extension build
           popd
       - name: Archive addon
         uses: actions/upload-artifact@v4
