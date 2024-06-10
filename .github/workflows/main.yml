@@ -29,6 +29,7 @@ jobs:
           wget -q $BLENDER_URL
           tar -xf $BLENDER_FILENAME
           rm -rf $BLENDER_FILENAME
+          ls -la
           echo "${{ github.workspace }}/${{ env.BLENDER_VERSION }}/" >> $GITHUB_PATH
           blender --version
       - uses: actions/checkout@v3
