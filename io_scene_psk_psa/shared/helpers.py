@@ -2,7 +2,6 @@ import re
 import typing
 from typing import List, Iterable
 
-import addon_utils
 import bpy.types
 from bpy.types import NlaStrip, Object, AnimData
 
@@ -165,4 +164,6 @@ def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_c
 
 
 def is_bdk_addon_loaded():
-    return addon_utils.check('bdk_addon')[1]
+    # TODO: this does not work anymore for *reasons*. Just check if bpy.ops.bdk.link_material exists.
+    # return addon_utils.check('bdk_addon')[1]
+    return bpy.ops.bdk.link_material is not None

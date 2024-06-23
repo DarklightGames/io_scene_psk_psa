@@ -101,6 +101,12 @@ class PSK_OT_import(Operator, ImportHelper):
         default=1.0,
         soft_min=0.0,
     )
+    bdk_repository_id: StringProperty(
+        name='BDK Repository ID',
+        default='',
+        options=empty_set,
+        description='The ID of the BDK repository to use for loading materials'
+    )
 
     def execute(self, context):
         psk = read_psk(self.filepath)
@@ -117,6 +123,9 @@ class PSK_OT_import(Operator, ImportHelper):
         options.should_import_materials = self.should_import_materials
         options.should_import_shape_keys = self.should_import_shape_keys
         options.scale = self.scale
+
+        if self.bdk_repository_id:
+            options.bdk_repository_id = self.bdk_repository_id
 
         if not options.should_import_mesh and not options.should_import_skeleton:
             self.report({'ERROR'}, 'Nothing to import')
