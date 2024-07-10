@@ -125,7 +125,7 @@ class PSA_PG_export(PropertyGroup):
         description='',
         items=(
             ('SCENE', 'Scene', '', 'SCENE_DATA', 0),
-            ('ACTION_METADATA', 'Action Metadata', 'The frame rate will be determined by action\'s FPS property found in the PSA Export panel.\n\nIf the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used', 'PROPERTIES', 1),
+            ('ACTION_METADATA', 'Action Metadata', 'The frame rate will be determined by action\'s FPS property found in the PSA Export panel.\n\nIf the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used', 'ACTION', 1),
             ('CUSTOM', 'Custom', '', 2)
         )
     )
