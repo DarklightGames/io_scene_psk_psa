@@ -8,34 +8,40 @@ This Blender addon allows you to import and export meshes and animations to and 
 
 This software is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html) license.
 
-# Compatibility
-
-| Blender Version | Addon Version | Long Term Support |
-|-|-|-|
-| [4.1](https://www.blender.org/download/releases/4-1/) | [latest](https://github.com/DarklightGames/io_scene_psk_psa/releases/latest)   | TBD |
-| [4.0](https://www.blender.org/download/releases/4-0/) | [6.2.1](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/6.2.1) | TBD |
-| [3.4 - 3.6](https://www.blender.org/download/lts/3-6/) | [5.0.6](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.6) | ✅️ June 2025 |
-| [2.93 - 3.3](https://www.blender.org/download/releases/3-3/) | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) | ✅️ September 2024 |
-
-Bug fixes will be issued for legacy addon versions that are under [Blender's LTS maintenance period](https://www.blender.org/download/lts/). Once the LTS period has ended, legacy addon versions will no longer be supported by the maintainers of this repository, although we will accept pull requests for bug fixes. 
-
 # Features
 * Full PSK/PSA import and export capabilities.
 * Non-standard file section data is supported for import only (vertex normals, extra UV channels, vertex colors, shape keys).
 * Fine-grained PSA sequence importing for efficient workflow when working with large PSA files.
-* PSA sequence metadata (e.g., frame rate, sequence name) is preserved on import, allowing this data to be reused on export.
+* PSA sequence metadata (e.g., frame rate) is preserved on import, allowing this data to be reused on export.
 * Specific bone collections can be excluded from PSK/PSA export (useful for excluding non-contributing bones such as IK controllers).
-* PSA sequences can be exported directly from actions or delineated using a scene's [timeline markers](https://docs.blender.org/manual/en/latest/animation/markers.html) or NLA track strips, allowing direct use of the [NLA](https://docs.blender.org/manual/en/latest/editors/nla/index.html) when creating sequences.
+* PSA sequences can be exported directly from actions or delineated using a scene's [timeline markers](https://docs.blender.org/manual/en/latest/animation/markers.html), pose markers, or NLA track strips, allowing direct use of the [NLA](https://docs.blender.org/manual/en/latest/editors/nla/index.html) when creating sequences.
 * Manual re-ordering of material slots when exporting multiple mesh objects.
 
 # Installation
-1. Download the zip file for the latest version from the [releases](https://github.com/DarklightGames/io_export_psk_psa/releases) page.
-2. Open Blender 4.0.0 or later.
+For Blender 4.2 and higher, it is recommended to download the latest version from the [Blender Extensions](https://extensions.blender.org/add-ons/io-scene-psk-psa/) platform.
+
+For Blender 4.1 and lower, you can install the addon manually by following these steps:
+
+1. Download the .zip file of the latest compatible version for your Blender version (see [Legacy Compatibility](#legacy-compatibility)).
+2. Open Blender.
 3. Navigate to the Blender Preferences (`Edit` > `Preferences`).
 4. Select the `Add-ons` tab.
 5. Click the `Install...` button.
 6. Select the .zip file that you downloaded earlier and click `Install Add-on`.
 7. Enable the newly added `Import-Export: PSK/PSA Importer/Exporter` addon.
+
+# Legacy Compatibility
+
+Below is a table of the latest addon versions that are compatible with older versions of Blender. These versions are no longer maintained and may contain bugs that have been fixed in newer versions. It is recommended to use the latest version of the addon for the best experience.
+
+Critical bug fixes may be issued for legacy addon versions that are under [Blender's LTS maintenance period](https://www.blender.org/download/lts/). Once the LTS period has ended, legacy addon versions will no longer be supported by the maintainers of this repository, although the releases will still be available for download.
+
+| Blender Version| Addon Version                                                                  | Long Term Support |
+|-|--------------------------------------------------------------------------------|-----------------|
+| [4.1](https://www.blender.org/download/releases/4-1/)        | [7.0.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/7.0.0) | No              |
+| [4.0](https://www.blender.org/download/releases/4-0/)        | [6.2.1](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/6.2.1) | No              |
+| [3.4 - 3.6](https://www.blender.org/download/lts/3-6/)       | [5.0.6](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.6) | June 2025       |
+| [2.93 - 3.3](https://www.blender.org/download/releases/3-3/) | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) | September 2024  |
 
 # Usage
 ## Exporting a PSK
@@ -71,3 +77,5 @@ The PSA importer creates [Actions](https://docs.blender.org/manual/en/latest/ani
 If preserving the mesh normals of models is important for your workflow, it is *not recommended* to export PSK files from UE Viewer. This is because UE Viewer makes no attempt to reconstruct the original [smoothing groups](https://en.wikipedia.org/wiki/Smoothing_group). As a result, the normals of imported PSK files will be incorrect when imported into Blender and will need to be manually fixed.
 
 As a workaround, it is recommended to export [glTF](https://en.wikipedia.org/wiki/GlTF) meshes out of UE Viewer instead, since the glTF format has support for explicit normals and UE Viewer can correctly preserve the mesh normals on export. Note, however, that the imported glTF armature may have it's bones oriented incorrectly when imported into Blender. To mitigate this, you can combine the armature of PSK and the mesh of the glTF for best results.
+
+There is also an open issue to add support for exporting explicit normals from UE Viewer in the future: [gildor-kh/UEViewer#1017]
