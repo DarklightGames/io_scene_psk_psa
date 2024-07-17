@@ -1,3 +1,4 @@
+import os
 from ctypes import Structure, sizeof
 from typing import Type
 
@@ -33,6 +34,9 @@ def write_psk(psk: Psk, path: str):
         raise RuntimeError(f'Number of bones ({len(psk.bones)}) exceeds limit of {MAX_BONE_COUNT}')
     elif len(psk.bones) == 0:
         raise RuntimeError(f'At least one bone must be marked for export')
+
+    # Make the directory for the file if it doesn't exist.
+    os.makedirs(os.path.dirname(path), exist_ok=True)
 
     with open(path, 'wb') as fp:
         _write_section(fp, b'ACTRHEAD')

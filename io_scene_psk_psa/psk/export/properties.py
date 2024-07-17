@@ -5,6 +5,12 @@ from ...shared.types import PSX_PG_bone_collection_list_item
 
 empty_set = set()
 
+
+object_eval_state_items = (
+    ('EVALUATED', 'Evaluated', 'Use data from fully evaluated object'),
+    ('ORIGINAL', 'Original', 'Use data from original object with no modifiers applied'),
+)
+
 class PSK_PG_material_list_item(PropertyGroup):
     material: PointerProperty(type=Material)
     index: IntProperty()
@@ -23,7 +29,11 @@ class PSK_PG_export(PropertyGroup):
     )
     bone_collection_list: CollectionProperty(type=PSX_PG_bone_collection_list_item)
     bone_collection_list_index: IntProperty(default=0)
-    use_raw_mesh_data: BoolProperty(default=False, name='Raw Mesh Data', description='No modifiers will be evaluated as part of the exported mesh')
+    object_eval_state: EnumProperty(
+        items=object_eval_state_items,
+        name='Object Evaluation State',
+        default='EVALUATED'
+    )
     material_list: CollectionProperty(type=PSK_PG_material_list_item)
     material_list_index: IntProperty(default=0)
     should_enforce_bone_name_restrictions: BoolProperty(

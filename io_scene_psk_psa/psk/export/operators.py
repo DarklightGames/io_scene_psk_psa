@@ -1,35 +1,40 @@
-from bpy.props import StringProperty
-from bpy.types import Operator
+from typing import List
+
+import bpy
+from bpy.props import StringProperty, BoolProperty, EnumProperty
+from bpy.types import Operator, Context, Object
 from bpy_extras.io_utils import ExportHelper
 
-from ..builder import build_psk, PskBuildOptions, get_psk_input_objects
+from .properties import object_eval_state_items
+from ..builder import build_psk, PskBuildOptions, get_psk_input_objects_for_context, \
+    get_psk_input_objects_for_collection
 from ..writer import write_psk
 from ...shared.helpers import populate_bone_collection_list
 
 
 def is_bone_filter_mode_item_available(context, identifier):
-    input_objects = get_psk_input_objects(context)
+    input_objects = get_psk_input_objects_for_context(context)
     armature_object = input_objects.armature_object
     if identifier == 'BONE_COLLECTIONS':
         if armature_object is None or armature_object.data is None or len(armature_object.data.collections) == 0:
             return False
-    # else if... you can set up other conditions if you add more options
     return True
 
 
-def populate_material_list(mesh_objects, material_list):
-    material_list.clear()
-
+def get_materials_for_mesh_objects(mesh_objects: List[Object]):
     materials = []
     for mesh_object in mesh_objects:
         for i, material_slot in enumerate(mesh_object.material_slots):
             material = material_slot.material
-            # TODO: put this in the poll arg?
             if material is None:
                 raise RuntimeError('Material slot cannot be empty (index ' + str(i) + ')')
             if material not in materials:
                 materials.append(material)
+    return materials
 
+def populate_material_list(mesh_objects, material_list):
+    materials =  get_materials_for_mesh_objects(mesh_objects)
+    material_list.clear()
     for index, material in enumerate(materials):
         m = material_list.add()
         m.material = material
@@ -72,6 +77,84 @@ class PSK_OT_material_list_move_down(Operator):
         return {'FINISHED'}
 
 
+class PSK_OT_export_collection(Operator, ExportHelper):
+    bl_idname = 'export.psk_collection'
+    bl_label = 'Export'
+    bl_options = {'INTERNAL'}
+    filename_ext = '.psk'
+    filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
+    filepath: StringProperty(
+        name='File Path',
+        description='File path used for exporting the PSK file',
+        maxlen=1024,
+        default='',
+        subtype='FILE_PATH')
+    collection: StringProperty(options={'HIDDEN'})
+
+    object_eval_state: EnumProperty(
+        items=object_eval_state_items,
+        name='Object Evaluation State',
+        default='EVALUATED'
+    )
+    should_enforce_bone_name_restrictions: BoolProperty(
+        default=False,
+        name='Enforce Bone Name Restrictions',
+        description='Enforce that bone names must only contain letters, numbers, spaces, hyphens and underscores.\n\n'
+                    'Depending on the engine, improper bone names might not be referenced correctly by scripts'
+    )
+
+    def execute(self, context):
+        collection = bpy.data.collections.get(self.collection)
+
+        try:
+            input_objects = get_psk_input_objects_for_collection(collection)
+        except RuntimeError as e:
+            self.report({'ERROR_INVALID_CONTEXT'}, str(e))
+            return {'CANCELLED'}
+
+        options = PskBuildOptions()
+        options.bone_filter_mode = 'ALL'
+        options.object_eval_state = self.object_eval_state
+        options.materials = get_materials_for_mesh_objects(input_objects.mesh_objects)
+        options.should_enforce_bone_name_restrictions = self.should_enforce_bone_name_restrictions
+
+        try:
+            result = build_psk(context, input_objects, options)
+            for warning in result.warnings:
+                self.report({'WARNING'}, warning)
+            write_psk(result.psk, self.filepath)
+            if len(result.warnings) > 0:
+                self.report({'WARNING'}, f'PSK export successful with {len(result.warnings)} warnings')
+            else:
+                self.report({'INFO'}, f'PSK export successful')
+        except RuntimeError as e:
+            self.report({'ERROR_INVALID_CONTEXT'}, str(e))
+            return {'CANCELLED'}
+
+        return {'FINISHED'}
+
+    def draw(self, context: Context):
+        layout = self.layout
+
+        # MESH
+        mesh_header, mesh_panel = layout.panel('Mesh', default_closed=False)
+        mesh_header.label(text='Mesh', icon='MESH_DATA')
+        if mesh_panel:
+            flow = mesh_panel.grid_flow(row_major=True)
+            flow.use_property_split = True
+            flow.use_property_decorate = False
+            flow.prop(self, 'object_eval_state', text='Data')
+
+        # BONES
+        bones_header, bones_panel = layout.panel('Bones', default_closed=False)
+        bones_header.label(text='Bones', icon='BONE_DATA')
+        if bones_panel:
+            flow = bones_panel.grid_flow(row_major=True)
+            flow.use_property_split = True
+            flow.use_property_decorate = False
+            flow.prop(self, 'should_enforce_bone_name_restrictions')
+
+
 class PSK_OT_export(Operator, ExportHelper):
     bl_idname = 'export.psk'
     bl_label = 'Export'
@@ -88,7 +171,7 @@ class PSK_OT_export(Operator, ExportHelper):
 
     def invoke(self, context, event):
         try:
-            input_objects = get_psk_input_objects(context)
+            input_objects = get_psk_input_objects_for_context(context)
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
@@ -110,7 +193,7 @@ class PSK_OT_export(Operator, ExportHelper):
     @classmethod
     def poll(cls, context):
         try:
-            get_psk_input_objects(context)
+            get_psk_input_objects_for_context(context)
         except RuntimeError as e:
             cls.poll_message_set(str(e))
             return False
@@ -118,16 +201,20 @@ class PSK_OT_export(Operator, ExportHelper):
 
     def draw(self, context):
         layout = self.layout
+
         pg = getattr(context.scene, 'psk_export')
 
         # MESH
-        mesh_header, mesh_panel = layout.panel('01_mesh', default_closed=False)
+        mesh_header, mesh_panel = layout.panel('Mesh', default_closed=False)
         mesh_header.label(text='Mesh', icon='MESH_DATA')
         if mesh_panel:
-            mesh_panel.prop(pg, 'use_raw_mesh_data')
+            flow = mesh_panel.grid_flow(row_major=True)
+            flow.use_property_split = True
+            flow.use_property_decorate = False
+            flow.prop(pg, 'object_eval_state', text='Data')
 
         # BONES
-        bones_header, bones_panel = layout.panel('02_bones', default_closed=False)
+        bones_header, bones_panel = layout.panel('Bones', default_closed=False)
         bones_header.label(text='Bones', icon='BONE_DATA')
         if bones_panel:
             bone_filter_mode_items = pg.bl_rna.properties['bone_filter_mode'].enum_items_static
@@ -146,7 +233,7 @@ class PSK_OT_export(Operator, ExportHelper):
             bones_panel.prop(pg, 'should_enforce_bone_name_restrictions')
 
         # MATERIALS
-        materials_header, materials_panel = layout.panel('03_materials', default_closed=False)
+        materials_header, materials_panel = layout.panel('Materials', default_closed=False)
         materials_header.label(text='Materials', icon='MATERIAL')
         if materials_panel:
             row = materials_panel.row()
@@ -157,16 +244,19 @@ class PSK_OT_export(Operator, ExportHelper):
             col.operator(PSK_OT_material_list_move_down.bl_idname, text='', icon='TRIA_DOWN')
 
     def execute(self, context):
-        pg = context.scene.psk_export
+        pg = getattr(context.scene, 'psk_export')
+
+        input_objects = get_psk_input_objects_for_context(context)
+
         options = PskBuildOptions()
         options.bone_filter_mode = pg.bone_filter_mode
         options.bone_collection_indices = [x.index for x in pg.bone_collection_list if x.is_selected]
-        options.use_raw_mesh_data = pg.use_raw_mesh_data
+        options.object_eval_state = pg.object_eval_state
         options.materials = [m.material for m in pg.material_list]
         options.should_enforce_bone_name_restrictions = pg.should_enforce_bone_name_restrictions
         
         try:
-            result = build_psk(context, options)
+            result = build_psk(context, input_objects, options)
             for warning in result.warnings:
                 self.report({'WARNING'}, warning)
             write_psk(result.psk, self.filepath)
@@ -185,4 +275,5 @@ classes = (
     PSK_OT_material_list_move_up,
     PSK_OT_material_list_move_down,
     PSK_OT_export,
+    PSK_OT_export_collection,
 )

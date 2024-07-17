@@ -108,7 +108,6 @@ def load_psa_file(context, filepath: str):
         pg.psa_error = str(e)
 
 
-
 def on_psa_file_path_updated(cls, context):
     load_psa_file(context, cls.filepath)
 
@@ -261,6 +260,7 @@ class PSA_FH_import(FileHandler):
     bl_idname = 'PSA_FH_import'
     bl_label = 'File handler for Unreal PSA import'
     bl_import_operator = 'psa_import.import'
+    bl_export_operator = 'psa_export.export'
     bl_file_extensions = '.psa'
 
     @classmethod

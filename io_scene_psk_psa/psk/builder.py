@@ -3,7 +3,7 @@ from typing import Optional
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import Armature, Material
+from bpy.types import Armature, Material, Collection, Context
 
 from .data import *
 from .properties import triangle_type_and_bit_flags_to_poly_flags
@@ -20,30 +20,28 @@ class PskBuildOptions(object):
     def __init__(self):
         self.bone_filter_mode = 'ALL'
         self.bone_collection_indices: List[int] = []
-        self.use_raw_mesh_data = True
+        self.object_eval_state = 'EVALUATED'
         self.materials: List[Material] = []
         self.should_enforce_bone_name_restrictions = False
 
 
-def get_psk_input_objects(context) -> PskInputObjects:
-    input_objects = PskInputObjects()
-    for selected_object in context.view_layer.objects.selected:
-        if selected_object.type == 'MESH':
-            input_objects.mesh_objects.append(selected_object)
+def get_mesh_objects_for_collection(collection: Collection):
+    for obj in collection.all_objects:
+        if obj.type == 'MESH':
+            yield obj
 
-    if len(input_objects.mesh_objects) == 0:
-        raise RuntimeError('At least one mesh must be selected')
 
-    for mesh_object in input_objects.mesh_objects:
-        if len(mesh_object.data.materials) == 0:
-            raise RuntimeError(f'Mesh "{mesh_object.name}" must have at least one material')
+def get_mesh_objects_for_context(context: Context):
+    for obj in context.view_layer.objects.selected:
+        if obj.type == 'MESH':
+            yield obj
 
-    # Ensure that there are either no armature modifiers (static mesh)
-    # or that there is exactly one armature modifier object shared between
-    # all selected meshes
+
+def get_armature_for_mesh_objects(mesh_objects: List[Object]) -> Optional[Object]:
+    # Ensure that there are either no armature modifiers (static mesh) or that there is exactly one armature modifier
+    # object shared between all meshes.
     armature_modifier_objects = set()
-
-    for mesh_object in input_objects.mesh_objects:
+    for mesh_object in mesh_objects:
         modifiers = [x for x in mesh_object.modifiers if x.type == 'ARMATURE']
         if len(modifiers) == 0:
             continue
@@ -53,11 +51,37 @@ def get_psk_input_objects(context) -> PskInputObjects:
 
     if len(armature_modifier_objects) > 1:
         armature_modifier_names = [x.name for x in armature_modifier_objects]
-        raise RuntimeError(f'All selected meshes must have the same armature modifier, encountered {len(armature_modifier_names)} ({", ".join(armature_modifier_names)})')
+        raise RuntimeError(
+            f'All meshes must have the same armature modifier, encountered {len(armature_modifier_names)} ({", ".join(armature_modifier_names)})')
     elif len(armature_modifier_objects) == 1:
-        input_objects.armature_object = list(armature_modifier_objects)[0]
+        return list(armature_modifier_objects)[0]
+    else:
+        return None
+
+
+def _get_psk_input_objects(mesh_objects: List[Object]) -> PskInputObjects:
+    if len(mesh_objects) == 0:
+        raise RuntimeError('At least one mesh must be selected')
+
+    for mesh_object in mesh_objects:
+        if len(mesh_object.data.materials) == 0:
+            raise RuntimeError(f'Mesh "{mesh_object.name}" must have at least one material')
+
+    input_objects = PskInputObjects()
+    input_objects.mesh_objects = mesh_objects
+    input_objects.armature_object = get_armature_for_mesh_objects(mesh_objects)
 
     return input_objects
+
+
+def get_psk_input_objects_for_context(context: Context) -> PskInputObjects:
+    mesh_objects = list(get_mesh_objects_for_context(context))
+    return _get_psk_input_objects(mesh_objects)
+
+
+def get_psk_input_objects_for_collection(collection: Collection) -> PskInputObjects:
+    mesh_objects = list(get_mesh_objects_for_collection(collection))
+    return _get_psk_input_objects(mesh_objects)
 
 
 class PskBuildResult(object):
@@ -66,8 +90,7 @@ class PskBuildResult(object):
         self.warnings: List[str] = []
 
 
-def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
-    input_objects = get_psk_input_objects(context)
+def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions) -> PskBuildResult:
     armature_object: bpy.types.Object = input_objects.armature_object
 
     result = PskBuildResult()
@@ -160,47 +183,48 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
         material_indices = [material_names.index(material_slot.material.name) for material_slot in input_mesh_object.material_slots]
 
         # MESH DATA
-        if options.use_raw_mesh_data:
-            mesh_object = input_mesh_object
-            mesh_data = input_mesh_object.data
-        else:
-            # Create a copy of the mesh object after non-armature modifiers are applied.
+        match options.object_eval_state:
+            case 'ORIGINAL':
+                mesh_object = input_mesh_object
+                mesh_data = input_mesh_object.data
+            case 'EVALUATED':
+                # Create a copy of the mesh object after non-armature modifiers are applied.
 
-            # Temporarily force the armature into the rest position.
-            # We will undo this later.
-            old_pose_position = None
-            if armature_object is not None:
-                old_pose_position = armature_object.data.pose_position
-                armature_object.data.pose_position = 'REST'
+                # Temporarily force the armature into the rest position.
+                # We will undo this later.
+                old_pose_position = None
+                if armature_object is not None:
+                    old_pose_position = armature_object.data.pose_position
+                    armature_object.data.pose_position = 'REST'
 
-            depsgraph = context.evaluated_depsgraph_get()
-            bm = bmesh.new()
-            bm.from_object(input_mesh_object, depsgraph)
-            mesh_data = bpy.data.meshes.new('')
-            bm.to_mesh(mesh_data)
-            del bm
-            mesh_object = bpy.data.objects.new('', mesh_data)
-            mesh_object.matrix_world = input_mesh_object.matrix_world
+                depsgraph = context.evaluated_depsgraph_get()
+                bm = bmesh.new()
+                bm.from_object(input_mesh_object, depsgraph)
+                mesh_data = bpy.data.meshes.new('')
+                bm.to_mesh(mesh_data)
+                del bm
+                mesh_object = bpy.data.objects.new('', mesh_data)
+                mesh_object.matrix_world = input_mesh_object.matrix_world
 
-            scale = (input_mesh_object.scale.x, input_mesh_object.scale.y, input_mesh_object.scale.z)
+                scale = (input_mesh_object.scale.x, input_mesh_object.scale.y, input_mesh_object.scale.z)
 
-            # Negative scaling in Blender results in inverted normals after the scale is applied. However, if the scale
-            # is not applied, the normals will appear unaffected in the viewport. The evaluated mesh data used in the
-            # export will have the scale applied, but this behavior is not obvious to the user.
-            #
-            # In order to have the exporter be as WYSIWYG as possible, we need to check for negative scaling and invert
-            # the normals if necessary. If two axes have negative scaling and the third has positive scaling, the
-            # normals will be correct. We can detect this by checking if the number of negative scaling axes is odd. If
-            # it is, we need to invert the normals of the mesh by swapping the order of the vertices in each face.
-            should_flip_normals = sum(1 for x in scale if x < 0) % 2 == 1
+                # Negative scaling in Blender results in inverted normals after the scale is applied. However, if the scale
+                # is not applied, the normals will appear unaffected in the viewport. The evaluated mesh data used in the
+                # export will have the scale applied, but this behavior is not obvious to the user.
+                #
+                # In order to have the exporter be as WYSIWYG as possible, we need to check for negative scaling and invert
+                # the normals if necessary. If two axes have negative scaling and the third has positive scaling, the
+                # normals will be correct. We can detect this by checking if the number of negative scaling axes is odd. If
+                # it is, we need to invert the normals of the mesh by swapping the order of the vertices in each face.
+                should_flip_normals = sum(1 for x in scale if x < 0) % 2 == 1
 
-            # Copy the vertex groups
-            for vertex_group in input_mesh_object.vertex_groups:
-                mesh_object.vertex_groups.new(name=vertex_group.name)
+                # Copy the vertex groups
+                for vertex_group in input_mesh_object.vertex_groups:
+                    mesh_object.vertex_groups.new(name=vertex_group.name)
 
-            # Restore the previous pose position on the armature.
-            if old_pose_position is not None:
-                armature_object.data.pose_position = old_pose_position
+                # Restore the previous pose position on the armature.
+                if old_pose_position is not None:
+                    armature_object.data.pose_position = old_pose_position
 
         vertex_offset = len(psk.points)
 
@@ -305,7 +329,7 @@ def build_psk(context, options: PskBuildOptions) -> PskBuildResult:
                     w.weight = weight
                     psk.weights.append(w)
 
-        if not options.use_raw_mesh_data:
+        if options.object_eval_state == 'EVALUATED':
             bpy.data.objects.remove(mesh_object)
             bpy.data.meshes.remove(mesh_data)
             del mesh_data
