@@ -214,7 +214,7 @@ class PSA_OT_export(Operator, ExportHelper):
     bl_idname = 'psa_export.operator'
     bl_label = 'Export'
     bl_options = {'INTERNAL', 'UNDO'}
-    __doc__ = 'Export actions to PSA'
+    bl_description = 'Export actions to PSA'
     filename_ext = '.psa'
     filter_glob: StringProperty(default='*.psa', options={'HIDDEN'})
     filepath: StringProperty(

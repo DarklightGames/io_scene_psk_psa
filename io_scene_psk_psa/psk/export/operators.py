@@ -159,7 +159,7 @@ class PSK_OT_export(Operator, ExportHelper):
     bl_idname = 'export.psk'
     bl_label = 'Export'
     bl_options = {'INTERNAL', 'UNDO'}
-    __doc__ = 'Export mesh and armature to PSK'
+    bl_description = 'Export mesh and armature to PSK'
     filename_ext = '.psk'
     filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
 

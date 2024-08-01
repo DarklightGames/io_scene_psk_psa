@@ -27,7 +27,7 @@ class PSK_OT_import(Operator, ImportHelper):
     bl_idname = 'import_scene.psk'
     bl_label = 'Import'
     bl_options = {'INTERNAL', 'UNDO', 'PRESET'}
-    __doc__ = 'Load a PSK file'
+    bl_description = 'Import a PSK file'
     filename_ext = '.psk'
     filter_glob: StringProperty(default='*.psk;*.pskx', options={'HIDDEN'})
     filepath: StringProperty(
