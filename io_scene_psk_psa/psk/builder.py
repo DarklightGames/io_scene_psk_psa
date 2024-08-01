@@ -311,6 +311,12 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
                                 break
                             except ValueError:
                                 bone = bone.parent
+
+            # Keep track of which vertices have been assigned weights.
+            # The ones that have not been assigned weights will be assigned to the root bone.
+            # Without this, some older versions of UnrealEd may have corrupted meshes.
+            vertices_assigned_weights = np.full(len(mesh_data.vertices), False)
+
             for vertex_group_index, vertex_group in enumerate(mesh_object.vertex_groups):
                 if vertex_group_index not in vertex_group_bone_indices:
                     # Vertex group has no associated bone, skip it.
@@ -327,6 +333,16 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
                     w.bone_index = bone_index
                     w.point_index = vertex_offset + vertex_index
                     w.weight = weight
+                    psk.weights.append(w)
+                    vertices_assigned_weights[vertex_index] = True
+
+            # Assign vertices that have not been assigned weights to the root bone.
+            for vertex_index, assigned in enumerate(vertices_assigned_weights):
+                if not assigned:
+                    w = Psk.Weight()
+                    w.bone_index = 0
+                    w.point_index = vertex_offset + vertex_index
+                    w.weight = 1.0
                     psk.weights.append(w)
 
         if options.object_eval_state == 'EVALUATED':
