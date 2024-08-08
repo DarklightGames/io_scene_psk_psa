@@ -28,7 +28,7 @@ def _load_config_file(file_path: str) -> ConfigParser:
     with open(file_path, 'r') as f:
         lines = f.read().split('\n')
 
-    lines = [re.sub(r'^\s*(\w+)\s*$', r'\1=', line) for line in lines]
+    lines = [re.sub(r'^\s*([^=]+)\s*$', r'\1=', line) for line in lines]
 
     contents = '\n'.join(lines)
 
