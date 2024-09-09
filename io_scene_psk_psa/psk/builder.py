@@ -25,10 +25,13 @@ class PskBuildOptions(object):
         self.should_enforce_bone_name_restrictions = False
 
 
-def get_mesh_objects_for_collection(collection: Collection):
+def get_mesh_objects_for_collection(collection: Collection, should_exclude_hidden_meshes: bool = True):
     for obj in collection.all_objects:
-        if obj.type == 'MESH':
-            yield obj
+        if obj.type != 'MESH':
+            continue
+        if should_exclude_hidden_meshes and obj.visible_get() is False:
+            continue
+        yield obj
 
 
 def get_mesh_objects_for_context(context: Context):
@@ -79,8 +82,8 @@ def get_psk_input_objects_for_context(context: Context) -> PskInputObjects:
     return _get_psk_input_objects(mesh_objects)
 
 
-def get_psk_input_objects_for_collection(collection: Collection) -> PskInputObjects:
-    mesh_objects = list(get_mesh_objects_for_collection(collection))
+def get_psk_input_objects_for_collection(collection: Collection, should_exclude_hidden_meshes: bool = True) -> PskInputObjects:
+    mesh_objects = list(get_mesh_objects_for_collection(collection, should_exclude_hidden_meshes))
     return _get_psk_input_objects(mesh_objects)
 
 

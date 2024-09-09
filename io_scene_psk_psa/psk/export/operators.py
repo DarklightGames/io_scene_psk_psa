@@ -102,12 +102,17 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         description='Enforce that bone names must only contain letters, numbers, spaces, hyphens and underscores.\n\n'
                     'Depending on the engine, improper bone names might not be referenced correctly by scripts'
     )
+    should_exclude_hidden_meshes: BoolProperty(
+        default=True,
+        name='Visible Only',
+        description='Export only visible meshes'
+    )
 
     def execute(self, context):
         collection = bpy.data.collections.get(self.collection)
 
         try:
-            input_objects = get_psk_input_objects_for_collection(collection)
+            input_objects = get_psk_input_objects_for_collection(collection, self.should_exclude_hidden_meshes)
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
@@ -144,6 +149,7 @@ class PSK_OT_export_collection(Operator, ExportHelper):
             flow.use_property_split = True
             flow.use_property_decorate = False
             flow.prop(self, 'object_eval_state', text='Data')
+            flow.prop(self, 'should_exclude_hidden_meshes')
 
         # BONES
         bones_header, bones_panel = layout.panel('Bones', default_closed=False)
