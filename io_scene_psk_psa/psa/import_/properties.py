@@ -103,6 +103,11 @@ class PSA_PG_import(PropertyGroup):
         soft_max=1.0,
         step=0.0625,
     )
+    translation_scale: FloatProperty(
+        name='Translation Scale',
+        default=1.0,
+        description='Scale factor for bone translation values. Use this when the scale of the armature does not match the PSA file'
+    )
 
 
 def filter_sequences(pg: PSA_PG_import, sequences) -> List[int]:

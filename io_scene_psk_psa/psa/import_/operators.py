@@ -156,6 +156,7 @@ class PSA_OT_import(Operator, ImportHelper):
         options.bone_mapping_mode = pg.bone_mapping_mode
         options.fps_source = pg.fps_source
         options.fps_custom = pg.fps_custom
+        options.translation_scale = pg.translation_scale
 
         if options.should_use_config_file:
             # Read the PSA config file if it exists.
@@ -247,6 +248,11 @@ class PSA_OT_import(Operator, ImportHelper):
             col.use_property_split = True
             col.use_property_decorate = False
             col.prop(pg, 'bone_mapping_mode')
+
+            col = advanced_panel.column()
+            col.use_property_split = True
+            col.use_property_decorate = False
+            col.prop(pg, 'translation_scale', text='Translation Scale')
 
             col = advanced_panel.column(heading='Options')
             col.use_property_split = True

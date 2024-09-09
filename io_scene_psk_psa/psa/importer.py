@@ -24,6 +24,7 @@ class PsaImportOptions(object):
         self.bone_mapping_mode = 'CASE_INSENSITIVE'
         self.fps_source = 'SEQUENCE'
         self.fps_custom: float = 30.0
+        self.translation_scale: float = 1.0
         self.should_use_config_file = True
         self.psa_config: PsaConfig = PsaConfig()
 
@@ -270,6 +271,10 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
             # Read the sequence data matrix from the PSA.
             sequence_data_matrix = psa_reader.read_sequence_data_matrix(sequence_name)
+
+            if options.translation_scale != 1.0:
+                # Scale the translation data.
+                sequence_data_matrix[:, :, 4:] *= options.translation_scale
 
             # Convert the sequence's data from world-space to local-space.
             for bone_index, import_bone in enumerate(import_bones):
