@@ -163,7 +163,5 @@ def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_c
     return bone_names
 
 
-def is_bdk_addon_loaded():
-    # TODO: this does not work anymore for *reasons*. Just check if bpy.ops.bdk.link_material exists.
-    # return addon_utils.check('bdk_addon')[1]
-    return bpy.ops.bdk.link_material is not None
+def is_bdk_addon_loaded() -> bool:
+    return bpy.ops.bdk is not None and bpy.ops.bdk.link_material is not None

@@ -131,7 +131,8 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
                     # Material does not yet exist, and we have the BDK addon installed.
                     # Attempt to load it using BDK addon's operator.
                     material_reference = psk.material_references[material_index]
-                    if material_reference and bpy.ops.bdk.link_material(reference=material_reference, repository_id=options.bdk_repository_id) == {'FINISHED'}:
+                    repository_id = options.bdk_repository_id if options.bdk_repository_id is not None else ''
+                    if material_reference and bpy.ops.bdk.link_material(reference=material_reference, repository_id=repository_id) == {'FINISHED'}:
                         material = bpy.data.materials[material_name]
                 else:
                     # Just create a blank material.
