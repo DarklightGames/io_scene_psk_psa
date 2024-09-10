@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
+from typing import List
 
-from bpy.props import StringProperty
-from bpy.types import Operator, Event, Context, FileHandler
+from bpy.props import StringProperty, CollectionProperty
+from bpy.types import Operator, Event, Context, FileHandler, OperatorFileListElement, Object
 from bpy_extras.io_utils import ImportHelper
 
 from .properties import get_visible_sequences
@@ -112,6 +113,95 @@ def on_psa_file_path_updated(cls, context):
     load_psa_file(context, cls.filepath)
 
 
+class PSA_OT_import_multiple(Operator):
+    bl_idname = 'psa_import.import_multiple'
+    bl_label = 'Import PSA'
+    bl_description = 'Import multiple PSA files'
+    bl_options = {'INTERNAL', 'UNDO'}
+
+    directory: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE', 'HIDDEN'})
+    files: CollectionProperty(type=OperatorFileListElement, options={'SKIP_SAVE', 'HIDDEN'})
+
+
+
+    def execute(self, context):
+        pg = getattr(context.scene, 'psa_import')
+        warnings = []
+
+        for file in self.files:
+            psa_path = os.path.join(self.directory, file.name)
+            psa_reader = PsaReader(psa_path)
+            sequence_names = psa_reader.sequences.keys()
+
+            result = _import_psa(context, pg, psa_path, sequence_names, context.view_layer.objects.active)
+            result.warnings.extend(warnings)
+
+        if len(result.warnings) > 0:
+            message = f'Imported {len(sequence_names)} action(s) with {len(result.warnings)} warning(s)\n'
+            self.report({'INFO'}, message)
+            for warning in result.warnings:
+                self.report({'WARNING'}, warning)
+
+        self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
+
+        return {'FINISHED'}
+
+    def invoke(self, context: Context, event):
+        # Make sure the selected object is an armature.
+        active_object = context.view_layer.objects.active
+        if active_object is None or active_object.type != 'ARMATURE':
+            self.report({'ERROR_INVALID_CONTEXT'}, 'The active object must be an armature')
+            return {'CANCELLED'}
+
+        # Show the import operator properties in a pop-up dialog (do not use the file selector).
+        context.window_manager.invoke_props_dialog(self)
+        return {'RUNNING_MODAL'}
+
+    def draw(self, context):
+        layout = self.layout
+        pg = getattr(context.scene, 'psa_import')
+        draw_psa_import_options_no_panels(layout, pg)
+
+
+def _import_psa(context,
+                pg,
+                filepath: str,
+                sequence_names: List[str],
+                armature_object: Object
+                ):
+    options = PsaImportOptions()
+    options.sequence_names = sequence_names
+    options.should_use_fake_user = pg.should_use_fake_user
+    options.should_stash = pg.should_stash
+    options.action_name_prefix = pg.action_name_prefix if pg.should_use_action_name_prefix else ''
+    options.should_overwrite = pg.should_overwrite
+    options.should_write_metadata = pg.should_write_metadata
+    options.should_write_keyframes = pg.should_write_keyframes
+    options.should_convert_to_samples = pg.should_convert_to_samples
+    options.bone_mapping_mode = pg.bone_mapping_mode
+    options.fps_source = pg.fps_source
+    options.fps_custom = pg.fps_custom
+    options.translation_scale = pg.translation_scale
+
+    warnings = []
+
+    if options.should_use_config_file:
+        # Read the PSA config file if it exists.
+        config_path = Path(filepath).with_suffix('.config')
+        if config_path.exists():
+            try:
+                options.psa_config = read_psa_config(sequence_names, str(config_path))
+            except Exception as e:
+                warnings.append(f'Failed to read PSA config file: {e}')
+
+    psa_reader = PsaReader(filepath)
+
+    result = import_psa(context, psa_reader, armature_object, options)
+    result.warnings.extend(warnings)
+
+    return result
+
+
 class PSA_OT_import(Operator, ImportHelper):
     bl_idname = 'psa_import.import'
     bl_label = 'Import'
@@ -137,37 +227,13 @@ class PSA_OT_import(Operator, ImportHelper):
 
     def execute(self, context):
         pg = getattr(context.scene, 'psa_import')
-        psa_reader = PsaReader(self.filepath)
         sequence_names = [x.action_name for x in pg.sequence_list if x.is_selected]
 
         if len(sequence_names) == 0:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No sequences selected')
             return {'CANCELLED'}
 
-        options = PsaImportOptions()
-        options.sequence_names = sequence_names
-        options.should_use_fake_user = pg.should_use_fake_user
-        options.should_stash = pg.should_stash
-        options.action_name_prefix = pg.action_name_prefix if pg.should_use_action_name_prefix else ''
-        options.should_overwrite = pg.should_overwrite
-        options.should_write_metadata = pg.should_write_metadata
-        options.should_write_keyframes = pg.should_write_keyframes
-        options.should_convert_to_samples = pg.should_convert_to_samples
-        options.bone_mapping_mode = pg.bone_mapping_mode
-        options.fps_source = pg.fps_source
-        options.fps_custom = pg.fps_custom
-        options.translation_scale = pg.translation_scale
-
-        if options.should_use_config_file:
-            # Read the PSA config file if it exists.
-            config_path = Path(self.filepath).with_suffix('.config')
-            if config_path.exists():
-                try:
-                    options.psa_config = read_psa_config(psa_reader, str(config_path))
-                except Exception as e:
-                    self.report({'WARNING'}, f'Failed to read PSA config file: {e}')
-
-        result = import_psa(context, psa_reader, context.view_layer.objects.active, options)
+        result = _import_psa(context, pg, self.filepath, sequence_names, context.view_layer.objects.active)
 
         if len(result.warnings) > 0:
             message = f'Imported {len(sequence_names)} action(s) with {len(result.warnings)} warning(s)\n'
@@ -262,10 +328,48 @@ class PSA_OT_import(Operator, ImportHelper):
             col.prop(pg, 'should_use_config_file')
 
 
+def draw_psa_import_options_no_panels(layout, pg):
+    col = layout.column(heading='Sequences')
+    col.use_property_split = True
+    col.use_property_decorate = False
+    col.prop(pg, 'fps_source')
+    if pg.fps_source == 'CUSTOM':
+        col.prop(pg, 'fps_custom')
+    col.prop(pg, 'should_overwrite')
+    col.prop(pg, 'should_use_action_name_prefix')
+    if pg.should_use_action_name_prefix:
+        col.prop(pg, 'action_name_prefix')
+
+    col = layout.column(heading='Write')
+    col.use_property_split = True
+    col.use_property_decorate = False
+    col.prop(pg, 'should_write_keyframes')
+    col.prop(pg, 'should_write_metadata')
+
+    if pg.should_write_keyframes:
+        col = col.column(heading='Keyframes')
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(pg, 'should_convert_to_samples')
+
+    col = layout.column()
+    col.use_property_split = True
+    col.use_property_decorate = False
+    col.prop(pg, 'bone_mapping_mode')
+    col.prop(pg, 'translation_scale')
+
+    col = layout.column(heading='Options')
+    col.use_property_split = True
+    col.use_property_decorate = False
+    col.prop(pg, 'should_use_fake_user')
+    col.prop(pg, 'should_stash')
+    col.prop(pg, 'should_use_config_file')
+
+
 class PSA_FH_import(FileHandler):
     bl_idname = 'PSA_FH_import'
     bl_label = 'File handler for Unreal PSA import'
-    bl_import_operator = 'psa_import.import'
+    bl_import_operator = 'psa_import.import_multiple'
     bl_export_operator = 'psa_export.export'
     bl_file_extensions = '.psa'
 
@@ -279,5 +383,6 @@ classes = (
     PSA_OT_import_sequences_deselect_all,
     PSA_OT_import_sequences_from_text,
     PSA_OT_import,
+    PSA_OT_import_multiple,
     PSA_FH_import,
 )
