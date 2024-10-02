@@ -155,7 +155,7 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
         # Calculate the frame step based on the compression factor.
         frame_extents = abs(frame_end - frame_start)
         frame_count_raw = frame_extents + 1
-        frame_count = max(export_sequence.key_quota, int(frame_count_raw * export_sequence.compression_ratio))
+        frame_count = max(1, max(export_sequence.key_quota, int(frame_count_raw * export_sequence.compression_ratio)))
 
         try:
             frame_step = frame_extents / (frame_count - 1)
