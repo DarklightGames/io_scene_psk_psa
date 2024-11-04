@@ -164,4 +164,4 @@ def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_c
 
 
 def is_bdk_addon_loaded() -> bool:
-    return bpy.ops.bdk is not None and bpy.ops.bdk.link_material is not None
+    return 'bdk' in dir(bpy.ops)
