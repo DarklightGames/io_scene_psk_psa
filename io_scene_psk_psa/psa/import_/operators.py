@@ -123,7 +123,6 @@ class PSA_OT_import_multiple(Operator):
     files: CollectionProperty(type=OperatorFileListElement, options={'SKIP_SAVE', 'HIDDEN'})
 
 
-
     def execute(self, context):
         pg = getattr(context.scene, 'psa_import')
         warnings = []
@@ -131,7 +130,7 @@ class PSA_OT_import_multiple(Operator):
         for file in self.files:
             psa_path = os.path.join(self.directory, file.name)
             psa_reader = PsaReader(psa_path)
-            sequence_names = psa_reader.sequences.keys()
+            sequence_names = list(psa_reader.sequences.keys())
 
             result = _import_psa(context, pg, psa_path, sequence_names, context.view_layer.objects.active)
             result.warnings.extend(warnings)
