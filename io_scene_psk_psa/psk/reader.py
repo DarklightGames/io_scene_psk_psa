@@ -36,41 +36,43 @@ def read_psk(path: str) -> Psk:
         while fp.read(1):
             fp.seek(-1, 1)
             section = Section.from_buffer_copy(fp.read(ctypes.sizeof(Section)))
-            if section.name == b'ACTRHEAD':
-                pass
-            elif section.name == b'PNTS0000':
-                _read_types(fp, Vector3, section, psk.points)
-            elif section.name == b'VTXW0000':
-                if section.data_size == ctypes.sizeof(Psk.Wedge16):
-                    _read_types(fp, Psk.Wedge16, section, psk.wedges)
-                elif section.data_size == ctypes.sizeof(Psk.Wedge32):
-                    _read_types(fp, Psk.Wedge32, section, psk.wedges)
-                else:
-                    raise RuntimeError('Unrecognized wedge format')
-            elif section.name == b'FACE0000':
-                _read_types(fp, Psk.Face, section, psk.faces)
-            elif section.name == b'MATT0000':
-                _read_types(fp, Psk.Material, section, psk.materials)
-            elif section.name == b'REFSKELT':
-                _read_types(fp, Psk.Bone, section, psk.bones)
-            elif section.name == b'RAWWEIGHTS':
-                _read_types(fp, Psk.Weight, section, psk.weights)
-            elif section.name == b'FACE3200':
-                _read_types(fp, Psk.Face32, section, psk.faces)
-            elif section.name == b'VERTEXCOLOR':
-                _read_types(fp, Color, section, psk.vertex_colors)
-            elif section.name.startswith(b'EXTRAUVS'):
-                _read_types(fp, Vector2, section, psk.extra_uvs)
-            elif section.name == b'VTXNORMS':
-                _read_types(fp, Vector3, section, psk.vertex_normals)
-            elif section.name == b'MRPHINFO':
-                _read_types(fp, Psk.MorphInfo, section, psk.morph_infos)
-            elif section.name == b'MRPHDATA':
-                _read_types(fp, Psk.MorphData, section, psk.morph_data)
-            else:
-                # Section is not handled, skip it.
-                fp.seek(section.data_size * section.data_count, os.SEEK_CUR)
-                warnings.warn(f'Unrecognized section "{section.name} at position {fp.tell():15}"')
+            match section.name:
+                case b'ACTRHEAD':
+                    pass
+                case b'PNTS0000':
+                    _read_types(fp, Vector3, section, psk.points)
+                case b'VTXW0000':
+                    if section.data_size == ctypes.sizeof(Psk.Wedge16):
+                        _read_types(fp, Psk.Wedge16, section, psk.wedges)
+                    elif section.data_size == ctypes.sizeof(Psk.Wedge32):
+                        _read_types(fp, Psk.Wedge32, section, psk.wedges)
+                    else:
+                        raise RuntimeError('Unrecognized wedge format')
+                case b'FACE0000':
+                    _read_types(fp, Psk.Face, section, psk.faces)
+                case b'MATT0000':
+                    _read_types(fp, Psk.Material, section, psk.materials)
+                case b'REFSKELT':
+                    _read_types(fp, Psk.Bone, section, psk.bones)
+                case b'RAWWEIGHTS':
+                    _read_types(fp, Psk.Weight, section, psk.weights)
+                case b'FACE3200':
+                    _read_types(fp, Psk.Face32, section, psk.faces)
+                case b'VERTEXCOLOR':
+                    _read_types(fp, Color, section, psk.vertex_colors)
+                case b'VTXNORMS':
+                    _read_types(fp, Vector3, section, psk.vertex_normals)
+                case b'MRPHINFO':
+                    _read_types(fp, Psk.MorphInfo, section, psk.morph_infos)
+                case b'MRPHDATA':
+                    _read_types(fp, Psk.MorphData, section, psk.morph_data)
+                case _:
+                    if section.name.startswith(b'EXTRAUVS'):
+                        _read_types(fp, Vector2, section, psk.extra_uvs)
+                    else:
+                        # Section is not handled, skip it.
+                        fp.seek(section.data_size * section.data_count, os.SEEK_CUR)
+                        warnings.warn(f'Unrecognized section "{section.name} at position {fp.tell():15}"')
 
     '''
     UEViewer exports a sidecar file (*.props.txt) with fully-qualified reference paths for each material

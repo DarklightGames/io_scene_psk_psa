@@ -1,7 +1,7 @@
 import re
 import sys
 from fnmatch import fnmatch
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from bpy.props import BoolProperty, PointerProperty, EnumProperty, FloatProperty, CollectionProperty, IntProperty, \
     StringProperty
@@ -42,6 +42,20 @@ class PSA_PG_export_nla_strip_list_item(PropertyGroup):
     is_selected: BoolProperty(default=True)
 
 
+def get_sequences_from_name_and_frame_range(name: str, frame_start: int, frame_end: int) -> List[Tuple[str, int, int]]:
+    reversed_pattern = r'(.+)/(.+)'
+    reversed_match = re.match(reversed_pattern, name)
+    if reversed_match:
+        forward_name = reversed_match.group(1)
+        backwards_name = reversed_match.group(2)
+        return [
+            (forward_name, frame_start, frame_end),
+            (backwards_name, frame_end, frame_start)
+        ]
+    else:
+        return [(name, frame_start, frame_end)]
+
+
 def nla_track_update_cb(self: 'PSA_PG_export', context: Context) -> None:
     self.nla_strip_list.clear()
     match = re.match(r'^(\d+).+$', self.nla_track)
@@ -52,11 +66,12 @@ def nla_track_update_cb(self: 'PSA_PG_export', context: Context) -> None:
             return
         nla_track = animation_data.nla_tracks[self.nla_track_index]
         for nla_strip in nla_track.strips:
-            strip: PSA_PG_export_nla_strip_list_item = self.nla_strip_list.add()
-            strip.action = nla_strip.action
-            strip.name = nla_strip.name
-            strip.frame_start = nla_strip.frame_start
-            strip.frame_end = nla_strip.frame_end
+            for sequence_name, frame_start, frame_end in get_sequences_from_name_and_frame_range(nla_strip.name, nla_strip.frame_start, nla_strip.frame_end):
+                strip: PSA_PG_export_nla_strip_list_item = self.nla_strip_list.add()
+                strip.action = nla_strip.action
+                strip.name = sequence_name
+                strip.frame_start = frame_start
+                strip.frame_end = frame_end
 
 
 def get_animation_data(pg: 'PSA_PG_export', context: Context) -> Optional[AnimData]:
@@ -69,10 +84,9 @@ def get_animation_data(pg: 'PSA_PG_export', context: Context) -> Optional[AnimDa
 def nla_track_search_cb(self, context: Context, edit_text: str):
     pg = getattr(context.scene, 'psa_export')
     animation_data = get_animation_data(pg, context)
-    if animation_data is None:
-        return
-    for index, nla_track in enumerate(animation_data.nla_tracks):
-        yield f'{index} - {nla_track.name}'
+    if animation_data is not None:
+        for index, nla_track in enumerate(animation_data.nla_tracks):
+            yield f'{index} - {nla_track.name}'
 
 
 def animation_data_override_update_cb(self: 'PSA_PG_export', context: Context):

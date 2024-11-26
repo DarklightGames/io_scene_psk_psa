@@ -1,9 +1,10 @@
+import typing
 from typing import Optional
 
 import bmesh
-import bpy
 import numpy as np
-from bpy.types import Armature, Material, Collection, Context
+from bpy.types import Material, Collection, Context
+from mathutils import Matrix
 
 from .data import *
 from .properties import triangle_type_and_bit_flags_to_poly_flags
@@ -23,6 +24,7 @@ class PskBuildOptions(object):
         self.object_eval_state = 'EVALUATED'
         self.materials: List[Material] = []
         self.should_enforce_bone_name_restrictions = False
+        self.scale = 1.0
 
 
 def get_mesh_objects_for_collection(collection: Collection, should_exclude_hidden_meshes: bool = True):
@@ -40,7 +42,7 @@ def get_mesh_objects_for_context(context: Context):
             yield obj
 
 
-def get_armature_for_mesh_objects(mesh_objects: List[Object]) -> Optional[Object]:
+def get_armature_for_mesh_objects(mesh_objects: Iterable[Object]) -> Optional[Object]:
     # Ensure that there are either no armature modifiers (static mesh) or that there is exactly one armature modifier
     # object shared between all meshes.
     armature_modifier_objects = set()
@@ -100,6 +102,8 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
     psk = Psk()
     bones = []
 
+    scale_matrix = Matrix.Scale(options.scale, 4)
+
     if armature_object is None or len(armature_object.data.bones) == 0:
         # If the mesh has no armature object or no bones, simply assign it a dummy bone at the root to satisfy the
         # requirement that a PSK file must have at least one bone.
@@ -150,6 +154,8 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
                 local_rotation = armature_local_matrix.to_3x3().to_quaternion().conjugated()
                 rotation = bone_rotation @ local_rotation
                 rotation.conjugate()
+
+            location = scale_matrix @ location
 
             psk_bone.location.x = location.x
             psk_bone.location.y = location.y
@@ -230,11 +236,12 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
                     armature_object.data.pose_position = old_pose_position
 
         vertex_offset = len(psk.points)
+        matrix_world = scale_matrix @ mesh_object.matrix_world
 
         # VERTICES
         for vertex in mesh_data.vertices:
             point = Vector3()
-            v = mesh_object.matrix_world @ vertex.co
+            v = matrix_world @ vertex.co
             point.x = v.x
             point.y = v.y
             point.z = v.z

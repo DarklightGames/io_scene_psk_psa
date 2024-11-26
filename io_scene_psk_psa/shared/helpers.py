@@ -1,9 +1,10 @@
 import re
-import typing
-from typing import List, Iterable
+from typing import List, Iterable, cast
 
-import bpy.types
-from bpy.types import NlaStrip, Object, AnimData
+import bpy
+from bpy.props import CollectionProperty
+from bpy.types import AnimData, Object
+from bpy.types import Armature
 
 
 def rgb_to_srgb(c: float):
@@ -13,10 +14,9 @@ def rgb_to_srgb(c: float):
         return 12.92 * c
 
 
-def get_nla_strips_in_frame_range(animation_data: AnimData, frame_min: float, frame_max: float) -> List[NlaStrip]:
+def get_nla_strips_in_frame_range(animation_data: AnimData, frame_min: float, frame_max: float):
     if animation_data is None:
-        return []
-    strips = []
+        return
     for nla_track in animation_data.nla_tracks:
         if nla_track.mute:
             continue
@@ -24,11 +24,10 @@ def get_nla_strips_in_frame_range(animation_data: AnimData, frame_min: float, fr
             if (strip.frame_start < frame_min and strip.frame_end > frame_max) or \
                     (frame_min <= strip.frame_start < frame_max) or \
                     (frame_min < strip.frame_end <= frame_max):
-                strips.append(strip)
-    return strips
+                yield strip
 
 
-def populate_bone_collection_list(armature_object: Object, bone_collection_list: bpy.props.CollectionProperty) -> None:
+def populate_bone_collection_list(armature_object: Object, bone_collection_list: CollectionProperty) -> None:
     """
     Updates the bone collections collection.
 
@@ -53,7 +52,7 @@ def populate_bone_collection_list(armature_object: Object, bone_collection_list:
 
     bone_collection_list.clear()
 
-    armature = armature_object.data
+    armature = cast(Armature, armature_object.data)
 
     if armature is None:
         return
@@ -82,7 +81,7 @@ def check_bone_names(bone_names: Iterable[str]):
                            f'You can bypass this by disabling "Enforce Bone Name Restrictions" in the export settings.')
 
 
-def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_collection_indices: List[int]) -> List[str]:
+def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_collection_indices: Iterable[int]) -> List[str]:
     """
     Returns a sorted list of bone indices that should be exported for the given bone filter mode and bone collections.
 
@@ -90,13 +89,13 @@ def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_c
 
     :param armature_object: Blender object with type 'ARMATURE'
     :param bone_filter_mode: One of ['ALL', 'BONE_COLLECTIONS']
-    :param bone_collection_indices: List of bone collection indices to be exported.
+    :param bone_collection_indices: A list of bone collection indices to export.
     :return: A sorted list of bone indices that should be exported.
     """
     if armature_object is None or armature_object.type != 'ARMATURE':
         raise ValueError('An armature object must be supplied')
 
-    armature_data = typing.cast(bpy.types.Armature, armature_object.data)
+    armature_data = cast(Armature, armature_object.data)
     bones = armature_data.bones
     bone_names = [x.name for x in bones]
 

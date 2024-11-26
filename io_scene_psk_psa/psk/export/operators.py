@@ -1,7 +1,7 @@
 from typing import List
 
 import bpy
-from bpy.props import StringProperty, BoolProperty, EnumProperty
+from bpy.props import StringProperty, BoolProperty, EnumProperty, FloatProperty
 from bpy.types import Operator, Context, Object
 from bpy_extras.io_utils import ExportHelper
 
@@ -31,6 +31,7 @@ def get_materials_for_mesh_objects(mesh_objects: List[Object]):
             if material not in materials:
                 materials.append(material)
     return materials
+
 
 def populate_material_list(mesh_objects, material_list):
     materials =  get_materials_for_mesh_objects(mesh_objects)
@@ -107,6 +108,13 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         name='Visible Only',
         description='Export only visible meshes'
     )
+    scale: FloatProperty(
+        name='Scale',
+        default=1.0,
+        description='Scale factor to apply to the exported mesh and armature',
+        min=0.0001,
+        soft_max=100.0
+    )
 
     def execute(self, context):
         collection = bpy.data.collections.get(self.collection)
@@ -122,6 +130,7 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         options.object_eval_state = self.object_eval_state
         options.materials = get_materials_for_mesh_objects(input_objects.mesh_objects)
         options.should_enforce_bone_name_restrictions = self.should_enforce_bone_name_restrictions
+        options.scale = self.scale
 
         try:
             result = build_psk(context, input_objects, options)
@@ -140,6 +149,12 @@ class PSK_OT_export_collection(Operator, ExportHelper):
 
     def draw(self, context: Context):
         layout = self.layout
+
+        flow = layout.grid_flow(row_major=True)
+        flow.use_property_split = True
+        flow.use_property_decorate = False
+
+        flow.prop(self, 'scale')
 
         # MESH
         mesh_header, mesh_panel = layout.panel('Mesh', default_closed=False)
@@ -260,6 +275,7 @@ class PSK_OT_export(Operator, ExportHelper):
         options.object_eval_state = pg.object_eval_state
         options.materials = [m.material for m in pg.material_list]
         options.should_enforce_bone_name_restrictions = pg.should_enforce_bone_name_restrictions
+        options.scale = pg.scale
         
         try:
             result = build_psk(context, input_objects, options)
