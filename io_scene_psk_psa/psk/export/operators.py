@@ -128,7 +128,7 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         options = PskBuildOptions()
         options.bone_filter_mode = 'ALL'
         options.object_eval_state = self.object_eval_state
-        options.materials = get_materials_for_mesh_objects(input_objects.mesh_objects)
+        options.materials = get_materials_for_mesh_objects([x[0] for x in input_objects.mesh_objects])
         options.should_enforce_bone_name_restrictions = self.should_enforce_bone_name_restrictions
         options.scale = self.scale
 
@@ -197,12 +197,16 @@ class PSK_OT_export(Operator, ExportHelper):
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
+        if len(input_objects.mesh_objects) == 0:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'No mesh objects selected')
+            return {'CANCELLED'}
+
         pg = getattr(context.scene, 'psk_export')
 
         populate_bone_collection_list(input_objects.armature_object, pg.bone_collection_list)
 
         try:
-            populate_material_list(input_objects.mesh_objects, pg.material_list)
+            populate_material_list([x[0] for x in input_objects.mesh_objects], pg.material_list)
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
@@ -210,15 +214,6 @@ class PSK_OT_export(Operator, ExportHelper):
         context.window_manager.fileselect_add(self)
 
         return {'RUNNING_MODAL'}
-
-    @classmethod
-    def poll(cls, context):
-        try:
-            get_psk_input_objects_for_context(context)
-        except RuntimeError as e:
-            cls.poll_message_set(str(e))
-            return False
-        return True
 
     def draw(self, context):
         layout = self.layout

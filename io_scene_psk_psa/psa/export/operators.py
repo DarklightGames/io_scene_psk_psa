@@ -132,7 +132,7 @@ def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context:
     # Timeline markers need to be sorted so that we can determine the sequence start and end positions.
     sequence_frame_ranges = dict()
     sorted_timeline_markers = list(sorted(context.scene.timeline_markers, key=lambda x: x.frame))
-    sorted_timeline_marker_names = list(map(lambda x: x.name, sorted_timeline_markers))
+    sorted_timeline_marker_names = [x.name for x in sorted_timeline_markers]
 
     for marker_name in marker_names:
         marker = context.scene.timeline_markers[marker_name]
