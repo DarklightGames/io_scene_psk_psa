@@ -11,6 +11,11 @@ object_eval_state_items = (
     ('ORIGINAL', 'Original', 'Use data from original object with no modifiers applied'),
 )
 
+export_space_items = [
+    ('WORLD', 'World', 'Export in world space'),
+    ('ARMATURE', 'Armature', 'Export in armature space'),
+]
+
 class PSK_PG_material_list_item(PropertyGroup):
     material: PointerProperty(type=Material)
     index: IntProperty()
@@ -48,6 +53,13 @@ class PSK_PG_export(PropertyGroup):
         description='Scale factor to apply to the exported mesh',
         min=0.0001,
         soft_max=100.0
+    )
+    export_space: EnumProperty(
+        name='Export Space',
+        options=empty_set,
+        description='Space to export the mesh in',
+        items=export_space_items,
+        default='WORLD'
     )
 
 

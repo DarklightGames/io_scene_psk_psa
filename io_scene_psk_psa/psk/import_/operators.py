@@ -152,6 +152,7 @@ class PSK_OT_import(Operator, ImportHelper):
         col.use_property_split = True
         col.use_property_decorate = False
         col.prop(self, 'scale')
+        col.prop(self, 'export_space')
 
         mesh_header, mesh_panel = layout.panel('mesh_panel_id', default_closed=False)
         mesh_header.prop(self, 'should_import_mesh')

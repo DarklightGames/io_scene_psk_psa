@@ -1,19 +1,20 @@
 import typing
-from typing import Optional, Set
+from typing import Optional
 
 import bmesh
 import numpy as np
-from bpy.types import Material, Collection, Context, LayerCollection, ViewLayer
+from bpy.types import Material, Collection, Context, Mesh
 from mathutils import Matrix
 
 from .data import *
 from .properties import triangle_type_and_bit_flags_to_poly_flags
+from ..shared.dfs import dfs_collection_objects, dfs_view_layer_objects, DfsObject
 from ..shared.helpers import *
 
 
 class PskInputObjects(object):
     def __init__(self):
-        self.mesh_objects: List[Tuple[Object, List[Object], Matrix]] = []
+        self.mesh_objects: List[DfsObject] = []
         self.armature_object: Optional[Object] = None
 
 
@@ -25,26 +26,17 @@ class PskBuildOptions(object):
         self.materials: List[Material] = []
         self.should_enforce_bone_name_restrictions = False
         self.scale = 1.0
+        self.export_space = 'WORLD'
 
 
-def get_mesh_objects_for_collection(collection: Collection, should_exclude_hidden_meshes: bool = True) -> Iterable[Tuple[Object, List[Object], Matrix]]:
-    for obj, instance_objects, matrix in dfs_collection_objects(collection):
-        if obj.type != 'MESH':
-            continue
-        if should_exclude_hidden_meshes:
-            if instance_objects:
-                if not instance_objects[-1].visible_get():
-                    continue
-            elif not obj.visible_get():
-                continue
-        yield (obj, instance_objects, matrix)
+def get_mesh_objects_for_collection(collection: Collection) -> Iterable[DfsObject]:
+    return filter(lambda x: x.obj.type == 'MESH', dfs_collection_objects(collection))
 
 
-def get_mesh_objects_for_context(context: Context) -> Iterable[Tuple[Object, List[Object], Matrix]]:
-    for (obj, instance_objects, matrix) in dfs_view_layer_objects(context.view_layer):
-        is_selected = obj.select_get() or any(x.select_get() for x in instance_objects)
-        if obj.type == 'MESH' and is_selected:
-            yield (obj, instance_objects, matrix)
+def get_mesh_objects_for_context(context: Context) -> Iterable[DfsObject]:
+    for dfs_object in dfs_view_layer_objects(context.view_layer):
+        if dfs_object.obj.type == 'MESH' and dfs_object.is_selected:
+            yield dfs_object
 
 
 def get_armature_for_mesh_objects(mesh_objects: Iterable[Object]) -> Optional[Object]:
@@ -69,17 +61,19 @@ def get_armature_for_mesh_objects(mesh_objects: Iterable[Object]) -> Optional[Ob
         return None
 
 
-def _get_psk_input_objects(mesh_objects: List[Tuple[Object, List[Object], Matrix]]) -> PskInputObjects:
+def _get_psk_input_objects(mesh_objects: Iterable[DfsObject]) -> PskInputObjects:
+    mesh_objects = list(mesh_objects)
     if len(mesh_objects) == 0:
         raise RuntimeError('At least one mesh must be selected')
 
-    for mesh_object, _, _ in mesh_objects:
-        if len(mesh_object.data.materials) == 0:
-            raise RuntimeError(f'Mesh "{mesh_object.name}" must have at least one material')
+    for dfs_object in mesh_objects:
+        mesh_data = cast(Mesh, dfs_object.obj.data)
+        if len(mesh_data.materials) == 0:
+            raise RuntimeError(f'Mesh "{dfs_object.obj.name}" must have at least one material')
 
     input_objects = PskInputObjects()
     input_objects.mesh_objects = mesh_objects
-    input_objects.armature_object = get_armature_for_mesh_objects([x[0] for x in mesh_objects])
+    input_objects.armature_object = get_armature_for_mesh_objects([x.obj for x in mesh_objects])
 
     return input_objects
 
@@ -90,7 +84,9 @@ def get_psk_input_objects_for_context(context: Context) -> PskInputObjects:
 
 
 def get_psk_input_objects_for_collection(collection: Collection, should_exclude_hidden_meshes: bool = True) -> PskInputObjects:
-    mesh_objects = list(get_mesh_objects_for_collection(collection, should_exclude_hidden_meshes))
+    mesh_objects = get_mesh_objects_for_collection(collection)
+    if should_exclude_hidden_meshes:
+        mesh_objects = filter(lambda x: x.is_visible, mesh_objects)
     return _get_psk_input_objects(mesh_objects)
 
 
@@ -107,6 +103,16 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
     psk = Psk()
     bones = []
 
+    def get_export_space_matrix():
+        match options.export_space:
+            case 'WORLD':
+                return Matrix.Identity(4)
+            case 'ARMATURE':
+                return armature_object.matrix_world.inverted()
+            case _:
+                raise ValueError(f'Invalid export space: {options.export_space}')
+
+    export_space_matrix = get_export_space_matrix()  # TODO: maybe neutralize the scale here?
     scale_matrix = Matrix.Scale(options.scale, 4)
 
     if armature_object is None or len(armature_object.data.bones) == 0:
@@ -153,7 +159,16 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
                 parent_tail = inverse_parent_rotation @ bone.parent.tail
                 location = (parent_tail - parent_head) + bone.head
             else:
-                armature_local_matrix = armature_object.matrix_local
+                def get_armature_local_matrix():
+                    match options.export_space:
+                        case 'WORLD':
+                            return armature_object.matrix_world
+                        case 'ARMATURE':
+                            return Matrix.Identity(4)
+                        case _:
+                            raise ValueError(f'Invalid export space: {options.export_space}')
+
+                armature_local_matrix = get_armature_local_matrix()
                 location = armature_local_matrix @ bone.head
                 bone_rotation = bone.matrix.to_quaternion().conjugated()
                 local_rotation = armature_local_matrix.to_3x3().to_quaternion().conjugated()
@@ -161,6 +176,14 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
                 rotation.conjugate()
 
             location = scale_matrix @ location
+
+            # If the armature object has been scaled, we need to scale the bone's location to match.
+            _, _, armature_object_scale = armature_object.matrix_world.decompose()
+            location.x *= armature_object_scale.x
+            location.y *= armature_object_scale.y
+            location.z *= armature_object_scale.z
+
+            print(bone.name, location)
 
             psk_bone.location.x = location.x
             psk_bone.location.y = location.y
@@ -170,12 +193,6 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
             psk_bone.rotation.x = rotation.x
             psk_bone.rotation.y = rotation.y
             psk_bone.rotation.z = rotation.z
-
-            # If the armature object has been scaled, we need to scale the bone's location to match.
-            _, _, armature_object_scale = armature_object.matrix_world.decompose()
-            psk_bone.location.x *= armature_object_scale.x
-            psk_bone.location.y *= armature_object_scale.y
-            psk_bone.location.z *= armature_object_scale.z
 
             psk.bones.append(psk_bone)
 
@@ -197,7 +214,7 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
 
     for object_index, input_mesh_object in enumerate(input_objects.mesh_objects):
 
-        obj, instance_objects, matrix_world = input_mesh_object
+        obj, instance_objects, matrix_world = input_mesh_object.obj, input_mesh_object.instance_objects, input_mesh_object.matrix_world
 
         should_flip_normals = False
 
@@ -252,7 +269,7 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
                 raise ValueError(f'Invalid object evaluation state: {options.object_eval_state}')
 
         vertex_offset = len(psk.points)
-        matrix_world = scale_matrix @ mesh_object.matrix_world
+        matrix_world = scale_matrix @ export_space_matrix @ mesh_object.matrix_world
 
         # VERTICES
         for vertex in mesh_data.vertices:
@@ -383,75 +400,3 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
     result.psk = psk
 
     return result
-
-
-def dfs_collection_objects_recursive(collection: Collection, visited: Optional[Set[Object]]=None) -> Iterable[Tuple[Object, List[Object], Matrix]]:
-    if visited is None:
-        visited = set()
-    yield from dfs_collection_objects(collection, visited=visited)
-    for child in collection.children:
-        yield from dfs_collection_objects_recursive(child, visited)
-
-
-# Construct a list of objects in hierarchy order from `collection.objects`, only keeping those that are in the
-# collection.
-def dfs_object_children(obj: Object, collection: Collection):
-    yield obj
-    for child in obj.children:
-        if child in collection.objects:
-            yield from dfs_object_children(child, collection)
-
-
-def dfs_objects_in_collection(collection: Collection):
-    # Return only the top-level objects in the collection.
-    objects_hierarchy = []
-    for obj in collection.objects:
-        if obj.parent is None or obj.parent not in set(collection.objects):
-            objects_hierarchy.append(obj)
-    for obj in collection.objects:
-        yield from dfs_object_children(obj, collection)
-
-
-def dfs_collection_objects(
-        collection: Collection,
-        instance_objects: Optional[List[Object]] = None,
-        matrix_world: Matrix = Matrix.Identity(4),
-        visited: Optional[Set[Object]]=None
-) -> Iterable[Tuple[Object, List[Object], Matrix]]:
-    # We want to also yield the top-level instance object so that callers can inspect the selection status etc.
-    if visited is None:
-        visited = set()
-
-    if instance_objects is None:
-        instance_objects = list()
-
-    for child in collection.children:
-        yield from dfs_collection_objects(child, instance_objects, matrix_world.copy(), visited)
-
-    for obj in dfs_objects_in_collection(collection):
-        visited_pair = (obj, instance_objects[-1] if instance_objects else None)
-        if visited_pair in visited:
-            continue
-        # If this an instance, we need to recurse into it.
-        if obj.instance_collection is not None:
-            # Calculate the instance transform.
-            instance_offset_matrix = Matrix.Translation(-obj.instance_collection.instance_offset)
-            # Recurse into the instance collection.
-            yield from dfs_collection_objects(obj.instance_collection,
-                                     instance_objects + [obj],
-                                     matrix_world @ (obj.matrix_world @ instance_offset_matrix),
-                                     visited)
-        else:
-            # Object is not an instance, yield it.
-            yield (obj, instance_objects, matrix_world @ obj.matrix_world)
-            visited.add(visited_pair)
-
-
-def dfs_view_layer_objects(view_layer: ViewLayer) -> Iterable[Tuple[Object, List[Object], Matrix]]:
-    def layer_collection_objects_recursive(layer_collection: LayerCollection):
-        for child in layer_collection.children:
-            yield from layer_collection_objects_recursive(child)
-        # Iterate only the top-level objects in this collection first.
-        yield from dfs_collection_objects(layer_collection.collection)
-
-    yield from layer_collection_objects_recursive(view_layer.layer_collection)

@@ -5,7 +5,7 @@ from bpy.props import StringProperty, BoolProperty, EnumProperty, FloatProperty
 from bpy.types import Operator, Context, Object
 from bpy_extras.io_utils import ExportHelper
 
-from .properties import object_eval_state_items
+from .properties import object_eval_state_items, export_space_items
 from ..builder import build_psk, PskBuildOptions, get_psk_input_objects_for_context, \
     get_psk_input_objects_for_collection
 from ..writer import write_psk
@@ -115,6 +115,13 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         min=0.0001,
         soft_max=100.0
     )
+    export_space: EnumProperty(
+        name='Export Space',
+        description='Space to export the mesh in',
+        items=export_space_items,
+        default='WORLD'
+    )
+
 
     def execute(self, context):
         collection = bpy.data.collections.get(self.collection)
@@ -128,9 +135,10 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         options = PskBuildOptions()
         options.bone_filter_mode = 'ALL'
         options.object_eval_state = self.object_eval_state
-        options.materials = get_materials_for_mesh_objects([x[0] for x in input_objects.mesh_objects])
+        options.materials = get_materials_for_mesh_objects([x.obj for x in input_objects.mesh_objects])
         options.should_enforce_bone_name_restrictions = self.should_enforce_bone_name_restrictions
         options.scale = self.scale
+        options.export_space = self.export_space
 
         try:
             result = build_psk(context, input_objects, options)
@@ -155,6 +163,7 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         flow.use_property_decorate = False
 
         flow.prop(self, 'scale')
+        flow.prop(self, 'export_space')
 
         # MESH
         mesh_header, mesh_panel = layout.panel('Mesh', default_closed=False)
@@ -271,6 +280,7 @@ class PSK_OT_export(Operator, ExportHelper):
         options.materials = [m.material for m in pg.material_list]
         options.should_enforce_bone_name_restrictions = pg.should_enforce_bone_name_restrictions
         options.scale = pg.scale
+        options.export_space = pg.export_space
         
         try:
             result = build_psk(context, input_objects, options)
