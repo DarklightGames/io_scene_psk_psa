@@ -26,11 +26,7 @@ class PSK_PG_export(PropertyGroup):
         name='Bone Filter',
         options=empty_set,
         description='',
-        items=(
-            ('ALL', 'All', 'All bones will be exported'),
-            ('BONE_COLLECTIONS', 'Bone Collections',
-             'Only bones belonging to the selected bone collections and their ancestors will be exported')
-        )
+        items=bone_filter_mode_items
     )
     bone_collection_list: CollectionProperty(type=PSX_PG_bone_collection_list_item)
     bone_collection_list_index: IntProperty(default=0)

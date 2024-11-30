@@ -93,3 +93,9 @@ class Section(Structure):
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
         self.type_flags = 1999801
+
+
+bone_filter_mode_items = (
+    ('ALL', 'All', 'All bones will be exported'),
+    ('BONE_COLLECTIONS', 'Bone Collections', 'Only bones belonging to the selected bone collections and their ancestors will be exported')
+)

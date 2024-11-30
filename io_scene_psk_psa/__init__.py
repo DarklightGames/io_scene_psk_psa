@@ -6,6 +6,8 @@ if 'bpy' in locals():
     importlib.reload(shared_data)
     importlib.reload(shared_helpers)
     importlib.reload(shared_types)
+    importlib.reload(shared_dfs)
+    importlib.reload(shared_ui)
 
     importlib.reload(psk_data)
     importlib.reload(psk_reader)
@@ -33,6 +35,7 @@ if 'bpy' in locals():
     importlib.reload(psa_import_ui)
 else:
     from .shared import data as shared_data, types as shared_types, helpers as shared_helpers
+    from .shared import dfs as shared_dfs, ui as shared_ui
     from .psk import data as psk_data, builder as psk_builder, writer as psk_writer, \
     importer as psk_importer, properties as psk_properties
     from .psk import reader as psk_reader, ui as psk_ui

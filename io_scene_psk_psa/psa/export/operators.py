@@ -13,6 +13,7 @@ from .properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_se
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from ..writer import write_psa
 from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range
+from ...shared.ui import draw_bone_filter_mode
 
 
 def is_action_for_armature(armature: Armature, action: Action):
@@ -118,14 +119,6 @@ def get_animation_data_object(context: Context) -> Object:
         animation_data_object = active_object
 
     return animation_data_object
-
-
-def is_bone_filter_mode_item_available(context, identifier):
-    if identifier == 'BONE_COLLECTIONS':
-        armature = context.active_object.data
-        if len(armature.collections) == 0:
-            return False
-    return True
 
 
 def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context: Context, marker_names: List[str]) -> Dict:
@@ -268,7 +261,7 @@ class PSA_OT_export(Operator, ExportHelper):
 
             propname, active_propname = get_sequences_propnames_from_source(pg.sequence_source)
             sequences_panel.template_list(PSA_UL_export_sequences.bl_idname, '', pg, propname, pg, active_propname,
-                                          rows=max(3, min(len(getattr(pg, propname), 10))))
+                                          rows=max(3, min(len(getattr(pg, propname)), 10)))
 
             flow = sequences_panel.grid_flow()
             flow.use_property_split = True
@@ -295,7 +288,8 @@ class PSA_OT_export(Operator, ExportHelper):
         bones_header.label(text='Bones', icon='BONE_DATA')
         if bones_panel:
             row = bones_panel.row(align=True)
-            row.prop(pg, 'bone_filter_mode', text='Bones')
+
+            draw_bone_filter_mode(row, pg)
 
             if pg.bone_filter_mode == 'BONE_COLLECTIONS':
                 row = bones_panel.row(align=True)

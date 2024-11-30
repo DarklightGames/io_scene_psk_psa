@@ -1,24 +1,18 @@
-from typing import List
+from typing import List, Optional, cast
 
 import bpy
-from bpy.props import StringProperty, BoolProperty, EnumProperty, FloatProperty
-from bpy.types import Operator, Context, Object
+from bpy.props import StringProperty, BoolProperty, EnumProperty, FloatProperty, CollectionProperty, IntProperty
+from bpy.types import Operator, Context, Object, Collection, SpaceProperties
 from bpy_extras.io_utils import ExportHelper
 
 from .properties import object_eval_state_items, export_space_items
 from ..builder import build_psk, PskBuildOptions, get_psk_input_objects_for_context, \
     get_psk_input_objects_for_collection
 from ..writer import write_psk
+from ...shared.data import bone_filter_mode_items
 from ...shared.helpers import populate_bone_collection_list
-
-
-def is_bone_filter_mode_item_available(context, identifier):
-    input_objects = get_psk_input_objects_for_context(context)
-    armature_object = input_objects.armature_object
-    if identifier == 'BONE_COLLECTIONS':
-        if armature_object is None or armature_object.data is None or len(armature_object.data.collections) == 0:
-            return False
-    return True
+from ...shared.types import PSX_PG_bone_collection_list_item
+from ...shared.ui import draw_bone_filter_mode
 
 
 def get_materials_for_mesh_objects(mesh_objects: List[Object]):
@@ -40,6 +34,49 @@ def populate_material_list(mesh_objects, material_list):
         m = material_list.add()
         m.material = material
         m.index = index
+
+
+
+def get_collection_from_context(context: Context) -> Optional[Collection]:
+    if context.space_data.type != 'PROPERTIES':
+        return None
+
+    space_data = cast(SpaceProperties, context.space_data)
+
+    if space_data.use_pin_id:
+        return cast(Collection, space_data.pin_id)
+    else:
+        return context.collection
+
+
+def get_collection_export_operator_from_context(context: Context) -> Optional[object]:
+    collection = get_collection_from_context(context)
+    if collection is None:
+        return None
+    if 0 > collection.active_exporter_index >= len(collection.exporters):
+        return None
+    exporter = collection.exporters[collection.active_exporter_index]
+    # TODO: make sure this is actually an ASE exporter.
+    return exporter.export_properties
+
+
+class PSK_OT_populate_bone_collection_list(Operator):
+    bl_idname = 'psk_export.populate_bone_collection_list'
+    bl_label = 'Populate Bone Collection List'
+    bl_description = 'Populate the bone collection list from the armature that will be used in this collection export'
+    bl_options = {'INTERNAL'}
+
+    def execute(self, context):
+        export_operator = get_collection_export_operator_from_context(context)
+        if export_operator is None:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
+            return {'CANCELLED'}
+        input_objects = get_psk_input_objects_for_collection(context.collection)
+        if input_objects.armature_object is None:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'No armature found in collection')
+            return {'CANCELLED'}
+        populate_bone_collection_list(input_objects.armature_object, export_operator.bone_collection_list)
+        return {'FINISHED'}
 
 
 class PSK_OT_material_list_move_up(Operator):
@@ -76,6 +113,9 @@ class PSK_OT_material_list_move_down(Operator):
         pg.material_list.move(pg.material_list_index, pg.material_list_index + 1)
         pg.material_list_index += 1
         return {'FINISHED'}
+
+
+empty_set = set()
 
 
 class PSK_OT_export_collection(Operator, ExportHelper):
@@ -121,6 +161,14 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         items=export_space_items,
         default='WORLD'
     )
+    bone_filter_mode: EnumProperty(
+        name='Bone Filter',
+        options=empty_set,
+        description='',
+        items=bone_filter_mode_items,
+    )
+    bone_collection_list: CollectionProperty(type=PSX_PG_bone_collection_list_item)
+    bone_collection_list_index: IntProperty(default=0)
 
 
     def execute(self, context):
@@ -133,12 +181,13 @@ class PSK_OT_export_collection(Operator, ExportHelper):
             return {'CANCELLED'}
 
         options = PskBuildOptions()
-        options.bone_filter_mode = 'ALL'
         options.object_eval_state = self.object_eval_state
         options.materials = get_materials_for_mesh_objects([x.obj for x in input_objects.mesh_objects])
         options.should_enforce_bone_name_restrictions = self.should_enforce_bone_name_restrictions
         options.scale = self.scale
         options.export_space = self.export_space
+        options.bone_filter_mode = self.bone_filter_mode
+        options.bone_collection_indices = [x.index for x in self.bone_collection_list if x.is_selected]
 
         try:
             result = build_psk(context, input_objects, options)
@@ -179,10 +228,17 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         bones_header, bones_panel = layout.panel('Bones', default_closed=False)
         bones_header.label(text='Bones', icon='BONE_DATA')
         if bones_panel:
-            flow = bones_panel.grid_flow(row_major=True)
-            flow.use_property_split = True
-            flow.use_property_decorate = False
-            flow.prop(self, 'should_enforce_bone_name_restrictions')
+            draw_bone_filter_mode(bones_panel, self)
+
+            row = bones_panel.row(align=True)
+
+            if self.bone_filter_mode == 'BONE_COLLECTIONS':
+                rows = max(3, min(len(self.bone_collection_list), 10))
+                row.template_list('PSX_UL_bone_collection_list', '', self, 'bone_collection_list', self, 'bone_collection_list_index', rows=rows)
+                col = row.column()
+                col.operator(PSK_OT_populate_bone_collection_list.bl_idname, text='', icon='FILE_REFRESH')
+
+            bones_panel.prop(self, 'should_enforce_bone_name_restrictions')
 
 
 class PSK_OT_export(Operator, ExportHelper):
@@ -215,7 +271,7 @@ class PSK_OT_export(Operator, ExportHelper):
         populate_bone_collection_list(input_objects.armature_object, pg.bone_collection_list)
 
         try:
-            populate_material_list([x[0] for x in input_objects.mesh_objects], pg.material_list)
+            populate_material_list([x.obj for x in input_objects.mesh_objects], pg.material_list)
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
@@ -242,14 +298,7 @@ class PSK_OT_export(Operator, ExportHelper):
         bones_header, bones_panel = layout.panel('Bones', default_closed=False)
         bones_header.label(text='Bones', icon='BONE_DATA')
         if bones_panel:
-            bone_filter_mode_items = pg.bl_rna.properties['bone_filter_mode'].enum_items_static
-            row = bones_panel.row(align=True)
-            for item in bone_filter_mode_items:
-                identifier = item.identifier
-                item_layout = row.row(align=True)
-                item_layout.prop_enum(pg, 'bone_filter_mode', item.identifier)
-                item_layout.enabled = is_bone_filter_mode_item_available(context, identifier)
-
+            draw_bone_filter_mode(bones_panel, pg)
             if pg.bone_filter_mode == 'BONE_COLLECTIONS':
                 row = bones_panel.row()
                 rows = max(3, min(len(pg.bone_collection_list), 10))
@@ -303,4 +352,5 @@ classes = (
     PSK_OT_material_list_move_down,
     PSK_OT_export,
     PSK_OT_export_collection,
+    PSK_OT_populate_bone_collection_list,
 )

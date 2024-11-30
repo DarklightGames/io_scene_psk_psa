@@ -7,6 +7,7 @@ from bpy.props import BoolProperty, PointerProperty, EnumProperty, FloatProperty
     StringProperty
 from bpy.types import PropertyGroup, Object, Action, AnimData, Context
 
+from ...shared.data import bone_filter_mode_items
 from ...shared.types import PSX_PG_bone_collection_list_item
 
 
@@ -155,11 +156,7 @@ class PSA_PG_export(PropertyGroup):
         name='Bone Filter',
         options=empty_set,
         description='',
-        items=(
-            ('ALL', 'All', 'All bones will be exported.'),
-            ('BONE_COLLECTIONS', 'Bone Collections', 'Only bones belonging to the selected bone collections and their '
-             'ancestors will be exported.'),
-        )
+        items=bone_filter_mode_items,
     )
     bone_collection_list: CollectionProperty(type=PSX_PG_bone_collection_list_item)
     bone_collection_list_index: IntProperty(default=0, name='', description='')
