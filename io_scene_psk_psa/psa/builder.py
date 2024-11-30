@@ -1,6 +1,6 @@
 from typing import Optional
 
-from bpy.types import Armature, Bone, Action, PoseBone
+from bpy.types import Bone, Action, PoseBone
 
 from .data import *
 from ..shared.helpers import *
@@ -27,7 +27,6 @@ class PsaBuildOptions:
         self.sequences: List[PsaBuildSequence] = []
         self.bone_filter_mode: str = 'ALL'
         self.bone_collection_indices: List[int] = []
-        self.should_enforce_bone_name_restrictions: bool = False
         self.sequence_name_prefix: str = ''
         self.sequence_name_suffix: str = ''
         self.root_motion: bool = False
@@ -83,10 +82,6 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
     # No bones are going to be exported.
     if len(bones) == 0:
         raise RuntimeError('No bones available for export')
-
-    # Check that all bone names are valid.
-    if options.should_enforce_bone_name_restrictions:
-        check_bone_names(map(lambda bone: bone.name, bones))
         
     # Build list of PSA bones.
     for bone in bones:

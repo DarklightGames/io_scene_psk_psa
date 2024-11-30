@@ -24,7 +24,6 @@ class PskBuildOptions(object):
         self.bone_collection_indices: List[int] = []
         self.object_eval_state = 'EVALUATED'
         self.materials: List[Material] = []
-        self.should_enforce_bone_name_restrictions = False
         self.scale = 1.0
         self.export_space = 'WORLD'
 
@@ -130,10 +129,6 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
         bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_collection_indices)
         armature_data = typing.cast(Armature, armature_object.data)
         bones = [armature_data.bones[bone_name] for bone_name in bone_names]
-
-        # Check that all bone names are valid.
-        if options.should_enforce_bone_name_restrictions:
-            check_bone_names(map(lambda x: x.name, bones))
 
         for bone in bones:
             psk_bone = Psk.Bone()

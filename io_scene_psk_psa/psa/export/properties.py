@@ -160,12 +160,6 @@ class PSA_PG_export(PropertyGroup):
     )
     bone_collection_list: CollectionProperty(type=PSX_PG_bone_collection_list_item)
     bone_collection_list_index: IntProperty(default=0, name='', description='')
-    should_enforce_bone_name_restrictions: BoolProperty(
-        default=False,
-        name='Enforce Bone Name Restrictions',
-        description='Bone names restrictions will be enforced. Note that bone names without properly formatted names '
-                    'may not be able to be referenced in-engine'
-    )
     sequence_name_prefix: StringProperty(name='Prefix', options=empty_set)
     sequence_name_suffix: StringProperty(name='Suffix', options=empty_set)
     sequence_filter_name: StringProperty(

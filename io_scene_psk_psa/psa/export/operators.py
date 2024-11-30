@@ -300,11 +300,6 @@ class PSA_OT_export(Operator, ExportHelper):
                 bones_panel.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index',
                                      rows=rows)
 
-            flow = bones_panel.grid_flow()
-            flow.use_property_split = True
-            flow.use_property_decorate = False
-            flow.prop(pg, 'should_enforce_bone_name_restrictions')
-
         # ADVANCED
         advanced_header, advanced_panel = layout.panel('Advanced', default_closed=False)
         advanced_header.label(text='Advanced')
@@ -410,7 +405,6 @@ class PSA_OT_export(Operator, ExportHelper):
         options.sequences = export_sequences
         options.bone_filter_mode = pg.bone_filter_mode
         options.bone_collection_indices = [x.index for x in pg.bone_collection_list if x.is_selected]
-        options.should_ignore_bone_name_restrictions = pg.should_enforce_bone_name_restrictions
         options.sequence_name_prefix = pg.sequence_name_prefix
         options.sequence_name_suffix = pg.sequence_name_suffix
         options.root_motion = pg.root_motion

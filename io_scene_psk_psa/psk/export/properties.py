@@ -1,4 +1,4 @@
-from bpy.props import EnumProperty, CollectionProperty, IntProperty, BoolProperty, PointerProperty, FloatProperty
+from bpy.props import EnumProperty, CollectionProperty, IntProperty, PointerProperty, FloatProperty
 from bpy.types import PropertyGroup, Material
 
 from ...shared.types import PSX_PG_bone_collection_list_item
@@ -37,12 +37,6 @@ class PSK_PG_export(PropertyGroup):
     )
     material_list: CollectionProperty(type=PSK_PG_material_list_item)
     material_list_index: IntProperty(default=0)
-    should_enforce_bone_name_restrictions: BoolProperty(
-        default=False,
-        name='Enforce Bone Name Restrictions',
-        description='Enforce that bone names must only contain letters, numbers, spaces, hyphens and underscores.\n\n'
-                    'Depending on the engine, improper bone names might not be referenced correctly by scripts'
-    )
     scale: FloatProperty(
         name='Scale',
         default=1.0,

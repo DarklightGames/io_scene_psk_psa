@@ -1,4 +1,3 @@
-import re
 from typing import List, Iterable, cast
 
 import bpy
@@ -70,15 +69,6 @@ def populate_bone_collection_list(armature_object: Object, bone_collection_list:
         item.index = bone_collection_index
         item.count = len(bone_collection.bones)
         item.is_selected = bone_collection.name in selected_assigned_collection_names if has_selected_collections else True
-
-
-def check_bone_names(bone_names: Iterable[str]):
-    pattern = re.compile(r'^[a-zA-Z\d_\- ]+$')
-    invalid_bone_names = [x for x in bone_names if pattern.match(x) is None]
-    if len(invalid_bone_names) > 0:
-        raise RuntimeError(f'The following bone names are invalid: {invalid_bone_names}.\n'
-                           f'Bone names must only contain letters, numbers, spaces, hyphens and underscores.\n'
-                           f'You can bypass this by disabling "Enforce Bone Name Restrictions" in the export settings.')
 
 
 def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_collection_indices: Iterable[int]) -> List[str]:

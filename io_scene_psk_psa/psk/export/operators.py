@@ -137,14 +137,8 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         name='Object Evaluation State',
         default='EVALUATED'
     )
-    should_enforce_bone_name_restrictions: BoolProperty(
-        default=False,
-        name='Enforce Bone Name Restrictions',
-        description='Enforce that bone names must only contain letters, numbers, spaces, hyphens and underscores.\n\n'
-                    'Depending on the engine, improper bone names might not be referenced correctly by scripts'
-    )
     should_exclude_hidden_meshes: BoolProperty(
-        default=True,
+        default=False,
         name='Visible Only',
         description='Export only visible meshes'
     )
@@ -183,7 +177,6 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         options = PskBuildOptions()
         options.object_eval_state = self.object_eval_state
         options.materials = get_materials_for_mesh_objects([x.obj for x in input_objects.mesh_objects])
-        options.should_enforce_bone_name_restrictions = self.should_enforce_bone_name_restrictions
         options.scale = self.scale
         options.export_space = self.export_space
         options.bone_filter_mode = self.bone_filter_mode
@@ -228,17 +221,11 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         bones_header, bones_panel = layout.panel('Bones', default_closed=False)
         bones_header.label(text='Bones', icon='BONE_DATA')
         if bones_panel:
+            bones_panel.operator(PSK_OT_populate_bone_collection_list.bl_idname, icon='FILE_REFRESH')
             draw_bone_filter_mode(bones_panel, self)
-
-            row = bones_panel.row(align=True)
-
             if self.bone_filter_mode == 'BONE_COLLECTIONS':
                 rows = max(3, min(len(self.bone_collection_list), 10))
-                row.template_list('PSX_UL_bone_collection_list', '', self, 'bone_collection_list', self, 'bone_collection_list_index', rows=rows)
-                col = row.column()
-                col.operator(PSK_OT_populate_bone_collection_list.bl_idname, text='', icon='FILE_REFRESH')
-
-            bones_panel.prop(self, 'should_enforce_bone_name_restrictions')
+                bones_panel.template_list('PSX_UL_bone_collection_list', '', self, 'bone_collection_list', self, 'bone_collection_list_index', rows=rows)
 
 
 class PSK_OT_export(Operator, ExportHelper):
@@ -304,8 +291,6 @@ class PSK_OT_export(Operator, ExportHelper):
                 rows = max(3, min(len(pg.bone_collection_list), 10))
                 row.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index', rows=rows)
 
-            bones_panel.prop(pg, 'should_enforce_bone_name_restrictions')
-
         # MATERIALS
         materials_header, materials_panel = layout.panel('Materials', default_closed=False)
         materials_header.label(text='Materials', icon='MATERIAL')
@@ -327,7 +312,6 @@ class PSK_OT_export(Operator, ExportHelper):
         options.bone_collection_indices = [x.index for x in pg.bone_collection_list if x.is_selected]
         options.object_eval_state = pg.object_eval_state
         options.materials = [m.material for m in pg.material_list]
-        options.should_enforce_bone_name_restrictions = pg.should_enforce_bone_name_restrictions
         options.scale = pg.scale
         options.export_space = pg.export_space
         
