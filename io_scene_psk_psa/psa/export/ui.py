@@ -8,8 +8,8 @@ from .properties import PSA_PG_export_action_list_item, filter_sequences
 class PSA_UL_export_sequences(UIList):
     bl_idname = 'PSA_UL_export_sequences'
 
-    def __init__(self):
-        super(PSA_UL_export_sequences, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(PSA_UL_export_sequences, self).__init__(*args, **kwargs)
         # Show the filtering options by default.
         self.use_filter_show = True
 

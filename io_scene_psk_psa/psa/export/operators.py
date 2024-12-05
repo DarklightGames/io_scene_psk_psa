@@ -203,7 +203,8 @@ class PSA_OT_export(Operator, ExportHelper):
         maxlen=1024,
         default='')
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.armature_object = None
 
     @classmethod
