@@ -1,6 +1,7 @@
 from bpy.props import EnumProperty, CollectionProperty, IntProperty, PointerProperty, FloatProperty
 from bpy.types import PropertyGroup, Material
 
+from ...shared.data import bone_filter_mode_items
 from ...shared.types import PSX_PG_bone_collection_list_item
 
 empty_set = set()

@@ -117,6 +117,36 @@ class PSK_OT_material_list_move_down(Operator):
 
 empty_set = set()
 
+axis_identifiers = ('X', 'Y', 'Z', '-X', '-Y', '-Z')
+
+forward_items = (
+    ('X', 'X Forward', ''),
+    ('Y', 'Y Forward', ''),
+    ('Z', 'Z Forward', ''),
+    ('-X', '-X Forward', ''),
+    ('-Y', '-Y Forward', ''),
+    ('-Z', '-Z Forward', ''),
+)
+
+up_items = (
+    ('X', 'X Up', ''),
+    ('Y', 'Y Up', ''),
+    ('Z', 'Z Up', ''),
+    ('-X', '-X Up', ''),
+    ('-Y', '-Y Up', ''),
+    ('-Z', '-Z Up', ''),
+)
+
+def forward_axis_update(self, context):
+    if self.forward_axis == self.up_axis:
+        # Automatically set the up axis to the next available axis
+        self.up_axis = next((axis for axis in axis_identifiers if axis != self.forward_axis), 'Z')
+
+
+def up_axis_update(self, context):
+    if self.up_axis == self.forward_axis:
+        # Automatically set the forward axis to the next available axis
+        self.forward_axis = next((axis for axis in axis_identifiers if axis != self.up_axis), 'X')
 
 class PSK_OT_export_collection(Operator, ExportHelper):
     bl_idname = 'export.psk_collection'
@@ -163,7 +193,18 @@ class PSK_OT_export_collection(Operator, ExportHelper):
     )
     bone_collection_list: CollectionProperty(type=PSX_PG_bone_collection_list_item)
     bone_collection_list_index: IntProperty(default=0)
-
+    forward_axis: EnumProperty(
+        name='Forward',
+        items=forward_items,
+        default='X',
+        update=forward_axis_update
+    )
+    up_axis: EnumProperty(
+        name='Up',
+        items=up_items,
+        default='Z',
+        update=up_axis_update
+    )
 
     def execute(self, context):
         collection = bpy.data.collections.get(self.collection)
@@ -181,6 +222,8 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         options.export_space = self.export_space
         options.bone_filter_mode = self.bone_filter_mode
         options.bone_collection_indices = [x.index for x in self.bone_collection_list if x.is_selected]
+        options.forward_axis = self.forward_axis
+        options.up_axis = self.up_axis
 
         try:
             result = build_psk(context, input_objects, options)
@@ -204,9 +247,6 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         flow.use_property_split = True
         flow.use_property_decorate = False
 
-        flow.prop(self, 'scale')
-        flow.prop(self, 'export_space')
-
         # MESH
         mesh_header, mesh_panel = layout.panel('Mesh', default_closed=False)
         mesh_header.label(text='Mesh', icon='MESH_DATA')
@@ -226,6 +266,18 @@ class PSK_OT_export_collection(Operator, ExportHelper):
             if self.bone_filter_mode == 'BONE_COLLECTIONS':
                 rows = max(3, min(len(self.bone_collection_list), 10))
                 bones_panel.template_list('PSX_UL_bone_collection_list', '', self, 'bone_collection_list', self, 'bone_collection_list_index', rows=rows)
+
+        # TRANSFORM
+        transform_header, transform_panel = layout.panel('Transform', default_closed=False)
+        transform_header.label(text='Transform')
+        if transform_panel:
+            flow = transform_panel.grid_flow(row_major=True)
+            flow.use_property_split = True
+            flow.use_property_decorate = False
+            flow.prop(self, 'export_space')
+            flow.prop(self, 'scale')
+            flow.prop(self, 'forward_axis')
+            flow.prop(self, 'up_axis')
 
 
 class PSK_OT_export(Operator, ExportHelper):

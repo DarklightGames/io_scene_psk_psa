@@ -1,6 +1,6 @@
 import re
 from collections import Counter
-from typing import List, Iterable, Dict, Tuple
+from typing import List, Iterable, Dict, Tuple, Optional
 
 import bpy
 from bpy.props import StringProperty
@@ -229,40 +229,41 @@ class PSA_OT_export(Operator, ExportHelper):
             flow.use_property_decorate = False
             flow.prop(pg, 'sequence_source', text='Source')
 
-            if pg.sequence_source in {'TIMELINE_MARKERS', 'NLA_TRACK_STRIPS'}:
-                # ANIMDATA SOURCE
-                flow.prop(pg, 'should_override_animation_data')
-                if pg.should_override_animation_data:
-                    flow.prop(pg, 'animation_data_override', text=' ')
+            if pg.sequence_source != 'ACTIVE_ACTION':
+                if pg.sequence_source in {'TIMELINE_MARKERS', 'NLA_TRACK_STRIPS'}:
+                    # ANIMDATA SOURCE
+                    flow.prop(pg, 'should_override_animation_data')
+                    if pg.should_override_animation_data:
+                        flow.prop(pg, 'animation_data_override', text=' ')
 
-            if pg.sequence_source == 'NLA_TRACK_STRIPS':
-                flow = sequences_panel.grid_flow()
-                flow.use_property_split = True
-                flow.use_property_decorate = False
-                flow.prop(pg, 'nla_track')
+                if pg.sequence_source == 'NLA_TRACK_STRIPS':
+                    flow = sequences_panel.grid_flow()
+                    flow.use_property_split = True
+                    flow.use_property_decorate = False
+                    flow.prop(pg, 'nla_track')
 
-            # SELECT ALL/NONE
-            row = sequences_panel.row(align=True)
-            row.label(text='Select')
-            row.operator(PSA_OT_export_actions_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
-            row.operator(PSA_OT_export_actions_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
+                # SELECT ALL/NONE
+                row = sequences_panel.row(align=True)
+                row.label(text='Select')
+                row.operator(PSA_OT_export_actions_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
+                row.operator(PSA_OT_export_actions_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
 
-            from .ui import PSA_UL_export_sequences
+                from .ui import PSA_UL_export_sequences
 
-            def get_sequences_propnames_from_source(sequence_source: str) -> Tuple[str, str]:
-                match sequence_source:
-                    case 'ACTIONS':
-                        return 'action_list', 'action_list_index'
-                    case 'TIMELINE_MARKERS':
-                        return 'marker_list', 'marker_list_index'
-                    case 'NLA_TRACK_STRIPS':
-                        return 'nla_strip_list', 'nla_strip_list_index'
-                    case _:
-                        raise ValueError(f'Unhandled sequence source: {sequence_source}')
+                def get_sequences_propnames_from_source(sequence_source: str) -> Optional[Tuple[str, str]]:
+                    match sequence_source:
+                        case 'ACTIONS':
+                            return 'action_list', 'action_list_index'
+                        case 'TIMELINE_MARKERS':
+                            return 'marker_list', 'marker_list_index'
+                        case 'NLA_TRACK_STRIPS':
+                            return 'nla_strip_list', 'nla_strip_list_index'
+                        case _:
+                            raise ValueError(f'Unhandled sequence source: {sequence_source}')
 
-            propname, active_propname = get_sequences_propnames_from_source(pg.sequence_source)
-            sequences_panel.template_list(PSA_UL_export_sequences.bl_idname, '', pg, propname, pg, active_propname,
-                                          rows=max(3, min(len(getattr(pg, propname)), 10)))
+                propname, active_propname = get_sequences_propnames_from_source(pg.sequence_source)
+                sequences_panel.template_list(PSA_UL_export_sequences.bl_idname, '', pg, propname, pg, active_propname,
+                                              rows=max(3, min(len(getattr(pg, propname)), 10)))
 
             flow = sequences_panel.grid_flow()
             flow.use_property_split = True
@@ -301,15 +302,16 @@ class PSA_OT_export(Operator, ExportHelper):
                 bones_panel.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index',
                                      rows=rows)
 
-        # ADVANCED
-        advanced_header, advanced_panel = layout.panel('Advanced', default_closed=False)
-        advanced_header.label(text='Advanced')
+        # TRANSFORM
+        transform_header, transform_panel = layout.panel('Advanced', default_closed=False)
+        transform_header.label(text='Transform')
 
-        if advanced_panel:
-            flow = advanced_panel.grid_flow()
+        if transform_panel:
+            flow = transform_panel.grid_flow()
             flow.use_property_split = True
             flow.use_property_decorate = False
             flow.prop(pg, 'root_motion', text='Root Motion')
+            flow.prop(pg, 'scale', text='Scale')
 
     @classmethod
     def _check_context(cls, context):
@@ -317,7 +319,16 @@ class PSA_OT_export(Operator, ExportHelper):
             raise RuntimeError('An armature must be selected')
 
         if context.view_layer.objects.active.type != 'ARMATURE':
-            raise RuntimeError('The selected object must be an armature')
+            raise RuntimeError('The active object must be an armature')
+
+        # If we have multiple armatures selected, make sure that they all use the same underlying armature data.
+        armature_objects = [obj for obj in context.selected_objects if obj.type == 'ARMATURE']
+
+        for obj in armature_objects:
+            if obj.data != context.view_layer.objects.active.data:
+                raise RuntimeError(f'All selected armatures must use the same armature data block.\n\n'
+                                   f'\The armature data block for "{obj.name}\" (\'{obj.data.name}\') does not match '
+                                   f'the active armature data block (\'{context.view_layer.objects.active.name}\')')
 
     def invoke(self, context, _event):
         try:
@@ -362,14 +373,16 @@ class PSA_OT_export(Operator, ExportHelper):
 
         export_sequences: List[PsaBuildSequence] = []
 
+        selected_armature_objects = [obj for obj in context.selected_objects if obj.type == 'ARMATURE']
+
         match pg.sequence_source:
             case 'ACTIONS':
                 for action_item in filter(lambda x: x.is_selected, pg.action_list):
                     if len(action_item.action.fcurves) == 0:
                         continue
-                    export_sequence = PsaBuildSequence()
-                    export_sequence.nla_state.action = action_item.action
+                    export_sequence = PsaBuildSequence(context.active_object, animation_data)
                     export_sequence.name = action_item.name
+                    export_sequence.nla_state.action = action_item.action
                     export_sequence.nla_state.frame_start = action_item.frame_start
                     export_sequence.nla_state.frame_end = action_item.frame_end
                     export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [action_item.action])
@@ -378,9 +391,8 @@ class PSA_OT_export(Operator, ExportHelper):
                     export_sequences.append(export_sequence)
             case 'TIMELINE_MARKERS':
                 for marker_item in filter(lambda x: x.is_selected, pg.marker_list):
-                    export_sequence = PsaBuildSequence()
+                    export_sequence = PsaBuildSequence(context.active_object, animation_data)
                     export_sequence.name = marker_item.name
-                    export_sequence.nla_state.action = None
                     export_sequence.nla_state.frame_start = marker_item.frame_start
                     export_sequence.nla_state.frame_end = marker_item.frame_end
                     nla_strips_actions = set(
@@ -389,14 +401,27 @@ class PSA_OT_export(Operator, ExportHelper):
                     export_sequences.append(export_sequence)
             case 'NLA_TRACK_STRIPS':
                 for nla_strip_item in filter(lambda x: x.is_selected, pg.nla_strip_list):
-                    export_sequence = PsaBuildSequence()
+                    export_sequence = PsaBuildSequence(context.active_object, animation_data)
                     export_sequence.name = nla_strip_item.name
-                    export_sequence.nla_state.action = None
                     export_sequence.nla_state.frame_start = nla_strip_item.frame_start
                     export_sequence.nla_state.frame_end = nla_strip_item.frame_end
                     export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [nla_strip_item.action])
                     export_sequence.compression_ratio = nla_strip_item.action.psa_export.compression_ratio
                     export_sequence.key_quota = nla_strip_item.action.psa_export.key_quota
+                    export_sequences.append(export_sequence)
+            case 'ACTIVE_ACTION':
+                for obj in selected_armature_objects:
+                    if obj.animation_data is None or obj.animation_data.action is None:
+                        continue
+                    action = obj.animation_data.action
+                    export_sequence = PsaBuildSequence(obj, obj.animation_data)
+                    export_sequence.name = action.name
+                    export_sequence.nla_state.action = action
+                    export_sequence.nla_state.frame_start = int(action.frame_range[0])
+                    export_sequence.nla_state.frame_end = int(action.frame_range[1])
+                    export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [action])
+                    export_sequence.compression_ratio = action.psa_export.compression_ratio
+                    export_sequence.key_quota = action.psa_export.key_quota
                     export_sequences.append(export_sequence)
             case _:
                 raise ValueError(f'Unhandled sequence source: {pg.sequence_source}')
@@ -409,6 +434,7 @@ class PSA_OT_export(Operator, ExportHelper):
         options.sequence_name_prefix = pg.sequence_name_prefix
         options.sequence_name_suffix = pg.sequence_name_suffix
         options.root_motion = pg.root_motion
+        options.scale = pg.scale
 
         try:
             psa = build_psa(context, options)

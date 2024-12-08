@@ -13,7 +13,9 @@ class PsaBuildSequence:
             self.frame_start: int = 0
             self.frame_end: int = 0
 
-    def __init__(self):
+    def __init__(self, armature_object: Object, anim_data: AnimData):
+        self.armature_object = armature_object
+        self.anim_data = anim_data
         self.name: str = ''
         self.nla_state: PsaBuildSequence.NlaState = PsaBuildSequence.NlaState()
         self.compression_ratio: float = 1.0
@@ -30,6 +32,7 @@ class PsaBuildOptions:
         self.sequence_name_prefix: str = ''
         self.sequence_name_suffix: str = ''
         self.root_motion: bool = False
+        self.scale = 1.0
 
 
 def _get_pose_bone_location_and_rotation(pose_bone: PoseBone, armature_object: Object, options: PsaBuildOptions):
@@ -47,6 +50,8 @@ def _get_pose_bone_location_and_rotation(pose_bone: PoseBone, armature_object: O
 
     location = pose_bone_matrix.to_translation()
     rotation = pose_bone_matrix.to_quaternion().normalized()
+
+    location *= options.scale
 
     if pose_bone.parent is not None:
         rotation.conjugate()
@@ -67,9 +72,6 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
     # As a result, we need to reconstruct the list of pose bones in the same order as the
     # armature bones.
     bone_names = [x.name for x in bones]
-    pose_bones = [(bone_names.index(bone.name), bone) for bone in armature_object.pose.bones]
-    pose_bones.sort(key=lambda x: x[0])
-    pose_bones = [x[1] for x in pose_bones]
 
     # Get a list of all the bone indices and instigator bones for the bone filter settings.
     export_bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_collection_indices)
@@ -77,12 +79,11 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
 
     # Make the bone lists contain only the bones that are going to be exported.
     bones = [bones[bone_index] for bone_index in bone_indices]
-    pose_bones = [pose_bones[bone_index] for bone_index in bone_indices]
 
     # No bones are going to be exported.
     if len(bones) == 0:
         raise RuntimeError('No bones available for export')
-        
+
     # Build list of PSA bones.
     for bone in bones:
         psa_bone = Psa.Bone()
@@ -140,8 +141,14 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
     context.window_manager.progress_begin(0, len(options.sequences))
 
     for export_sequence_index, export_sequence in enumerate(options.sequences):
+        # Look up the pose bones for the bones that are going to be exported.
+        pose_bones = [(bone_names.index(bone.name), bone) for bone in export_sequence.armature_object.pose.bones]
+        pose_bones.sort(key=lambda x: x[0])
+        pose_bones = [x[1] for x in pose_bones]
+        pose_bones = [pose_bones[bone_index] for bone_index in bone_indices]
+
         # Link the action to the animation data and update view layer.
-        options.animation_data.action = export_sequence.nla_state.action
+        export_sequence.anim_data.action = export_sequence.nla_state.action
         context.view_layer.update()
 
         frame_start = export_sequence.nla_state.frame_start
@@ -181,7 +188,7 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
             context.scene.frame_set(frame=int(frame), subframe=frame % 1.0)
 
             for pose_bone in pose_bones:
-                location, rotation = _get_pose_bone_location_and_rotation(pose_bone, armature_object, options)
+                location, rotation = _get_pose_bone_location_and_rotation(pose_bone, export_sequence.armature_object, options)
 
                 key = Psa.Key()
                 key.location.x = location.x

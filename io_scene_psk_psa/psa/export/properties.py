@@ -123,7 +123,8 @@ class PSA_PG_export(PropertyGroup):
         items=(
             ('ACTIONS', 'Actions', 'Sequences will be exported using actions', 'ACTION', 0),
             ('TIMELINE_MARKERS', 'Timeline Markers', 'Sequences are delineated by scene timeline markers', 'MARKER_HLT', 1),
-            ('NLA_TRACK_STRIPS', 'NLA Track Strips', 'Sequences are delineated by the start & end times of strips on the selected NLA track', 'NLA', 2)
+            ('NLA_TRACK_STRIPS', 'NLA Track Strips', 'Sequences are delineated by the start & end times of strips on the selected NLA track', 'NLA', 2),
+            ('ACTIVE_ACTION', 'Active Action', 'The active action will be exported for each selected armature', 'ACTION', 3),
         )
     )
     nla_track: StringProperty(
@@ -187,6 +188,13 @@ class PSA_PG_export(PropertyGroup):
         options=empty_set,
         name='Show Reversed',
         description='Show reversed sequences'
+    )
+    scale: FloatProperty(
+        name='Scale',
+        default=1.0,
+        description='Scale factor to apply to the bone translations. Use this if you are exporting animations for a scaled PSK mesh',
+        min=0.0,
+        soft_max=100.0
     )
 
 
