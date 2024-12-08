@@ -1,6 +1,6 @@
 import re
 from collections import Counter
-from typing import List, Iterable, Dict, Tuple, Optional
+from typing import List, Iterable, Dict, Tuple, cast, Optional
 
 import bpy
 from bpy.props import StringProperty
@@ -14,6 +14,20 @@ from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from ..writer import write_psa
 from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range
 from ...shared.ui import draw_bone_filter_mode
+
+
+def get_sequences_propnames_from_source(sequence_source: str) -> Optional[Tuple[str, str]]:
+    match sequence_source:
+        case 'ACTIONS':
+            return 'action_list', 'action_list_index'
+        case 'TIMELINE_MARKERS':
+            return 'marker_list', 'marker_list_index'
+        case 'NLA_TRACK_STRIPS':
+            return 'nla_strip_list', 'nla_strip_list_index'
+        case 'ACTIVE_ACTION':
+            return 'active_action_list', 'active_action_list_index'
+        case _:
+            raise ValueError(f'Unhandled sequence source: {sequence_source}')
 
 
 def is_action_for_armature(armature: Armature, action: Action):
@@ -30,12 +44,13 @@ def is_action_for_armature(armature: Armature, action: Action):
     return False
 
 
-def update_actions_and_timeline_markers(context: Context, armature: Armature):
+def update_actions_and_timeline_markers(context: Context):
     pg = getattr(context.scene, 'psa_export')
 
     # Clear actions and markers.
     pg.action_list.clear()
     pg.marker_list.clear()
+    pg.active_action_list.clear()
 
     # Get animation data.
     animation_data_object = get_animation_data_object(context)
@@ -44,9 +59,11 @@ def update_actions_and_timeline_markers(context: Context, armature: Armature):
     if animation_data is None:
         return
 
+    active_armature = cast(Armature, context.active_object.data)
+
     # Populate actions list.
     for action in bpy.data.actions:
-        if not is_action_for_armature(armature, action):
+        if not is_action_for_armature(active_armature, action):
             continue
 
         if action.name != '' and not action.name.startswith('#'):
@@ -90,6 +107,19 @@ def update_actions_and_timeline_markers(context: Context, armature: Armature):
             item.is_selected = False
             item.frame_start = frame_start
             item.frame_end = frame_end
+
+    # Populate the active action list.
+    for armature_object in context.selected_objects:
+        if armature_object.type != 'ARMATURE':
+            continue
+        action = armature_object.animation_data.action
+        item = pg.active_action_list.add()
+        item.name = action.name
+        item.armature_object = armature_object
+        item.action = action
+        item.frame_start = int(item.action.frame_range[0])
+        item.frame_end = int(item.action.frame_range[1])
+        item.is_selected = True
 
 
 def get_sequence_fps(context: Context, fps_source: str, fps_custom: float, actions: Iterable[Action]) -> float:
@@ -229,41 +259,29 @@ class PSA_OT_export(Operator, ExportHelper):
             flow.use_property_decorate = False
             flow.prop(pg, 'sequence_source', text='Source')
 
-            if pg.sequence_source != 'ACTIVE_ACTION':
-                if pg.sequence_source in {'TIMELINE_MARKERS', 'NLA_TRACK_STRIPS'}:
-                    # ANIMDATA SOURCE
-                    flow.prop(pg, 'should_override_animation_data')
-                    if pg.should_override_animation_data:
-                        flow.prop(pg, 'animation_data_override', text=' ')
+            if pg.sequence_source in {'TIMELINE_MARKERS', 'NLA_TRACK_STRIPS'}:
+                # ANIMDATA SOURCE
+                flow.prop(pg, 'should_override_animation_data')
+                if pg.should_override_animation_data:
+                    flow.prop(pg, 'animation_data_override', text=' ')
 
-                if pg.sequence_source == 'NLA_TRACK_STRIPS':
-                    flow = sequences_panel.grid_flow()
-                    flow.use_property_split = True
-                    flow.use_property_decorate = False
-                    flow.prop(pg, 'nla_track')
+            if pg.sequence_source == 'NLA_TRACK_STRIPS':
+                flow = sequences_panel.grid_flow()
+                flow.use_property_split = True
+                flow.use_property_decorate = False
+                flow.prop(pg, 'nla_track')
 
-                # SELECT ALL/NONE
-                row = sequences_panel.row(align=True)
-                row.label(text='Select')
-                row.operator(PSA_OT_export_actions_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
-                row.operator(PSA_OT_export_actions_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
+            # SELECT ALL/NONE
+            row = sequences_panel.row(align=True)
+            row.label(text='Select')
+            row.operator(PSA_OT_export_actions_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
+            row.operator(PSA_OT_export_actions_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
 
-                from .ui import PSA_UL_export_sequences
+            from .ui import PSA_UL_export_sequences
 
-                def get_sequences_propnames_from_source(sequence_source: str) -> Optional[Tuple[str, str]]:
-                    match sequence_source:
-                        case 'ACTIONS':
-                            return 'action_list', 'action_list_index'
-                        case 'TIMELINE_MARKERS':
-                            return 'marker_list', 'marker_list_index'
-                        case 'NLA_TRACK_STRIPS':
-                            return 'nla_strip_list', 'nla_strip_list_index'
-                        case _:
-                            raise ValueError(f'Unhandled sequence source: {sequence_source}')
-
-                propname, active_propname = get_sequences_propnames_from_source(pg.sequence_source)
-                sequences_panel.template_list(PSA_UL_export_sequences.bl_idname, '', pg, propname, pg, active_propname,
-                                              rows=max(3, min(len(getattr(pg, propname)), 10)))
+            propname, active_propname = get_sequences_propnames_from_source(pg.sequence_source)
+            sequences_panel.template_list(PSA_UL_export_sequences.bl_idname, '', pg, propname, pg, active_propname,
+                                          rows=max(3, min(len(getattr(pg, propname)), 10)))
 
             flow = sequences_panel.grid_flow()
             flow.use_property_split = True
@@ -345,7 +363,7 @@ class PSA_OT_export(Operator, ExportHelper):
             # data created before (i.e. if no action was ever assigned to it).
             self.armature_object.animation_data_create()
 
-        update_actions_and_timeline_markers(context, self.armature_object.data)
+        update_actions_and_timeline_markers(context)
 
         populate_bone_collection_list(self.armature_object, pg.bone_collection_list)
 
@@ -410,11 +428,9 @@ class PSA_OT_export(Operator, ExportHelper):
                     export_sequence.key_quota = nla_strip_item.action.psa_export.key_quota
                     export_sequences.append(export_sequence)
             case 'ACTIVE_ACTION':
-                for obj in selected_armature_objects:
-                    if obj.animation_data is None or obj.animation_data.action is None:
-                        continue
-                    action = obj.animation_data.action
-                    export_sequence = PsaBuildSequence(obj, obj.animation_data)
+                for active_action_item in filter(lambda x: x.is_selected, pg.active_action_list):
+                    export_sequence = PsaBuildSequence(active_action_item.armature_object, active_action_item.armature_object.animation_data)
+                    action = active_action_item.action
                     export_sequence.name = action.name
                     export_sequence.nla_state.action = action
                     export_sequence.nla_state.frame_start = int(action.frame_range[0])
@@ -464,6 +480,8 @@ class PSA_OT_export_actions_select_all(Operator):
                 return pg.marker_list
             case 'NLA_TRACK_STRIPS':
                 return pg.nla_strip_list
+            case 'ACTIVE_ACTION':
+                return pg.active_action_list
             case _:
                 return None
 
@@ -471,6 +489,7 @@ class PSA_OT_export_actions_select_all(Operator):
     def poll(cls, context):
         pg = getattr(context.scene, 'psa_export')
         item_list = cls.get_item_list(context)
+        print(item_list)
         visible_sequences = get_visible_sequences(pg, item_list)
         has_unselected_sequences = any(map(lambda item: not item.is_selected, visible_sequences))
         return has_unselected_sequences
@@ -499,6 +518,8 @@ class PSA_OT_export_actions_deselect_all(Operator):
                 return pg.marker_list
             case 'NLA_TRACK_STRIPS':
                 return pg.nla_strip_list
+            case 'ACTIVE_ACTION':
+                return pg.active_action_list
             case _:
                 return None
 

@@ -27,6 +27,15 @@ class PSA_PG_export_action_list_item(PropertyGroup):
     is_pose_marker: BoolProperty(options={'HIDDEN'})
 
 
+class PSA_PG_export_active_action_list_item(PropertyGroup):
+    action: PointerProperty(type=Action)
+    name: StringProperty()
+    armature_object: PointerProperty(type=Object)
+    is_selected: BoolProperty(default=True)
+    frame_start: IntProperty(options={'HIDDEN'})
+    frame_end: IntProperty(options={'HIDDEN'})
+
+
 class PSA_PG_export_timeline_markers(PropertyGroup):  # TODO: rename this to singular
     marker_index: IntProperty()
     name: StringProperty()
@@ -153,6 +162,8 @@ class PSA_PG_export(PropertyGroup):
     marker_list_index: IntProperty(default=0)
     nla_strip_list: CollectionProperty(type=PSA_PG_export_nla_strip_list_item)
     nla_strip_list_index: IntProperty(default=0)
+    active_action_list: CollectionProperty(type=PSA_PG_export_active_action_list_item)
+    active_action_list_index: IntProperty(default=0)
     bone_filter_mode: EnumProperty(
         name='Bone Filter',
         options=empty_set,
@@ -235,5 +246,6 @@ classes = (
     PSA_PG_export_action_list_item,
     PSA_PG_export_timeline_markers,
     PSA_PG_export_nla_strip_list_item,
+    PSA_PG_export_active_action_list_item,
     PSA_PG_export,
 )
