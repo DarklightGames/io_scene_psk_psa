@@ -489,7 +489,6 @@ class PSA_OT_export_actions_select_all(Operator):
     def poll(cls, context):
         pg = getattr(context.scene, 'psa_export')
         item_list = cls.get_item_list(context)
-        print(item_list)
         visible_sequences = get_visible_sequences(pg, item_list)
         has_unselected_sequences = any(map(lambda item: not item.is_selected, visible_sequences))
         return has_unselected_sequences
