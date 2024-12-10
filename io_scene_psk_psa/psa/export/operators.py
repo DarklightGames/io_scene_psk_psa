@@ -112,7 +112,9 @@ def update_actions_and_timeline_markers(context: Context):
     for armature_object in context.selected_objects:
         if armature_object.type != 'ARMATURE':
             continue
-        action = armature_object.animation_data.action
+        action = armature_object.animation_data.action if armature_object.animation_data else None
+        if action is None:
+            continue
         item = pg.active_action_list.add()
         item.name = action.name
         item.armature_object = armature_object
