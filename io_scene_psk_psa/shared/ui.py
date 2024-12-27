@@ -4,12 +4,8 @@ from .data import bone_filter_mode_items
 
 
 def is_bone_filter_mode_item_available(pg, identifier):
-    match identifier:
-        case 'BONE_COLLECTIONS':
-            if len(pg.bone_collection_list) == 0:
-                return False
-        case _:
-            pass
+    if identifier == 'BONE_COLLECTIONS' and len(pg.bone_collection_list) == 0:
+        return False
     return True
 
 

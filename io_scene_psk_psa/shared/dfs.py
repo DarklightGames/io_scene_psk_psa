@@ -133,11 +133,12 @@ def dfs_view_layer_objects(view_layer: ViewLayer) -> Iterable[DfsObject]:
     @param view_layer: The view layer to inspect.
     @return: An iterable of tuples containing the object, the instance objects, and the world matrix.
     '''
+    visited = set()
     def layer_collection_objects_recursive(layer_collection: LayerCollection):
         for child in layer_collection.children:
             yield from layer_collection_objects_recursive(child)
         # Iterate only the top-level objects in this collection first.
-        yield from _dfs_collection_objects_recursive(layer_collection.collection)
+        yield from _dfs_collection_objects_recursive(layer_collection.collection, visited=visited)
 
     yield from layer_collection_objects_recursive(view_layer.layer_collection)
 
