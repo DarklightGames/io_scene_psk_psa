@@ -30,7 +30,8 @@ jobs:
           sudo apt-get install libxfixes3 -y
           sudo apt-get install libxi-dev -y
           sudo apt-get install libxkbcommon-x11-0 -y
-          sudo apt-get install libgl1-mesa-glx -y
+          sudo apt-get install libgl1 -y
+          sudo apt-get install libglx-mesa0 -y
       - name: Download & Extract Blender
         run: |
           wget -q $BLENDER_URL
