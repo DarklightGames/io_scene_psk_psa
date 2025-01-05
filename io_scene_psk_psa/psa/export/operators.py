@@ -137,6 +137,17 @@ def get_sequence_fps(context: Context, fps_source: str, fps_custom: float, actio
             raise RuntimeError(f'Invalid FPS source "{fps_source}"')
 
 
+def get_sequence_compression_ratio(compression_ratio_source: str, compression_ratio_custom: float, actions: Iterable[Action]) -> float:
+    match compression_ratio_source:
+        case 'ACTION_METADATA':
+            # Get the minimum value of action metadata compression ratio values.
+            return min([action.psa_export.compression_ratio for action in actions])
+        case 'CUSTOM':
+            return compression_ratio_custom
+        case _:
+            raise RuntimeError(f'Invalid compression ratio source "{compression_ratio_source}"')
+
+
 def get_animation_data_object(context: Context) -> Object:
     pg: PSA_PG_export = getattr(context.scene, 'psa_export')
 
@@ -285,25 +296,42 @@ class PSA_OT_export(Operator, ExportHelper):
             sequences_panel.template_list(PSA_UL_export_sequences.bl_idname, '', pg, propname, pg, active_propname,
                                           rows=max(3, min(len(getattr(pg, propname)), 10)))
 
-            flow = sequences_panel.grid_flow()
-            flow.use_property_split = True
-            flow.use_property_decorate = False
-            flow.prop(pg, 'sequence_name_prefix', text='Name Prefix')
-            flow.prop(pg, 'sequence_name_suffix')
+            name_header, name_panel = layout.panel('Name', default_closed=False)
+            name_header.label(text='Name')
+            if name_panel:
+                flow = name_panel.grid_flow()
+                flow.use_property_split = True
+                flow.use_property_decorate = False
+                flow.prop(pg, 'sequence_name_prefix', text='Name Prefix')
+                flow.prop(pg, 'sequence_name_suffix')
 
-            # Determine if there is going to be a naming conflict and display an error, if so.
-            selected_items = [x for x in pg.action_list if x.is_selected]
-            action_names = [x.name for x in selected_items]
-            action_name_counts = Counter(action_names)
-            for action_name, count in action_name_counts.items():
-                if count > 1:
-                    layout.label(text=f'Duplicate action: {action_name}', icon='ERROR')
-                    break
+                # Determine if there is going to be a naming conflict and display an error, if so.
+                selected_items = [x for x in pg.action_list if x.is_selected]
+                action_names = [x.name for x in selected_items]
+                action_name_counts = Counter(action_names)
+                for action_name, count in action_name_counts.items():
+                    if count > 1:
+                        layout.label(text=f'Duplicate action: {action_name}', icon='ERROR')
+                        break
 
-            # FPS
-            flow.prop(pg, 'fps_source')
-            if pg.fps_source == 'CUSTOM':
-                flow.prop(pg, 'fps_custom', text='Custom')
+            data_source_header, data_source_panel = layout.panel('Data Source', default_closed=False)
+            data_source_header.label(text='Data Sources')
+            if data_source_panel:
+                flow = data_source_panel.grid_flow()
+                flow.use_property_split = True
+                flow.use_property_decorate = False
+
+                # FPS
+                col = flow.row(align=True)
+                col.prop(pg, 'fps_source', text='FPS')
+                if pg.fps_source == 'CUSTOM':
+                    col.prop(pg, 'fps_custom', text='')
+
+                # COMPRESSION RATIO
+                col = flow.row(align=True)
+                col.prop(pg, 'compression_ratio_source', text='Compression Ratio')
+                if pg.compression_ratio_source == 'CUSTOM':
+                    col.prop(pg, 'compression_ratio_custom', text='')
 
         # BONES
         bones_header, bones_panel = layout.panel('Bones', default_closed=False)
@@ -406,7 +434,7 @@ class PSA_OT_export(Operator, ExportHelper):
                     export_sequence.nla_state.frame_start = action_item.frame_start
                     export_sequence.nla_state.frame_end = action_item.frame_end
                     export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [action_item.action])
-                    export_sequence.compression_ratio = action_item.action.psa_export.compression_ratio
+                    export_sequence.compression_ratio = get_sequence_compression_ratio(pg.compression_ratio_source, pg.compression_ratio_custom, [action_item.action])
                     export_sequence.key_quota = action_item.action.psa_export.key_quota
                     export_sequences.append(export_sequence)
             case 'TIMELINE_MARKERS':
@@ -418,6 +446,7 @@ class PSA_OT_export(Operator, ExportHelper):
                     nla_strips_actions = set(
                         map(lambda x: x.action, get_nla_strips_in_frame_range(animation_data, marker_item.frame_start, marker_item.frame_end)))
                     export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, nla_strips_actions)
+                    export_sequence.compression_ratio = get_sequence_compression_ratio(pg.compression_ratio_source, pg.compression_ratio_custom, nla_strips_actions)
                     export_sequences.append(export_sequence)
             case 'NLA_TRACK_STRIPS':
                 for nla_strip_item in filter(lambda x: x.is_selected, pg.nla_strip_list):
@@ -426,7 +455,7 @@ class PSA_OT_export(Operator, ExportHelper):
                     export_sequence.nla_state.frame_start = nla_strip_item.frame_start
                     export_sequence.nla_state.frame_end = nla_strip_item.frame_end
                     export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [nla_strip_item.action])
-                    export_sequence.compression_ratio = nla_strip_item.action.psa_export.compression_ratio
+                    export_sequence.compression_ratio = get_sequence_compression_ratio(pg.compression_ratio_source, pg.compression_ratio_custom, [nla_strip_item.action])
                     export_sequence.key_quota = nla_strip_item.action.psa_export.key_quota
                     export_sequences.append(export_sequence)
             case 'ACTIVE_ACTION':
@@ -438,7 +467,7 @@ class PSA_OT_export(Operator, ExportHelper):
                     export_sequence.nla_state.frame_start = int(action.frame_range[0])
                     export_sequence.nla_state.frame_end = int(action.frame_range[1])
                     export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [action])
-                    export_sequence.compression_ratio = action.psa_export.compression_ratio
+                    export_sequence.compression_ratio = get_sequence_compression_ratio(pg.compression_ratio_source, pg.compression_ratio_custom, [action])
                     export_sequence.key_quota = action.psa_export.key_quota
                     export_sequences.append(export_sequence)
             case _:

@@ -156,6 +156,16 @@ class PSA_PG_export(PropertyGroup):
     )
     fps_custom: FloatProperty(default=30.0, min=sys.float_info.epsilon, soft_min=1.0, options=empty_set, step=100,
                               soft_max=60.0)
+    compression_ratio_source: EnumProperty(
+        name='Compression Ratio Source',
+        options=empty_set,
+        description='',
+        items=(
+            ('ACTION_METADATA', 'Action Metadata', 'The compression ratio will be determined by action\'s Compression Ratio property found in the PSA Export panel.\n\nIf the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used', 'ACTION', 1),
+            ('CUSTOM', 'Custom', '', 2)
+        )
+    )
+    compression_ratio_custom: FloatProperty(default=1.0, min=0.0, max=1.0, subtype='FACTOR', description='The key sampling ratio of the exported sequence.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames')
     action_list: CollectionProperty(type=PSA_PG_export_action_list_item)
     action_list_index: IntProperty(default=0)
     marker_list: CollectionProperty(type=PSA_PG_export_timeline_markers)
