@@ -314,12 +314,15 @@ class PSA_OT_export(Operator, ExportHelper):
                         layout.label(text=f'Duplicate action: {action_name}', icon='ERROR')
                         break
 
-            data_source_header, data_source_panel = layout.panel('Data Source', default_closed=False)
-            data_source_header.label(text='Data Sources')
-            if data_source_panel:
-                flow = data_source_panel.grid_flow()
+            sampling_header, sampling_panel = layout.panel('Data Source', default_closed=False)
+            sampling_header.label(text='Sampling')
+            if sampling_panel:
+                flow = sampling_panel.grid_flow()
                 flow.use_property_split = True
                 flow.use_property_decorate = False
+
+                # SAMPLING MODE
+                flow.prop(pg, 'sampling_mode', text='Sampling Mode')
 
                 # FPS
                 col = flow.row(align=True)
@@ -377,6 +380,9 @@ class PSA_OT_export(Operator, ExportHelper):
                 raise RuntimeError(f'All selected armatures must use the same armature data block.\n\n'
                                    f'\The armature data block for "{obj.name}\" (\'{obj.data.name}\') does not match '
                                    f'the active armature data block (\'{context.view_layer.objects.active.name}\')')
+
+        if context.scene.is_nla_tweakmode:
+            raise RuntimeError('Cannot export PSA while in NLA tweak mode')
 
     def invoke(self, context, _event):
         try:
@@ -482,6 +488,7 @@ class PSA_OT_export(Operator, ExportHelper):
         options.sequence_name_suffix = pg.sequence_name_suffix
         options.root_motion = pg.root_motion
         options.scale = pg.scale
+        options.sampling_mode = pg.sampling_mode
 
         try:
             psa = build_psa(context, options)

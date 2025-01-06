@@ -217,6 +217,16 @@ class PSA_PG_export(PropertyGroup):
         min=0.0,
         soft_max=100.0
     )
+    sampling_mode: EnumProperty(
+        name='Sampling Mode',
+        options=empty_set,
+        description='The method by which frames are sampled',
+        items=(
+            ('INTERPOLATED', 'Interpolated', 'Sampling is performed by interpolating the evaluated bone poses from the adjacent whole frames.', 'INTERPOLATED', 0),
+            ('SUBFRAME', 'Subframe', 'Sampling is performed by evaluating the bone poses at the subframe time.\n\nNot recommended unless you are also animating with subframes enabled.', 'SUBFRAME', 1),
+        ),
+        default='INTERPOLATED'
+    )
 
 
 def filter_sequences(pg: PSA_PG_export, sequences) -> List[int]:

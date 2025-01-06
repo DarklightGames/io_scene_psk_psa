@@ -1,6 +1,7 @@
 from typing import Optional
 
 from bpy.types import Bone, Action, PoseBone
+from mathutils import Vector
 
 from .data import *
 from ..shared.helpers import *
@@ -33,6 +34,7 @@ class PsaBuildOptions:
         self.sequence_name_suffix: str = ''
         self.root_motion: bool = False
         self.scale = 1.0
+        self.sampling_mode: str = 'INTERPOLATED'  # One of ('INTERPOLATED', 'SUBFRAME')
 
 
 def _get_pose_bone_location_and_rotation(pose_bone: PoseBone, armature_object: Object, options: PsaBuildOptions):
@@ -184,24 +186,83 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
 
         frame = float(frame_start)
 
-        for _ in range(frame_count):
-            context.scene.frame_set(frame=int(frame), subframe=frame % 1.0)
+        def add_key(location: Vector, rotation: Quaternion):
+            key = Psa.Key()
+            key.location.x = location.x
+            key.location.y = location.y
+            key.location.z = location.z
+            key.rotation.x = rotation.x
+            key.rotation.y = rotation.y
+            key.rotation.z = rotation.z
+            key.rotation.w = rotation.w
+            key.time = 1.0 / psa_sequence.fps
+            psa.keys.append(key)
 
-            for pose_bone in pose_bones:
-                location, rotation = _get_pose_bone_location_and_rotation(pose_bone, export_sequence.armature_object, options)
+        match options.sampling_mode:
+            case 'INTERPOLATED':
+                # Used as a store for the last frame's pose bone locations and rotations.
+                last_frame: Optional[int] = None
+                last_frame_bone_poses: List[Tuple[Vector, Quaternion]] = []
 
-                key = Psa.Key()
-                key.location.x = location.x
-                key.location.y = location.y
-                key.location.z = location.z
-                key.rotation.x = rotation.x
-                key.rotation.y = rotation.y
-                key.rotation.z = rotation.z
-                key.rotation.w = rotation.w
-                key.time = 1.0 / psa_sequence.fps
-                psa.keys.append(key)
+                next_frame: Optional[int] = None
+                next_frame_bone_poses: List[Tuple[Vector, Quaternion]] = []
 
-            frame += frame_step
+                for _ in range(frame_count):
+                    if last_frame is None or last_frame != int(frame):
+                        # Populate the bone poses for frame A.
+                        last_frame = int(frame)
+
+                        # TODO: simplify this code and make it easier to follow!
+                        if next_frame == last_frame:
+                            # Simply transfer the data from next_frame to the last_frame so that we don't need to
+                            # resample anything.
+                            last_frame_bone_poses = next_frame_bone_poses.copy()
+                        else:
+                            last_frame_bone_poses.clear()
+                            context.scene.frame_set(frame=last_frame)
+                            for pose_bone in pose_bones:
+                                location, rotation = _get_pose_bone_location_and_rotation(pose_bone,
+                                                                                          export_sequence.armature_object,
+                                                                                          options)
+                                last_frame_bone_poses.append((location, rotation))
+
+                        next_frame = None
+                        next_frame_bone_poses.clear()
+
+                    # If this is not a subframe, just use the last frame's bone poses.
+                    if frame % 1.0 == 0:
+                        for i in range(len(pose_bones)):
+                            add_key(*last_frame_bone_poses[i])
+                    else:
+                        # Otherwise, this is a subframe, so we need to interpolate the pose between the next frame and the last frame.
+                        if next_frame is None:
+                            next_frame = last_frame + 1
+                            context.scene.frame_set(frame=next_frame)
+                            for pose_bone in pose_bones:
+                                location, rotation = _get_pose_bone_location_and_rotation(pose_bone, export_sequence.armature_object, options)
+                                next_frame_bone_poses.append((location, rotation))
+
+                        factor = frame % 1.0
+
+                        for i in range(len(pose_bones)):
+                            last_location, last_rotation = last_frame_bone_poses[i]
+                            next_location, next_rotation = next_frame_bone_poses[i]
+
+                            location = last_location.lerp(next_location, factor)
+                            rotation = last_rotation.slerp(next_rotation, factor)
+
+                            add_key(location, rotation)
+
+                    frame += frame_step
+            case 'SUBFRAME':
+                for _ in range(frame_count):
+                    context.scene.frame_set(frame=int(frame), subframe=frame % 1.0)
+
+                    for pose_bone in pose_bones:
+                        location, rotation = _get_pose_bone_location_and_rotation(pose_bone, export_sequence.armature_object, options)
+                        add_key(location, rotation)
+
+                    frame += frame_step
 
         frame_start_index += frame_count
 
