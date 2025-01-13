@@ -279,7 +279,7 @@ class PSK_OT_export_collection(Operator, ExportHelper):
         bones_header, bones_panel = layout.panel('Bones', default_closed=False)
         bones_header.label(text='Bones', icon='BONE_DATA')
         if bones_panel:
-            draw_bone_filter_mode(bones_panel, self)
+            draw_bone_filter_mode(bones_panel, self, True)
             if self.bone_filter_mode == 'BONE_COLLECTIONS':
                 bones_panel.operator(PSK_OT_populate_bone_collection_list.bl_idname, icon='FILE_REFRESH')
                 rows = max(3, min(len(self.bone_collection_list), 10))
