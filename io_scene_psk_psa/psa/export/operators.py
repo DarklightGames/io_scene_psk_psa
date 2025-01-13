@@ -1,4 +1,3 @@
-import re
 from collections import Counter
 from typing import List, Iterable, Dict, Tuple, cast, Optional
 
@@ -12,7 +11,7 @@ from .properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_se
     get_sequences_from_name_and_frame_range
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from ..writer import write_psa
-from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range
+from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range, SemanticVersion
 from ...shared.ui import draw_bone_filter_mode
 
 
@@ -33,14 +32,27 @@ def get_sequences_propnames_from_source(sequence_source: str) -> Optional[Tuple[
 def is_action_for_armature(armature: Armature, action: Action):
     if len(action.fcurves) == 0:
         return False
-    bone_names = set([x.name for x in armature.bones])
-    for fcurve in action.fcurves:
-        match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
-        if not match:
-            continue
-        bone_name = match.group(1)
-        if bone_name in bone_names:
-            return True
+
+    version = SemanticVersion(bpy.app.version)
+
+    if version < SemanticVersion((4, 4, 0)):
+        import re
+        bone_names = set([x.name for x in armature.bones])
+        for fcurve in action.fcurves:
+            match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
+            if not match:
+                continue
+            bone_name = match.group(1)
+            if bone_name in bone_names:
+                return True
+    else:
+        # Look up the armature by ID and check if its data block pointer matches the armature.
+        for slot in filter(lambda x: x.id_root == 'OBJECT', action.slots):
+            # Lop off the 'OB' prefix from the identifier for the lookup.
+            object = bpy.data.objects.get(slot.identifier[2:], None)
+            if object and object.data == armature:
+                return True
+
     return False
 
 
