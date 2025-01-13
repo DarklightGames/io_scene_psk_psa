@@ -63,7 +63,7 @@ def populate_bone_collection_list(armature_object: Object, bone_collection_list:
     item.count = sum(map(lambda bone: 1 if len(bone.collections) == 0 else 0, armature.bones))
     item.is_selected = unassigned_collection_is_selected
 
-    for bone_collection_index, bone_collection in enumerate(armature.collections):
+    for bone_collection_index, bone_collection in enumerate(armature.collections_all):
         item = bone_collection_list.add()
         item.name = bone_collection.name
         item.index = bone_collection_index
@@ -92,7 +92,7 @@ def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_c
     # Get a list of the bone indices that we are explicitly including.
     bone_index_stack = []
     is_exporting_unassigned_bone_collections = -1 in bone_collection_indices
-    bone_collections = list(armature_data.collections)
+    bone_collections = list(armature_data.collections_all)
 
     for bone_index, bone in enumerate(bones):
         # Check if this bone is in any of the collections in the bone collection indices list.
