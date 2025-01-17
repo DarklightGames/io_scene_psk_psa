@@ -212,6 +212,60 @@ def _import_psa(context,
     return result
 
 
+class PSA_OT_import_all(Operator, PsaImportMixin):
+    bl_idname = 'psa.import_all'
+    bl_label = 'Import PSA'
+    bl_description = 'Import all sequences from the selected PSA file'
+    bl_options = {'INTERNAL', 'UNDO'}
+
+    filepath: StringProperty(
+        name='File Path',
+        description='File path used for importing the PSA file',
+        maxlen=1024,
+        default='',
+        update=on_psa_file_path_updated)
+
+    @classmethod
+    def poll(cls, context):
+        return psa_import_poll(cls, context)
+
+    def execute(self, context):
+        sequence_names = []
+        with PsaReader(self.filepath) as psa_reader:
+            sequence_names.extend(psa_reader.sequences.keys())
+
+        options = PsaImportOptions(
+            action_name_prefix=self.action_name_prefix,
+            bone_mapping_mode=self.bone_mapping_mode,
+            fps_custom=self.fps_custom,
+            fps_source=self.fps_source,
+            sequence_names=sequence_names,
+            should_convert_to_samples=self.should_convert_to_samples,
+            should_overwrite=self.should_overwrite,
+            should_stash=self.should_stash,
+            should_use_config_file=self.should_use_config_file,
+            should_use_fake_user=self.should_use_fake_user,
+            should_write_keyframes=self.should_write_keyframes,
+            should_write_metadata=self.should_write_metadata,
+            translation_scale=self.translation_scale
+        )
+
+        result = _import_psa(context, options, self.filepath, context.view_layer.objects.active)
+
+        if len(result.warnings) > 0:
+            message = f'Imported {len(options.sequence_names)} action(s) with {len(result.warnings)} warning(s)\n'
+            self.report({'WARNING'}, message)
+            for warning in result.warnings:
+                self.report({'WARNING'}, warning)
+        else:
+            self.report({'INFO'}, f'Imported {len(options.sequence_names)} action(s)')
+
+        return {'FINISHED'}
+
+    def draw(self, context: Context):
+        draw_psa_import_options_no_panels(self.layout, self)
+
+
 class PSA_OT_import(Operator, ImportHelper, PsaImportMixin):
     bl_idname = 'psa.import'
     bl_label = 'Import'
@@ -389,6 +443,7 @@ classes = (
     PSA_OT_import_sequences_deselect_all,
     PSA_OT_import_sequences_select_from_text,
     PSA_OT_import,
+    PSA_OT_import_all,
     PSA_OT_import_drag_and_drop,
     PSA_FH_import,
 )

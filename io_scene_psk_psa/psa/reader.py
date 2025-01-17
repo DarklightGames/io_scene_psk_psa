@@ -34,6 +34,12 @@ class PsaReader(object):
         self.fp = open(path, 'rb')
         self.psa: Psa = self._read(self.fp)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.fp.close()
+
     @property
     def bones(self):
         return self.psa.bones
