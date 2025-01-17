@@ -132,26 +132,26 @@ class PSA_OT_import_drag_and_drop(Operator, PsaImportMixin):
 
     def execute(self, context):
         warnings = []
-        sequence_names = []
+        sequences_count = 0
 
         for file in self.files:
             psa_path = str(os.path.join(self.directory, file.name))
             psa_reader = PsaReader(psa_path)
-            file_sequence_names = list(psa_reader.sequences.keys())
-            options = psa_import_options_from_property_group(self, file_sequence_names)
+            sequence_names = list(psa_reader.sequences.keys())
+            options = psa_import_options_from_property_group(self, sequence_names)
 
-            sequence_names.extend(file_sequence_names)
+            sequences_count += len(sequence_names)
 
             result = _import_psa(context, options, psa_path, context.view_layer.objects.active)
             warnings.extend(result.warnings)
 
         if len(warnings) > 0:
-            message = f'Imported {len(sequence_names)} action(s) with {len(warnings)} warning(s)\n'
+            message = f'Imported {sequences_count} action(s) from {len(self.files)} file(s) with {len(warnings)} warning(s)\n'
             self.report({'INFO'}, message)
             for warning in warnings:
                 self.report({'WARNING'}, warning)
 
-        self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
+        self.report({'INFO'}, f'Imported {sequences_count} action(s) from {len(self.files)} file(s)')
 
         return {'FINISHED'}
 
