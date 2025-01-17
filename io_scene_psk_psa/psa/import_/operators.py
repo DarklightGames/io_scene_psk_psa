@@ -1,19 +1,27 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import Iterable
 
 from bpy.props import StringProperty, CollectionProperty
 from bpy.types import Operator, Event, Context, FileHandler, OperatorFileListElement, Object
 from bpy_extras.io_utils import ImportHelper
 
-from .properties import get_visible_sequences
+from .properties import get_visible_sequences, PsaImportMixin
 from ..config import read_psa_config
 from ..importer import import_psa, PsaImportOptions
 from ..reader import PsaReader
 
 
-class PSA_OT_import_sequences_from_text(Operator):
-    bl_idname = 'psa_import.sequences_select_from_text'
+def psa_import_poll(cls, context: Context):
+    active_object = context.view_layer.objects.active
+    if active_object is None or active_object.type != 'ARMATURE':
+        cls.poll_message_set('The active object must be an armature')
+        return False
+    return True
+
+
+class PSA_OT_import_sequences_select_from_text(Operator):
+    bl_idname = 'psa.import_sequences_select_from_text'
     bl_label = 'Select By Text List'
     bl_description = 'Select sequences by name from text list'
     bl_options = {'INTERNAL', 'UNDO'}
@@ -49,7 +57,7 @@ class PSA_OT_import_sequences_from_text(Operator):
 
 
 class PSA_OT_import_sequences_select_all(Operator):
-    bl_idname = 'psa_import.sequences_select_all'
+    bl_idname = 'psa.import_sequences_select_all'
     bl_label = 'All'
     bl_description = 'Select all sequences'
     bl_options = {'INTERNAL'}
@@ -70,7 +78,7 @@ class PSA_OT_import_sequences_select_all(Operator):
 
 
 class PSA_OT_import_sequences_deselect_all(Operator):
-    bl_idname = 'psa_import.sequences_deselect_all'
+    bl_idname = 'psa.import_sequences_deselect_all'
     bl_label = 'None'
     bl_description = 'Deselect all visible sequences'
     bl_options = {'INTERNAL'}
@@ -113,8 +121,8 @@ def on_psa_file_path_updated(cls, context):
     load_psa_file(context, cls.filepath)
 
 
-class PSA_OT_import_multiple(Operator):
-    bl_idname = 'psa_import.import_multiple'
+class PSA_OT_import_drag_and_drop(Operator, PsaImportMixin):
+    bl_idname = 'psa.import_drag_and_drop'
     bl_label = 'Import PSA'
     bl_description = 'Import multiple PSA files'
     bl_options = {'INTERNAL', 'UNDO'}
@@ -122,23 +130,25 @@ class PSA_OT_import_multiple(Operator):
     directory: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE', 'HIDDEN'})
     files: CollectionProperty(type=OperatorFileListElement, options={'SKIP_SAVE', 'HIDDEN'})
 
-
     def execute(self, context):
-        pg = getattr(context.scene, 'psa_import')
         warnings = []
+        sequence_names = []
 
         for file in self.files:
-            psa_path = os.path.join(self.directory, file.name)
+            psa_path = str(os.path.join(self.directory, file.name))
             psa_reader = PsaReader(psa_path)
-            sequence_names = list(psa_reader.sequences.keys())
+            file_sequence_names = list(psa_reader.sequences.keys())
+            options = psa_import_options_from_property_group(self, file_sequence_names)
 
-            result = _import_psa(context, pg, psa_path, sequence_names, context.view_layer.objects.active)
-            result.warnings.extend(warnings)
+            sequence_names.extend(file_sequence_names)
 
-        if len(result.warnings) > 0:
-            message = f'Imported {len(sequence_names)} action(s) with {len(result.warnings)} warning(s)\n'
+            result = _import_psa(context, options, psa_path, context.view_layer.objects.active)
+            warnings.extend(result.warnings)
+
+        if len(warnings) > 0:
+            message = f'Imported {len(sequence_names)} action(s) with {len(warnings)} warning(s)\n'
             self.report({'INFO'}, message)
-            for warning in result.warnings:
+            for warning in warnings:
                 self.report({'WARNING'}, warning)
 
         self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
@@ -146,7 +156,7 @@ class PSA_OT_import_multiple(Operator):
         return {'FINISHED'}
 
     def invoke(self, context: Context, event):
-        # Make sure the selected object is an armature.
+        # Make sure the selected object is an obj.
         active_object = context.view_layer.objects.active
         if active_object is None or active_object.type != 'ARMATURE':
             self.report({'ERROR_INVALID_CONTEXT'}, 'The active object must be an armature')
@@ -158,18 +168,12 @@ class PSA_OT_import_multiple(Operator):
 
     def draw(self, context):
         layout = self.layout
-        pg = getattr(context.scene, 'psa_import')
-        draw_psa_import_options_no_panels(layout, pg)
+        draw_psa_import_options_no_panels(layout, self)
 
 
-def _import_psa(context,
-                pg,
-                filepath: str,
-                sequence_names: List[str],
-                armature_object: Object
-                ):
+def psa_import_options_from_property_group(pg: PsaImportMixin, sequence_names: Iterable[str]) -> PsaImportOptions:
     options = PsaImportOptions()
-    options.sequence_names = sequence_names
+    options.sequence_names = list(sequence_names)
     options.should_use_fake_user = pg.should_use_fake_user
     options.should_stash = pg.should_stash
     options.action_name_prefix = pg.action_name_prefix if pg.should_use_action_name_prefix else ''
@@ -181,7 +185,14 @@ def _import_psa(context,
     options.fps_source = pg.fps_source
     options.fps_custom = pg.fps_custom
     options.translation_scale = pg.translation_scale
+    return options
 
+
+def _import_psa(context,
+                options: PsaImportOptions,
+                filepath: str,
+                armature_object: Object
+                ):
     warnings = []
 
     if options.should_use_config_file:
@@ -189,7 +200,7 @@ def _import_psa(context,
         config_path = Path(filepath).with_suffix('.config')
         if config_path.exists():
             try:
-                options.psa_config = read_psa_config(sequence_names, str(config_path))
+                options.psa_config = read_psa_config(options.sequence_names, str(config_path))
             except Exception as e:
                 warnings.append(f'Failed to read PSA config file: {e}')
 
@@ -201,8 +212,8 @@ def _import_psa(context,
     return result
 
 
-class PSA_OT_import(Operator, ImportHelper):
-    bl_idname = 'psa_import.import'
+class PSA_OT_import(Operator, ImportHelper, PsaImportMixin):
+    bl_idname = 'psa.import'
     bl_label = 'Import'
     bl_description = 'Import the selected animations into the scene as actions'
     bl_options = {'INTERNAL', 'UNDO'}
@@ -218,29 +229,25 @@ class PSA_OT_import(Operator, ImportHelper):
 
     @classmethod
     def poll(cls, context):
-        active_object = context.view_layer.objects.active
-        if active_object is None or active_object.type != 'ARMATURE':
-            cls.poll_message_set('The active object must be an armature')
-            return False
-        return True
+        return psa_import_poll(cls, context)
 
     def execute(self, context):
         pg = getattr(context.scene, 'psa_import')
-        sequence_names = [x.action_name for x in pg.sequence_list if x.is_selected]
+        options = psa_import_options_from_property_group(self, [x.action_name for x in pg.sequence_list if x.is_selected])
 
-        if len(sequence_names) == 0:
+        if len(options.sequence_names) == 0:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No sequences selected')
             return {'CANCELLED'}
 
-        result = _import_psa(context, pg, self.filepath, sequence_names, context.view_layer.objects.active)
+        result = _import_psa(context, options, self.filepath, context.view_layer.objects.active)
 
         if len(result.warnings) > 0:
-            message = f'Imported {len(sequence_names)} action(s) with {len(result.warnings)} warning(s)\n'
+            message = f'Imported {len(options.sequence_names)} action(s) with {len(result.warnings)} warning(s)\n'
             self.report({'WARNING'}, message)
             for warning in result.warnings:
                 self.report({'WARNING'}, warning)
         else:
-            self.report({'INFO'}, f'Imported {len(sequence_names)} action(s)')
+            self.report({'INFO'}, f'Imported {len(options.sequence_names)} action(s)')
 
         return {'FINISHED'}
 
@@ -271,7 +278,7 @@ class PSA_OT_import(Operator, ImportHelper):
 
                 row2 = col.row(align=True)
                 row2.label(text='Select')
-                row2.operator(PSA_OT_import_sequences_from_text.bl_idname, text='', icon='TEXT')
+                row2.operator(PSA_OT_import_sequences_select_from_text.bl_idname, text='', icon='TEXT')
                 row2.operator(PSA_OT_import_sequences_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
                 row2.operator(PSA_OT_import_sequences_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
 
@@ -281,13 +288,13 @@ class PSA_OT_import(Operator, ImportHelper):
             col = sequences_panel.column(heading='')
             col.use_property_split = True
             col.use_property_decorate = False
-            col.prop(pg, 'fps_source')
-            if pg.fps_source == 'CUSTOM':
-                col.prop(pg, 'fps_custom')
-            col.prop(pg, 'should_overwrite')
-            col.prop(pg, 'should_use_action_name_prefix')
-            if pg.should_use_action_name_prefix:
-                col.prop(pg, 'action_name_prefix')
+            col.prop(self, 'fps_source')
+            if self.fps_source == 'CUSTOM':
+                col.prop(self, 'fps_custom')
+            col.prop(self, 'should_overwrite')
+            col.prop(self, 'should_use_action_name_prefix')
+            if self.should_use_action_name_prefix:
+                col.prop(self, 'action_name_prefix')
 
         data_header, data_panel = layout.panel('data_panel_id', default_closed=False)
         data_header.label(text='Data')
@@ -296,14 +303,14 @@ class PSA_OT_import(Operator, ImportHelper):
             col = data_panel.column(heading='Write')
             col.use_property_split = True
             col.use_property_decorate = False
-            col.prop(pg, 'should_write_keyframes')
-            col.prop(pg, 'should_write_metadata')
+            col.prop(self, 'should_write_keyframes')
+            col.prop(self, 'should_write_metadata')
 
-            if pg.should_write_keyframes:
+            if self.should_write_keyframes:
                 col = col.column(heading='Keyframes')
                 col.use_property_split = True
                 col.use_property_decorate = False
-                col.prop(pg, 'should_convert_to_samples')
+                col.prop(self, 'should_convert_to_samples')
 
         advanced_header, advanced_panel = layout.panel('advanced_panel_id', default_closed=True)
         advanced_header.label(text='Advanced')
@@ -312,22 +319,22 @@ class PSA_OT_import(Operator, ImportHelper):
             col = advanced_panel.column()
             col.use_property_split = True
             col.use_property_decorate = False
-            col.prop(pg, 'bone_mapping_mode')
+            col.prop(self, 'bone_mapping_mode')
 
             col = advanced_panel.column()
             col.use_property_split = True
             col.use_property_decorate = False
-            col.prop(pg, 'translation_scale', text='Translation Scale')
+            col.prop(self, 'translation_scale', text='Translation Scale')
 
             col = advanced_panel.column(heading='Options')
             col.use_property_split = True
             col.use_property_decorate = False
-            col.prop(pg, 'should_use_fake_user')
-            col.prop(pg, 'should_stash')
-            col.prop(pg, 'should_use_config_file')
+            col.prop(self, 'should_use_fake_user')
+            col.prop(self, 'should_stash')
+            col.prop(self, 'should_use_config_file')
 
 
-def draw_psa_import_options_no_panels(layout, pg):
+def draw_psa_import_options_no_panels(layout, pg: PsaImportMixin):
     col = layout.column(heading='Sequences')
     col.use_property_split = True
     col.use_property_decorate = False
@@ -365,11 +372,11 @@ def draw_psa_import_options_no_panels(layout, pg):
     col.prop(pg, 'should_use_config_file')
 
 
-class PSA_FH_import(FileHandler):
+class PSA_FH_import(FileHandler):  # TODO: rename and add handling for PSA export.
     bl_idname = 'PSA_FH_import'
     bl_label = 'File handler for Unreal PSA import'
-    bl_import_operator = 'psa_import.import_multiple'
-    bl_export_operator = 'psa_export.export'
+    bl_import_operator = PSA_OT_import_drag_and_drop.bl_idname
+    # bl_export_operator = 'psa_export.export'
     bl_file_extensions = '.psa'
 
     @classmethod
@@ -380,8 +387,8 @@ class PSA_FH_import(FileHandler):
 classes = (
     PSA_OT_import_sequences_select_all,
     PSA_OT_import_sequences_deselect_all,
-    PSA_OT_import_sequences_from_text,
+    PSA_OT_import_sequences_select_from_text,
     PSA_OT_import,
-    PSA_OT_import_multiple,
+    PSA_OT_import_drag_and_drop,
     PSA_FH_import,
 )

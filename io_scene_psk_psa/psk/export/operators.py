@@ -5,7 +5,7 @@ from bpy.props import StringProperty
 from bpy.types import Operator, Context, Object, Collection, SpaceProperties, Depsgraph, Material
 from bpy_extras.io_utils import ExportHelper
 
-from .properties import add_psk_export_properties
+from .properties import PskExportMixin
 from ..builder import build_psk, PskBuildOptions, get_psk_input_objects_for_context, \
     get_psk_input_objects_for_collection
 from ..writer import write_psk
@@ -14,16 +14,16 @@ from ...shared.ui import draw_bone_filter_mode
 
 
 def get_materials_for_mesh_objects(depsgraph: Depsgraph, mesh_objects: Iterable[Object]):
-    materials = []
+    yielded_materials = set()
     for mesh_object in mesh_objects:
         evaluated_mesh_object = mesh_object.evaluated_get(depsgraph)
         for i, material_slot in enumerate(evaluated_mesh_object.material_slots):
             material = material_slot.material
             if material is None:
                 raise RuntimeError('Material slot cannot be empty (index ' + str(i) + ')')
-            if material not in materials:
-                materials.append(material)
-    return materials
+            if material not in yielded_materials:
+                yielded_materials.add(material)
+                yield material
 
 
 def populate_material_name_list(depsgraph: Depsgraph, mesh_objects, material_list):
@@ -60,7 +60,7 @@ def get_collection_export_operator_from_context(context: Context) -> Optional[ob
 
 
 class PSK_OT_populate_bone_collection_list(Operator):
-    bl_idname = 'psk_export.populate_bone_collection_list'
+    bl_idname = 'psk.export_populate_bone_collection_list'
     bl_label = 'Populate Bone Collection List'
     bl_description = 'Populate the bone collection list from the armature that will be used in this collection export'
     bl_options = {'INTERNAL'}
@@ -79,7 +79,7 @@ class PSK_OT_populate_bone_collection_list(Operator):
 
 
 class PSK_OT_populate_material_name_list(Operator):
-    bl_idname = 'psk_export.populate_material_name_list'
+    bl_idname = 'psk.export_populate_material_name_list'
     bl_label = 'Populate Material Name List'
     bl_description = 'Populate the material name list from the objects that will be used in this export'
     bl_options = {'INTERNAL'}
@@ -100,7 +100,7 @@ class PSK_OT_populate_material_name_list(Operator):
 
 
 class PSK_OT_material_list_move_up(Operator):
-    bl_idname = 'psk_export.material_list_item_move_up'
+    bl_idname = 'psk.export_material_list_item_move_up'
     bl_label = 'Move Up'
     bl_options = {'INTERNAL'}
     bl_description = 'Move the selected material up one slot'
@@ -118,7 +118,7 @@ class PSK_OT_material_list_move_up(Operator):
 
 
 class PSK_OT_material_list_move_down(Operator):
-    bl_idname = 'psk_export.material_list_item_move_down'
+    bl_idname = 'psk.export_material_list_item_move_down'
     bl_label = 'Move Down'
     bl_options = {'INTERNAL'}
     bl_description = 'Move the selected material down one slot'
@@ -136,7 +136,7 @@ class PSK_OT_material_list_move_down(Operator):
 
 
 class PSK_OT_material_list_name_move_up(Operator):
-    bl_idname = 'psk_export.material_name_list_item_move_up'
+    bl_idname = 'psk.export_material_name_list_item_move_up'
     bl_label = 'Move Up'
     bl_options = {'INTERNAL'}
     bl_description = 'Move the selected material name up one slot'
@@ -159,7 +159,7 @@ class PSK_OT_material_list_name_move_up(Operator):
 
 
 class PSK_OT_material_list_name_move_down(Operator):
-    bl_idname = 'psk_export.material_name_list_item_move_down'
+    bl_idname = 'psk.export_material_name_list_item_move_down'
     bl_label = 'Move Down'
     bl_options = {'INTERNAL'}
     bl_description = 'Move the selected material name down one slot'
@@ -218,8 +218,8 @@ def get_psk_build_options_from_property_group(mesh_objects: Iterable[Object],  p
     return options
 
 
-class PSK_OT_export_collection(Operator, ExportHelper):
-    bl_idname = 'export.psk_collection'
+class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
+    bl_idname = 'psk.export_collection'
     bl_label = 'Export'
     bl_options = {'INTERNAL'}
     filename_ext = '.psk'
@@ -312,12 +312,8 @@ class PSK_OT_export_collection(Operator, ExportHelper):
 
 
 
-add_psk_export_properties(PSK_OT_export_collection)
-
-
-
 class PSK_OT_export(Operator, ExportHelper):
-    bl_idname = 'export.psk'
+    bl_idname = 'psk.export'
     bl_label = 'Export'
     bl_options = {'INTERNAL', 'UNDO'}
     bl_description = 'Export mesh and armature to PSK'

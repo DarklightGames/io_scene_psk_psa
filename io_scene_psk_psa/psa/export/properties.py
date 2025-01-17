@@ -1,7 +1,7 @@
 import re
 import sys
 from fnmatch import fnmatch
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from bpy.props import BoolProperty, PointerProperty, EnumProperty, FloatProperty, CollectionProperty, IntProperty, \
     StringProperty
@@ -52,18 +52,16 @@ class PSA_PG_export_nla_strip_list_item(PropertyGroup):
     is_selected: BoolProperty(default=True)
 
 
-def get_sequences_from_name_and_frame_range(name: str, frame_start: int, frame_end: int) -> List[Tuple[str, int, int]]:
+def get_sequences_from_name_and_frame_range(name: str, frame_start: int, frame_end: int):
     reversed_pattern = r'(.+)/(.+)'
     reversed_match = re.match(reversed_pattern, name)
     if reversed_match:
         forward_name = reversed_match.group(1)
         backwards_name = reversed_match.group(2)
-        return [
-            (forward_name, frame_start, frame_end),
-            (backwards_name, frame_end, frame_start)
-        ]
+        yield forward_name, frame_start, frame_end
+        yield backwards_name, frame_end, frame_start
     else:
-        return [(name, frame_start, frame_end)]
+        yield name, frame_start, frame_end
 
 
 def nla_track_update_cb(self: 'PSA_PG_export', context: Context) -> None:

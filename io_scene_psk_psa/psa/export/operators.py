@@ -1,9 +1,9 @@
 from collections import Counter
-from typing import List, Iterable, Dict, Tuple, cast, Optional
+from typing import List, Iterable, Dict, Tuple, Optional
 
 import bpy
 from bpy.props import StringProperty
-from bpy.types import Context, Armature, Action, Object, AnimData, TimelineMarker
+from bpy.types import Context, Action, Object, AnimData, TimelineMarker
 from bpy_extras.io_utils import ExportHelper
 from bpy_types import Operator
 
@@ -29,15 +29,22 @@ def get_sequences_propnames_from_source(sequence_source: str) -> Optional[Tuple[
             raise ValueError(f'Unhandled sequence source: {sequence_source}')
 
 
-def is_action_for_armature(armature: Armature, action: Action):
+def is_action_for_object(obj: Object, action: Action):
     if len(action.fcurves) == 0:
+        return False
+
+    if obj.animation_data is None:
+        return False
+
+    if obj.type != 'ARMATURE':
         return False
 
     version = SemanticVersion(bpy.app.version)
 
     if version < SemanticVersion((4, 4, 0)):
         import re
-        bone_names = set([x.name for x in armature.bones])
+        armature_data = obj.data
+        bone_names = set([x.name for x in armature_data.bones])
         for fcurve in action.fcurves:
             match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
             if not match:
@@ -46,12 +53,9 @@ def is_action_for_armature(armature: Armature, action: Action):
             if bone_name in bone_names:
                 return True
     else:
-        # Look up the armature by ID and check if its data block pointer matches the armature.
-        for slot in filter(lambda x: x.id_root == 'OBJECT', action.slots):
-            # Lop off the 'OB' prefix from the identifier for the lookup.
-            object = bpy.data.objects.get(slot.identifier[2:], None)
-            if object and object.data == armature:
-                return True
+        # In 4.4.0 and later, we can check if the object's action slot handle matches an action slot handle in the action.
+        if any(obj.animation_data.action_slot_handle == slot.handle for slot in action.slots):
+            return True
 
     return False
 
@@ -71,22 +75,20 @@ def update_actions_and_timeline_markers(context: Context):
     if animation_data is None:
         return
 
-    active_armature = cast(Armature, context.active_object.data)
-
     # Populate actions list.
     for action in bpy.data.actions:
-        if not is_action_for_armature(active_armature, action):
+        if not is_action_for_object(context.active_object, action):
             continue
 
-        if action.name != '' and not action.name.startswith('#'):
-            for (name, frame_start, frame_end) in get_sequences_from_action(action):
-                item = pg.action_list.add()
-                item.action = action
-                item.name = name
-                item.is_selected = False
-                item.is_pose_marker = False
-                item.frame_start = frame_start
-                item.frame_end = frame_end
+        for (name, frame_start, frame_end) in get_sequences_from_action(action):
+            print(name)
+            item = pg.action_list.add()
+            item.action = action
+            item.name = name
+            item.is_selected = False
+            item.is_pose_marker = False
+            item.frame_start = frame_start
+            item.frame_end = frame_end
 
         # Pose markers are not guaranteed to be in frame-order, so make sure that they are.
         pose_markers = sorted(action.pose_markers, key=lambda x: x.frame)
@@ -217,13 +219,15 @@ def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context:
     return sequence_frame_ranges
 
 
-def get_sequences_from_action(action: Action) -> List[Tuple[str, int, int]]:
+def get_sequences_from_action(action: Action):
+    if action.name == '' or action.name.startswith('#'):
+        return
     frame_start = int(action.frame_range[0])
     frame_end = int(action.frame_range[1])
-    return get_sequences_from_name_and_frame_range(action.name, frame_start, frame_end)
+    yield from get_sequences_from_name_and_frame_range(action.name, frame_start, frame_end)
 
 
-def get_sequences_from_action_pose_markers(action: Action, pose_markers: List[TimelineMarker], pose_marker: TimelineMarker, pose_marker_index: int) -> List[Tuple[str, int, int]]:
+def get_sequences_from_action_pose_markers(action: Action, pose_markers: List[TimelineMarker], pose_marker: TimelineMarker, pose_marker_index: int):
     frame_start = pose_marker.frame
     sequence_name = pose_marker.name
     if pose_marker.name.startswith('!'):
@@ -234,7 +238,7 @@ def get_sequences_from_action_pose_markers(action: Action, pose_markers: List[Ti
         frame_end = pose_markers[pose_marker_index + 1].frame
     else:
         frame_end = int(action.frame_range[1])
-    return get_sequences_from_name_and_frame_range(sequence_name, frame_start, frame_end)
+    yield from get_sequences_from_name_and_frame_range(sequence_name, frame_start, frame_end)
 
 
 def get_visible_sequences(pg: PSA_PG_export, sequences) -> List[PSA_PG_export_action_list_item]:
@@ -246,7 +250,7 @@ def get_visible_sequences(pg: PSA_PG_export, sequences) -> List[PSA_PG_export_ac
 
 
 class PSA_OT_export(Operator, ExportHelper):
-    bl_idname = 'psa_export.operator'
+    bl_idname = 'psa.export'
     bl_label = 'Export'
     bl_options = {'INTERNAL', 'UNDO'}
     bl_description = 'Export actions to PSA'
@@ -515,7 +519,7 @@ class PSA_OT_export(Operator, ExportHelper):
 
 
 class PSA_OT_export_actions_select_all(Operator):
-    bl_idname = 'psa_export.sequences_select_all'
+    bl_idname = 'psa.export_actions_select_all'
     bl_label = 'Select All'
     bl_description = 'Select all visible sequences'
     bl_options = {'INTERNAL'}
@@ -552,7 +556,7 @@ class PSA_OT_export_actions_select_all(Operator):
 
 
 class PSA_OT_export_actions_deselect_all(Operator):
-    bl_idname = 'psa_export.sequences_deselect_all'
+    bl_idname = 'psa.export_sequences_deselect_all'
     bl_label = 'Deselect All'
     bl_description = 'Deselect all visible sequences'
     bl_options = {'INTERNAL'}
@@ -587,7 +591,7 @@ class PSA_OT_export_actions_deselect_all(Operator):
 
 
 class PSA_OT_export_bone_collections_select_all(Operator):
-    bl_idname = 'psa_export.bone_collections_select_all'
+    bl_idname = 'psa.export_bone_collections_select_all'
     bl_label = 'Select All'
     bl_description = 'Select all bone collections'
     bl_options = {'INTERNAL'}
@@ -607,7 +611,7 @@ class PSA_OT_export_bone_collections_select_all(Operator):
 
 
 class PSA_OT_export_bone_collections_deselect_all(Operator):
-    bl_idname = 'psa_export.bone_collections_deselect_all'
+    bl_idname = 'psa.export_bone_collections_deselect_all'
     bl_label = 'Deselect All'
     bl_description = 'Deselect all bone collections'
     bl_options = {'INTERNAL'}

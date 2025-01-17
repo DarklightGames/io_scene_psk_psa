@@ -12,21 +12,36 @@ from .reader import PsaReader
 
 
 class PsaImportOptions(object):
-    def __init__(self):
-        self.should_use_fake_user = False
-        self.should_stash = False
-        self.sequence_names = []
-        self.should_overwrite = False
-        self.should_write_keyframes = True
-        self.should_write_metadata = True
-        self.action_name_prefix = ''
-        self.should_convert_to_samples = False
-        self.bone_mapping_mode = 'CASE_INSENSITIVE'
-        self.fps_source = 'SEQUENCE'
-        self.fps_custom: float = 30.0
-        self.translation_scale: float = 1.0
-        self.should_use_config_file = True
-        self.psa_config: PsaConfig = PsaConfig()
+    def __init__(self,
+                 action_name_prefix: str = '',
+                 bone_mapping_mode: str = 'CASE_INSENSITIVE',
+                 fps_custom: float = 30.0,
+                 fps_source: str = 'SEQUENCE',
+                 psa_config: PsaConfig = PsaConfig(),
+                 sequence_names: List[str] = None,
+                 should_convert_to_samples: bool = False,
+                 should_overwrite: bool = False,
+                 should_stash: bool = False,
+                 should_use_config_file: bool = True,
+                 should_use_fake_user: bool = False,
+                 should_write_keyframes: bool = True,
+                 should_write_metadata: bool = True,
+                 translation_scale: float = 1.0
+                 ):
+        self.action_name_prefix = action_name_prefix
+        self.bone_mapping_mode = bone_mapping_mode
+        self.fps_custom = fps_custom
+        self.fps_source = fps_source
+        self.psa_config = psa_config
+        self.sequence_names = sequence_names if sequence_names is not None else []
+        self.should_convert_to_samples = should_convert_to_samples
+        self.should_overwrite = should_overwrite
+        self.should_stash = should_stash
+        self.should_use_config_file = should_use_config_file
+        self.should_use_fake_user = should_use_fake_user
+        self.should_write_keyframes = should_write_keyframes
+        self.should_write_metadata = should_write_metadata
+        self.translation_scale = translation_scale
 
 
 class ImportBone(object):

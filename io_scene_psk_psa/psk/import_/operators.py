@@ -1,11 +1,11 @@
 import os
-import sys
 
-from bpy.props import StringProperty, BoolProperty, EnumProperty, FloatProperty
+from bpy.props import StringProperty
 from bpy.types import Operator, FileHandler, Context
 from bpy_extras.io_utils import ImportHelper
 
 from ..importer import PskImportOptions, import_psk
+from ..properties import PskImportMixin
 from ..reader import read_psk
 
 empty_set = set()
@@ -23,8 +23,8 @@ class PSK_FH_import(FileHandler):
         return context.area and context.area.type == 'VIEW_3D'
 
 
-class PSK_OT_import(Operator, ImportHelper):
-    bl_idname = 'import_scene.psk'
+class PSK_OT_import(Operator, ImportHelper, PskImportMixin):
+    bl_idname = 'psk.import'
     bl_label = 'Import'
     bl_options = {'INTERNAL', 'UNDO', 'PRESET'}
     bl_description = 'Import a PSK file'
@@ -35,79 +35,6 @@ class PSK_OT_import(Operator, ImportHelper):
         description='File path used for exporting the PSK file',
         maxlen=1024,
         default='')
-
-    should_import_vertex_colors: BoolProperty(
-        default=True,
-        options=empty_set,
-        name='Import Vertex Colors',
-        description='Import vertex colors, if available'
-    )
-    vertex_color_space: EnumProperty(
-        name='Vertex Color Space',
-        options=empty_set,
-        description='The source vertex color space',
-        default='SRGBA',
-        items=(
-            ('LINEAR', 'Linear', ''),
-            ('SRGBA', 'sRGBA', ''),
-        )
-    )
-    should_import_vertex_normals: BoolProperty(
-        default=True,
-        name='Import Vertex Normals',
-        options=empty_set,
-        description='Import vertex normals, if available'
-    )
-    should_import_extra_uvs: BoolProperty(
-        default=True,
-        name='Import Extra UVs',
-        options=empty_set,
-        description='Import extra UV maps, if available'
-    )
-    should_import_mesh: BoolProperty(
-        default=True,
-        name='Import Mesh',
-        options=empty_set,
-        description='Import mesh'
-    )
-    should_import_materials: BoolProperty(
-        default=True,
-        name='Import Materials',
-        options=empty_set,
-    )
-    should_import_skeleton: BoolProperty(
-        default=True,
-        name='Import Skeleton',
-        options=empty_set,
-        description='Import skeleton'
-    )
-    bone_length: FloatProperty(
-        default=1.0,
-        min=sys.float_info.epsilon,
-        step=100,
-        soft_min=1.0,
-        name='Bone Length',
-        options=empty_set,
-        subtype='DISTANCE',
-        description='Length of the bones'
-    )
-    should_import_shape_keys: BoolProperty(
-        default=True,
-        name='Import Shape Keys',
-        options=empty_set,
-        description='Import shape keys, if available'
-    )
-    scale: FloatProperty(
-        name='Scale',
-        default=1.0,
-        soft_min=0.0,
-    )
-    bdk_repository_id: StringProperty(
-        name='BDK Repository ID',
-        default='',
-        options=empty_set,
-        description='The ID of the BDK repository to use for loading materials'
-    )
 
     def execute(self, context):
         psk = read_psk(self.filepath)
@@ -152,7 +79,6 @@ class PSK_OT_import(Operator, ImportHelper):
         col.use_property_split = True
         col.use_property_decorate = False
         col.prop(self, 'scale')
-        col.prop(self, 'export_space')
 
         mesh_header, mesh_panel = layout.panel('mesh_panel_id', default_closed=False)
         mesh_header.prop(self, 'should_import_mesh')
