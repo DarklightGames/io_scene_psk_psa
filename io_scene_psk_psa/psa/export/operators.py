@@ -222,9 +222,18 @@ def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context:
 def get_sequences_from_action(action: Action):
     if action.name == '' or action.name.startswith('#'):
         return
+
     frame_start = int(action.frame_range[0])
-    frame_end = int(action.frame_range[1])
-    yield from get_sequences_from_name_and_frame_range(action.name, frame_start, frame_end)
+    action_name = action.name
+
+    if action_name.startswith('!'):
+        # If the pose marker name starts with an exclamation mark, only export the first frame.
+        frame_end = frame_start
+        action_name = action_name[1:]
+    else:
+        frame_end = int(action.frame_range[1])
+
+    yield from get_sequences_from_name_and_frame_range(action_name, frame_start, frame_end)
 
 
 def get_sequences_from_action_pose_markers(action: Action, pose_markers: List[TimelineMarker], pose_marker: TimelineMarker, pose_marker_index: int):
