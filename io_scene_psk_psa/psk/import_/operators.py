@@ -11,18 +11,6 @@ from ..reader import read_psk
 empty_set = set()
 
 
-class PSK_FH_import(FileHandler):
-    bl_idname = 'PSK_FH_import'
-    bl_label = 'Unreal PSK'
-    bl_import_operator = 'import_scene.psk'
-    bl_export_operator = 'export.psk_collection'
-    bl_file_extensions = '.psk;.pskx'
-
-    @classmethod
-    def poll_drop(cls, context: Context):
-        return context.area and context.area.type == 'VIEW_3D'
-
-
 class PSK_OT_import(Operator, ImportHelper, PskImportMixin):
     bl_idname = 'psk.import'
     bl_label = 'Import'
@@ -106,6 +94,18 @@ class PSK_OT_import(Operator, ImportHelper, PskImportMixin):
             col.use_property_decorate = False
             col.prop(self, 'bone_length')
 
+
+# TODO: move to another file
+class PSK_FH_import(FileHandler):
+    bl_idname = 'PSK_FH_import'
+    bl_label = 'Unreal PSK'
+    bl_import_operator = PSK_OT_import.bl_idname
+    bl_export_operator = 'psk.export_collection'
+    bl_file_extensions = '.psk;.pskx'
+
+    @classmethod
+    def poll_drop(cls, context: Context):
+        return context.area and context.area.type == 'VIEW_3D'
 
 classes = (
     PSK_OT_import,
