@@ -383,11 +383,14 @@ class PSA_OT_export(Operator, ExportHelper):
         transform_header.label(text='Transform')
 
         if transform_panel:
-            flow = transform_panel.grid_flow()
+            flow = transform_panel.grid_flow(row_major=True)
             flow.use_property_split = True
             flow.use_property_decorate = False
-            flow.prop(pg, 'root_motion', text='Root Motion')
-            flow.prop(pg, 'scale', text='Scale')
+            flow.prop(pg, 'root_motion')
+            flow.prop(pg, 'export_space')
+            flow.prop(pg, 'scale')
+            flow.prop(pg, 'forward_axis')
+            flow.prop(pg, 'up_axis')
 
     @classmethod
     def _check_context(cls, context):
@@ -514,6 +517,9 @@ class PSA_OT_export(Operator, ExportHelper):
         options.root_motion = pg.root_motion
         options.scale = pg.scale
         options.sampling_mode = pg.sampling_mode
+        options.export_space = pg.export_space
+        options.forward_axis = pg.forward_axis
+        options.up_axis = pg.up_axis
 
         try:
             psa = build_psa(context, options)

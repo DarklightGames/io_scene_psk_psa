@@ -4,6 +4,9 @@ import bpy
 from bpy.props import CollectionProperty
 from bpy.types import AnimData, Object
 from bpy.types import Armature
+from mathutils import Matrix
+
+from .data import get_coordinate_system_transform
 
 
 def rgb_to_srgb(c: float):
@@ -208,3 +211,90 @@ class SemanticVersion(object):
 
     def __hash__(self):
         return hash((self.major, self.minor, self.patch))
+
+
+def convert_blender_bones_to_psx_bones(
+        bones: List[bpy.types.Bone],
+        bone_class: type,
+        export_space: str = 'WORLD',        # perhaps export space should just be a transform matrix, since the below is not actually used unless we're using WORLD space.
+        armature_object_matrix_world: Matrix = Matrix.Identity(4),
+        scale = 1.0,
+        forward_axis: str = 'X',
+        up_axis: str = 'Z'
+) -> Iterable[type]:
+    '''
+    Function that converts a Blender bone list into a bone list that
+    @param bones:
+    @return:
+    '''
+    scale_matrix = Matrix.Scale(scale, 4)
+
+    coordinate_system_transform = get_coordinate_system_transform(forward_axis, up_axis)
+    coordinate_system_default_rotation = coordinate_system_transform.to_quaternion()
+
+    psx_bones = []
+    for bone in bones:
+        psx_bone = bone_class()
+
+        try:
+            psx_bone.name = bytes(bone.name, encoding='windows-1252')
+        except UnicodeEncodeError:
+            raise RuntimeError(
+                f'Bone name "{bone.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
+
+        # TODO: flags & children_count should be initialized to zero anyways, so we can probably remove these lines?
+        psx_bone.flags = 0
+        psx_bone.children_count = 0
+
+        try:
+            parent_index = bones.index(bone.parent)
+            psx_bone.parent_index = parent_index
+            psx_bones[parent_index].children_count += 1
+        except ValueError:
+            psx_bone.parent_index = 0
+
+        if bone.parent is not None:
+            rotation = bone.matrix.to_quaternion().conjugated()
+            inverse_parent_rotation = bone.parent.matrix.to_quaternion().inverted()
+            parent_head = inverse_parent_rotation @ bone.parent.head
+            parent_tail = inverse_parent_rotation @ bone.parent.tail
+            location = (parent_tail - parent_head) + bone.head
+        else:
+            def get_armature_local_matrix():
+                match export_space:
+                    case 'WORLD':
+                        return armature_object_matrix_world
+                    case 'ARMATURE':
+                        return Matrix.Identity(4)
+                    case _:
+                        raise ValueError(f'Invalid export space: {export_space}')
+
+            armature_local_matrix = get_armature_local_matrix()
+            location = armature_local_matrix @ bone.head
+            location = coordinate_system_transform @ location
+            bone_rotation = bone.matrix.to_quaternion().conjugated()
+            local_rotation = armature_local_matrix.to_3x3().to_quaternion().conjugated()
+            rotation = bone_rotation @ local_rotation
+            rotation.conjugate()
+            rotation = coordinate_system_default_rotation @ rotation
+
+        location = scale_matrix @ location
+
+        # If the armature object has been scaled, we need to scale the bone's location to match.
+        _, _, armature_object_scale = armature_object_matrix_world.decompose()
+        location.x *= armature_object_scale.x
+        location.y *= armature_object_scale.y
+        location.z *= armature_object_scale.z
+
+        psx_bone.location.x = location.x
+        psx_bone.location.y = location.y
+        psx_bone.location.z = location.z
+
+        psx_bone.rotation.w = rotation.w
+        psx_bone.rotation.x = rotation.x
+        psx_bone.rotation.y = rotation.y
+        psx_bone.rotation.z = rotation.z
+
+        psx_bones.append(psx_bone)
+
+    return psx_bones

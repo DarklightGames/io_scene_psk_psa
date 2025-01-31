@@ -4,7 +4,6 @@ from typing import Optional
 import bmesh
 import numpy as np
 from bpy.types import Material, Collection, Context
-from mathutils import Matrix, Vector
 
 from .data import *
 from .properties import triangle_type_and_bit_flags_to_poly_flags
@@ -28,34 +27,6 @@ class PskBuildOptions(object):
         self.export_space = 'WORLD'
         self.forward_axis = 'X'
         self.up_axis = 'Z'
-
-
-def get_vector_from_axis_identifier(axis_identifier: str) -> Vector:
-    match axis_identifier:
-        case 'X':
-            return Vector((1.0, 0.0, 0.0))
-        case 'Y':
-            return Vector((0.0, 1.0, 0.0))
-        case 'Z':
-            return Vector((0.0, 0.0, 1.0))
-        case '-X':
-            return Vector((-1.0, 0.0, 0.0))
-        case '-Y':
-            return Vector((0.0, -1.0, 0.0))
-        case '-Z':
-            return Vector((0.0, 0.0, -1.0))
-
-
-def get_coordinate_system_transform(forward_axis: str = 'X', up_axis: str = 'Z') -> Matrix:
-    forward = get_vector_from_axis_identifier(forward_axis)
-    up = get_vector_from_axis_identifier(up_axis)
-    left = up.cross(forward)
-    return Matrix((
-        (forward.x, forward.y, forward.z, 0.0),
-        (left.x, left.y, left.z, 0.0),
-        (up.x, up.y, up.z, 0.0),
-        (0.0, 0.0, 0.0, 1.0)
-    )).inverted()
 
 
 def get_mesh_objects_for_collection(collection: Collection) -> Iterable[DfsObject]:
@@ -143,7 +114,12 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
     coordinate_system_default_rotation = coordinate_system_matrix.to_quaternion()
 
     export_space_matrix = get_export_space_matrix()  # TODO: maybe neutralize the scale here?
-    scale_matrix = coordinate_system_matrix @ Matrix.Scale(options.scale, 4)
+    scale_matrix = Matrix.Scale(options.scale, 4)
+
+    # We effectively need 3 transforms, I think:
+    # 1. The transform for the mesh vertices.
+    # 2. The transform for the bone locations.
+    # 3. The transform for the bone rotations.
 
     if armature_object is None or len(armature_object.data.bones) == 0:
         # If the mesh has no armature object or no bones, simply assign it a dummy bone at the root to satisfy the
@@ -161,65 +137,14 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
         armature_data = typing.cast(Armature, armature_object.data)
         bones = [armature_data.bones[bone_name] for bone_name in bone_names]
 
-        for bone in bones:
-            psk_bone = Psk.Bone()
-            try:
-                psk_bone.name = bytes(bone.name, encoding='windows-1252')
-            except UnicodeEncodeError:
-                raise RuntimeError(
-                    f'Bone name "{bone.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
-            psk_bone.flags = 0
-            psk_bone.children_count = 0
-
-            try:
-                parent_index = bones.index(bone.parent)
-                psk_bone.parent_index = parent_index
-                psk.bones[parent_index].children_count += 1
-            except ValueError:
-                psk_bone.parent_index = 0
-
-            if bone.parent is not None:
-                rotation = bone.matrix.to_quaternion().conjugated()
-                inverse_parent_rotation = bone.parent.matrix.to_quaternion().inverted()
-                parent_head = inverse_parent_rotation @ bone.parent.head
-                parent_tail = inverse_parent_rotation @ bone.parent.tail
-                location = (parent_tail - parent_head) + bone.head
-            else:
-                def get_armature_local_matrix():
-                    match options.export_space:
-                        case 'WORLD':
-                            return armature_object.matrix_world
-                        case 'ARMATURE':
-                            return Matrix.Identity(4)
-                        case _:
-                            raise ValueError(f'Invalid export space: {options.export_space}')
-
-                armature_local_matrix = get_armature_local_matrix()
-                location = armature_local_matrix @ bone.head
-                bone_rotation = bone.matrix.to_quaternion().conjugated()
-                local_rotation = armature_local_matrix.to_3x3().to_quaternion().conjugated()
-                rotation = bone_rotation @ local_rotation
-                rotation.conjugate()
-                rotation = coordinate_system_default_rotation @ rotation
-
-            location = scale_matrix @ location
-
-            # If the armature object has been scaled, we need to scale the bone's location to match.
-            _, _, armature_object_scale = armature_object.matrix_world.decompose()
-            location.x *= armature_object_scale.x
-            location.y *= armature_object_scale.y
-            location.z *= armature_object_scale.z
-
-            psk_bone.location.x = location.x
-            psk_bone.location.y = location.y
-            psk_bone.location.z = location.z
-
-            psk_bone.rotation.w = rotation.w
-            psk_bone.rotation.x = rotation.x
-            psk_bone.rotation.y = rotation.y
-            psk_bone.rotation.z = rotation.z
-
-            psk.bones.append(psk_bone)
+        psk.bones = convert_blender_bones_to_psx_bones(
+            bones, Psk.Bone,
+            options.export_space,
+            armature_object.matrix_world,
+            options.scale,
+            options.forward_axis,
+            options.up_axis
+        )
 
     # MATERIALS
     for material in options.materials:
@@ -247,6 +172,8 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
     context.window_manager.progress_begin(0, len(input_objects.mesh_objects))
 
     material_names = [m.name for m in options.materials]
+
+    vertex_transform_matrix = scale_matrix @ coordinate_system_matrix @ export_space_matrix
 
     for object_index, input_mesh_object in enumerate(input_objects.mesh_objects):
 
@@ -329,12 +256,12 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
                 raise ValueError(f'Invalid object evaluation state: {options.object_eval_state}')
 
         vertex_offset = len(psk.points)
-        matrix_world = scale_matrix @ export_space_matrix @ mesh_object.matrix_world
+        point_transform_matrix = vertex_transform_matrix @ mesh_object.matrix_world
 
         # VERTICES
         for vertex in mesh_data.vertices:
             point = Vector3()
-            v = matrix_world @ vertex.co
+            v = point_transform_matrix @ vertex.co
             point.x = v.x
             point.y = v.y
             point.z = v.z

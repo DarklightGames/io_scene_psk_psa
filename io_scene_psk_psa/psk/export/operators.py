@@ -99,6 +99,35 @@ class PSK_OT_populate_material_name_list(Operator):
         return {'FINISHED'}
 
 
+
+def material_list_names_search_cb(self, context: Context, edit_text: str):
+    for material in bpy.data.materials:
+        yield material.name
+
+
+class PSK_OT_material_list_name_add(Operator):
+    bl_idname = 'psk.export_material_name_list_item_add'
+    bl_label = 'Add Material'
+    bl_description = 'Add a material to the material name list (useful if you want to add a material slot that is not actually used in the mesh)'
+    bl_options = {'INTERNAL'}
+
+    name: StringProperty(search=material_list_names_search_cb)
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        export_operator = get_collection_export_operator_from_context(context)
+        if export_operator is None:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
+            return {'CANCELLED'}
+        m = export_operator.material_name_list.add()
+        m.material_name = self.name
+        m.index = len(export_operator.material_name_list) - 1
+        return {'FINISHED'}
+
+
+
 class PSK_OT_material_list_move_up(Operator):
     bl_idname = 'psk.export_material_list_item_move_up'
     bl_label = 'Move Up'
@@ -198,10 +227,7 @@ def get_sorted_materials_by_names(materials: Iterable[Material], material_names:
     return materials_in_collection + materials_not_in_collection
 
 
-def get_psk_build_options_from_property_group(mesh_objects: Iterable[Object],  pg: 'PSK_PG_export', depsgraph: Optional[Depsgraph] = None) -> PskBuildOptions:
-    if depsgraph is None:
-        depsgraph = bpy.context.evaluated_depsgraph_get()
-
+def get_psk_build_options_from_property_group(pg: 'PSK_PG_export') -> PskBuildOptions:
     options = PskBuildOptions()
     options.object_eval_state = pg.object_eval_state
     options.export_space = pg.export_space
@@ -212,8 +238,12 @@ def get_psk_build_options_from_property_group(mesh_objects: Iterable[Object],  p
     options.up_axis = pg.up_axis
 
     # TODO: perhaps move this into the build function and replace the materials list with a material names list.
-    materials = get_materials_for_mesh_objects(depsgraph, mesh_objects)
-    options.materials = get_sorted_materials_by_names(materials, [m.material_name for m in pg.material_name_list])
+    # materials = get_materials_for_mesh_objects(depsgraph, mesh_objects)
+
+    # The material name list may contain materials that are not on the mesh objects.
+    # Therefore, we can perhaps take the material_name_list as gospel and simply use it as a lookup table.
+    # If a look-up fails, replace it with an empty material.
+    options.materials = [bpy.data.materials.get(x.material_name, None) for x in pg.material_name_list]
 
     return options
 
@@ -241,7 +271,7 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
-        options = get_psk_build_options_from_property_group([x.obj for x in input_objects.mesh_objects], self)
+        options = get_psk_build_options_from_property_group(self)
 
         try:
             result = build_psk(context, input_objects, options)
@@ -297,6 +327,8 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
             col = row.column(align=True)
             col.operator(PSK_OT_material_list_name_move_up.bl_idname, text='', icon='TRIA_UP')
             col.operator(PSK_OT_material_list_name_move_down.bl_idname, text='', icon='TRIA_DOWN')
+            col.separator()
+            col.operator(PSK_OT_material_list_name_add.bl_idname, text='', icon='ADD')
 
         # TRANSFORM
         transform_header, transform_panel = layout.panel('Transform', default_closed=False)
@@ -391,7 +423,7 @@ class PSK_OT_export(Operator, ExportHelper):
         pg = getattr(context.scene, 'psk_export')
 
         input_objects = get_psk_input_objects_for_context(context)
-        options = get_psk_build_options_from_property_group([x.obj for x in input_objects.mesh_objects], pg)
+        options = get_psk_build_options_from_property_group(pg)
 
         try:
             result = build_psk(context, input_objects, options)
@@ -418,4 +450,5 @@ classes = (
     PSK_OT_populate_material_name_list,
     PSK_OT_material_list_name_move_up,
     PSK_OT_material_list_name_move_down,
+    PSK_OT_material_list_name_add,
 )

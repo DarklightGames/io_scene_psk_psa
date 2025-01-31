@@ -7,7 +7,7 @@ from bpy.props import BoolProperty, PointerProperty, EnumProperty, FloatProperty
     StringProperty
 from bpy.types import PropertyGroup, Object, Action, AnimData, Context
 
-from ...shared.data import bone_filter_mode_items
+from ...shared.data import bone_filter_mode_items, ForwardUpAxisMixin, ExportSpaceMixin
 from ...shared.types import PSX_PG_bone_collection_list_item
 
 
@@ -102,7 +102,7 @@ def animation_data_override_update_cb(self: 'PSA_PG_export', context: Context):
     self.nla_track = ''
 
 
-class PSA_PG_export(PropertyGroup):
+class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin):
     root_motion: BoolProperty(
         name='Root Motion',
         options=empty_set,

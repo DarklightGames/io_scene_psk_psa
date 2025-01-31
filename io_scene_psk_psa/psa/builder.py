@@ -1,7 +1,6 @@
 from typing import Optional
 
 from bpy.types import Bone, Action, PoseBone
-from mathutils import Vector
 
 from .data import *
 from ..shared.helpers import *
@@ -35,25 +34,32 @@ class PsaBuildOptions:
         self.root_motion: bool = False
         self.scale = 1.0
         self.sampling_mode: str = 'INTERPOLATED'  # One of ('INTERPOLATED', 'SUBFRAME')
+        self.export_space = 'WORLD'
+        self.forward_axis = 'X'
+        self.up_axis = 'Z'
 
 
-def _get_pose_bone_location_and_rotation(pose_bone: PoseBone, armature_object: Object, options: PsaBuildOptions):
+def _get_pose_bone_location_and_rotation(pose_bone: PoseBone, armature_object: Object, root_motion: bool, scale: float, coordinate_system_transform: Matrix) -> Tuple[Vector, Quaternion]:
     if pose_bone.parent is not None:
         pose_bone_matrix = pose_bone.matrix
         pose_bone_parent_matrix = pose_bone.parent.matrix
         pose_bone_matrix = pose_bone_parent_matrix.inverted() @ pose_bone_matrix
     else:
-        if options.root_motion:
+        if root_motion:
             # Get the bone's pose matrix, taking the armature object's world matrix into account.
             pose_bone_matrix = armature_object.matrix_world @ pose_bone.matrix
         else:
             # Use the bind pose matrix for the root bone.
             pose_bone_matrix = pose_bone.matrix
 
+        # The root bone is the only bone that should be transformed by the coordinate system transform, since all
+        # other bones are relative to their parent bones.
+        pose_bone_matrix = coordinate_system_transform @ pose_bone_matrix
+
     location = pose_bone_matrix.to_translation()
     rotation = pose_bone_matrix.to_quaternion().normalized()
 
-    location *= options.scale
+    location *= scale
 
     if pose_bone.parent is not None:
         rotation.conjugate()
@@ -86,46 +92,18 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
     if len(bones) == 0:
         raise RuntimeError('No bones available for export')
 
+    # The bone building code should be shared between the PSK and PSA exporters, since they both need to build a nearly identical bone list.
+
     # Build list of PSA bones.
-    for bone in bones:
-        psa_bone = Psa.Bone()
-
-        try:
-            psa_bone.name = bytes(bone.name, encoding='windows-1252')
-        except UnicodeEncodeError:
-            raise RuntimeError(f'Bone name "{bone.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
-
-        try:
-            parent_index = bones.index(bone.parent)
-            psa_bone.parent_index = parent_index
-            psa.bones[parent_index].children_count += 1
-        except ValueError:
-            psa_bone.parent_index = 0
-
-        if bone.parent is not None:
-            rotation = bone.matrix.to_quaternion().conjugated()
-            inverse_parent_rotation = bone.parent.matrix.to_quaternion().inverted()
-            parent_head = inverse_parent_rotation @ bone.parent.head
-            parent_tail = inverse_parent_rotation @ bone.parent.tail
-            location = (parent_tail - parent_head) + bone.head
-        else:
-            armature_local_matrix = armature_object.matrix_local
-            location = armature_local_matrix @ bone.head
-            bone_rotation = bone.matrix.to_quaternion().conjugated()
-            local_rotation = armature_local_matrix.to_3x3().to_quaternion().conjugated()
-            rotation = bone_rotation @ local_rotation
-            rotation.conjugate()
-
-        psa_bone.location.x = location.x
-        psa_bone.location.y = location.y
-        psa_bone.location.z = location.z
-
-        psa_bone.rotation.x = rotation.x
-        psa_bone.rotation.y = rotation.y
-        psa_bone.rotation.z = rotation.z
-        psa_bone.rotation.w = rotation.w
-
-        psa.bones.append(psa_bone)
+    psa.bones = convert_blender_bones_to_psx_bones(
+        bones=bones,
+        bone_class=Psa.Bone,
+        export_space=options.export_space,
+        armature_object_matrix_world=armature_object.matrix_world,
+        scale=options.scale,
+        forward_axis=options.forward_axis,
+        up_axis=options.up_axis
+    )
 
     # Add prefixes and suffices to the names of the export sequences and strip whitespace.
     for export_sequence in options.sequences:
@@ -141,6 +119,8 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
     frame_start_index = 0
 
     context.window_manager.progress_begin(0, len(options.sequences))
+
+    coordinate_system_transform = get_coordinate_system_transform(options.forward_axis, options.up_axis)
 
     for export_sequence_index, export_sequence in enumerate(options.sequences):
         # Look up the pose bones for the bones that are going to be exported.
@@ -221,9 +201,13 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
                             last_frame_bone_poses.clear()
                             context.scene.frame_set(frame=last_frame)
                             for pose_bone in pose_bones:
-                                location, rotation = _get_pose_bone_location_and_rotation(pose_bone,
-                                                                                          export_sequence.armature_object,
-                                                                                          options)
+                                location, rotation = _get_pose_bone_location_and_rotation(
+                                    pose_bone,
+                                    export_sequence.armature_object,
+                                    root_motion=options.root_motion,
+                                    scale=options.scale,
+                                    coordinate_system_transform=coordinate_system_transform
+                                )
                                 last_frame_bone_poses.append((location, rotation))
 
                         next_frame = None
@@ -239,7 +223,13 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
                             next_frame = last_frame + 1
                             context.scene.frame_set(frame=next_frame)
                             for pose_bone in pose_bones:
-                                location, rotation = _get_pose_bone_location_and_rotation(pose_bone, export_sequence.armature_object, options)
+                                location, rotation = _get_pose_bone_location_and_rotation(
+                                    pose_bone,
+                                    export_sequence.armature_object,
+                                    root_motion=options.root_motion,
+                                    scale=options.scale,
+                                    coordinate_system_transform=coordinate_system_transform
+                                )
                                 next_frame_bone_poses.append((location, rotation))
 
                         factor = frame % 1.0
