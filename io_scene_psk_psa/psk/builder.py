@@ -130,7 +130,7 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
         psk_bone.children_count = 0
         psk_bone.parent_index = 0
         psk_bone.location = Vector3.zero()
-        psk_bone.rotation = coordinate_system_default_rotation
+        psk_bone.rotation = Quaternion.from_bpy_quaternion(coordinate_system_default_rotation)
         psk.bones.append(psk_bone)
     else:
         bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, options.bone_collection_indices)

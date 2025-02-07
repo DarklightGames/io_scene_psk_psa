@@ -2,7 +2,7 @@ from ctypes import *
 from typing import Tuple
 
 from bpy.props import EnumProperty
-from mathutils import Vector, Matrix
+from mathutils import Vector, Matrix, Quaternion as BpyQuaternion
 
 
 class Color(Structure):
@@ -83,6 +83,15 @@ class Quaternion(Structure):
     @classmethod
     def identity(cls):
         return Quaternion(0, 0, 0, 1)
+
+    @classmethod
+    def from_bpy_quaternion(cls, other: BpyQuaternion) -> BpyQuaternion:
+        quaternion = Quaternion()
+        quaternion.x = other.x
+        quaternion.y = other.y
+        quaternion.z = other.z
+        quaternion.w = other.w
+        return quaternion
 
 
 class Section(Structure):
