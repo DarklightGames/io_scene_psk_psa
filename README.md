@@ -76,6 +76,4 @@ The PSA importer creates [Actions](https://docs.blender.org/manual/en/latest/ani
 ## Why are the mesh normals not accurate when importing a PSK extracted from [UE Viewer](https://www.gildor.org/en/projects/umodel)?
 If preserving the mesh normals of models is important for your workflow, it is *not recommended* to export PSK files from UE Viewer. This is because UE Viewer makes no attempt to reconstruct the original [smoothing groups](https://en.wikipedia.org/wiki/Smoothing_group). As a result, the normals of imported PSK files will be incorrect when imported into Blender and will need to be manually fixed.
 
-As a workaround, it is recommended to export [glTF](https://en.wikipedia.org/wiki/GlTF) meshes out of UE Viewer instead, since the glTF format has support for explicit normals and UE Viewer can correctly preserve the mesh normals on export. Note, however, that the imported glTF armature may have it's bones oriented incorrectly when imported into Blender. To mitigate this, you can combine the armature of PSK and the mesh of the glTF for best results.
-
-There is also an open pull request to add support for exporting explicit normals from UE Viewer in the future: https://github.com/gildor2/UEViewer/pull/277.
+There is an open pull request to add support for exporting explicit normals from UE Viewer in the future: https://github.com/gildor2/UEViewer/pull/277.
