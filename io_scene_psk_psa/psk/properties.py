@@ -47,6 +47,13 @@ def poly_flags_to_triangle_type_and_bit_flags(poly_flags: int) -> (str, set[str]
 empty_set = set()
 
 
+def should_import_mesh_get(self):
+    return self.import_components in {'ALL', 'MESH'}
+
+def should_import_skleton_get(self):
+    return self.import_components in {'ALL', 'SKELETON'}
+
+
 class PskImportMixin:
     should_import_vertex_colors: BoolProperty(
         default=True,
@@ -76,11 +83,20 @@ class PskImportMixin:
         options=empty_set,
         description='Import extra UV maps, if available'
     )
-    should_import_mesh: BoolProperty(
-        default=True,
-        name='Import Mesh',
+    import_components: EnumProperty(
+        name='Import Components',
         options=empty_set,
-        description='Import mesh'
+        description='Determine which components to import',
+        items=(
+            ('ALL', 'Mesh & Skeleton', 'Import mesh and skeleton'),
+            ('MESH', 'Mesh Only', 'Import mesh only'),
+            ('SKELETON', 'Skeleton Only', 'Import skeleton only'),
+        ),
+        default='ALL'
+    )
+    should_import_mesh: BoolProperty(
+        name='Import Mesh',
+        get=should_import_mesh_get,
     )
     should_import_materials: BoolProperty(
         default=True,
@@ -88,10 +104,8 @@ class PskImportMixin:
         options=empty_set,
     )
     should_import_skeleton: BoolProperty(
-        default=True,
         name='Import Skeleton',
-        options=empty_set,
-        description='Import skeleton'
+        get=should_import_skleton_get,
     )
     bone_length: FloatProperty(
         default=1.0,

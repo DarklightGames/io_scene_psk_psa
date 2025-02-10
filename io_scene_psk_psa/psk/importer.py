@@ -3,7 +3,7 @@ from typing import Optional, List
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import VertexGroup
+from bpy.types import VertexGroup, Context, Object
 from mathutils import Quaternion, Vector, Matrix
 
 from .data import Psk
@@ -13,7 +13,6 @@ from ..shared.helpers import rgb_to_srgb, is_bdk_addon_loaded
 
 class PskImportOptions:
     def __init__(self):
-        self.name = ''
         self.should_import_mesh = True
         self.should_reuse_materials = True
         self.should_import_vertex_colors = True
@@ -49,17 +48,23 @@ class ImportBone:
 class PskImportResult:
     def __init__(self):
         self.warnings: List[str] = []
+        self.armature_object: Optional[Object] = None
+        self.mesh_object: Optional[Object] = None
+
+    @property
+    def root_object(self) -> Object:
+        return self.armature_object if self.armature_object is not None else self.mesh_object
 
 
-def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
+def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions) -> PskImportResult:
     result = PskImportResult()
     armature_object = None
     mesh_object = None
 
     if options.should_import_skeleton:
         # ARMATURE
-        armature_data = bpy.data.armatures.new(options.name)
-        armature_object = bpy.data.objects.new(options.name, armature_data)
+        armature_data = bpy.data.armatures.new(name)
+        armature_object = bpy.data.objects.new(name, armature_data)
         armature_object.show_in_front = True
 
         context.scene.collection.objects.link(armature_object)
@@ -116,8 +121,8 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
 
     # MESH
     if options.should_import_mesh:
-        mesh_data = bpy.data.meshes.new(options.name)
-        mesh_object = bpy.data.objects.new(options.name, mesh_data)
+        mesh_data = bpy.data.meshes.new(name)
+        mesh_object = bpy.data.objects.new(name, mesh_data)
 
         # MATERIALS
         if options.should_import_materials:
@@ -279,5 +284,8 @@ def import_psk(psk: Psk, context, options: PskImportOptions) -> PskImportResult:
         bpy.ops.object.mode_set(mode='OBJECT')
     except:
         pass
+
+    result.armature_object = armature_object
+    result.mesh_object = mesh_object
 
     return result

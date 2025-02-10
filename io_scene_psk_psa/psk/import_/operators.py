@@ -1,7 +1,8 @@
 import os
+from pathlib import Path
 
-from bpy.props import StringProperty
-from bpy.types import Operator, FileHandler, Context
+from bpy.props import StringProperty, CollectionProperty
+from bpy.types import Operator, FileHandler, Context, OperatorFileListElement, UILayout
 from bpy_extras.io_utils import ImportHelper
 
 from ..importer import PskImportOptions, import_psk
@@ -9,6 +10,70 @@ from ..properties import PskImportMixin
 from ..reader import read_psk
 
 empty_set = set()
+
+def get_psk_import_options_from_properties(property_group: PskImportMixin):
+    options = PskImportOptions()
+    options.should_import_mesh = property_group.should_import_mesh
+    options.should_import_extra_uvs = property_group.should_import_extra_uvs
+    options.should_import_vertex_colors = property_group.should_import_vertex_colors
+    options.should_import_vertex_normals = property_group.should_import_vertex_normals
+    options.vertex_color_space = property_group.vertex_color_space
+    options.should_import_skeleton = property_group.should_import_skeleton
+    options.bone_length = property_group.bone_length
+    options.should_import_materials = property_group.should_import_materials
+    options.should_import_shape_keys = property_group.should_import_shape_keys
+    options.scale = property_group.scale
+
+    if property_group.bdk_repository_id:
+        options.bdk_repository_id = property_group.bdk_repository_id
+
+    return options
+
+
+def psk_import_draw(layout: UILayout, props: PskImportMixin):
+    row = layout.row()
+
+    col = row.column()
+    col.use_property_split = True
+    col.use_property_decorate = False
+    col.prop(props, 'import_components')
+
+    if props.should_import_mesh:
+        mesh_header, mesh_panel = layout.panel('mesh_panel_id', default_closed=False)
+        mesh_header.label(text='Mesh', icon='MESH_DATA')
+
+        if mesh_panel:
+            row = mesh_panel.row()
+            col = row.column()
+            col.use_property_split = True
+            col.use_property_decorate = False
+            col.prop(props, 'should_import_materials', text='Materials')
+            col.prop(props, 'should_import_vertex_normals', text='Vertex Normals')
+            col.prop(props, 'should_import_extra_uvs', text='Extra UVs')
+            col.prop(props, 'should_import_vertex_colors', text='Vertex Colors')
+            if props.should_import_vertex_colors:
+                col.prop(props, 'vertex_color_space')
+            col.prop(props, 'should_import_shape_keys', text='Shape Keys')
+
+    if props.should_import_skeleton:
+        skeleton_header, skeleton_panel = layout.panel('skeleton_panel_id', default_closed=False)
+        skeleton_header.label(text='Skeleton', icon='OUTLINER_DATA_ARMATURE')
+
+        if skeleton_panel:
+            row = skeleton_panel.row()
+            col = row.column()
+            col.use_property_split = True
+            col.use_property_decorate = False
+            col.prop(props, 'bone_length')
+
+    transform_header, transform_panel = layout.panel('transform_panel_id', default_closed=False)
+    transform_header.label(text='Transform')
+    if transform_panel:
+        row = transform_panel.row()
+        col = row.column()
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(props, 'scale')
 
 
 class PSK_OT_import(Operator, ImportHelper, PskImportMixin):
@@ -26,80 +91,69 @@ class PSK_OT_import(Operator, ImportHelper, PskImportMixin):
 
     def execute(self, context):
         psk = read_psk(self.filepath)
-
-        options = PskImportOptions()
-        options.name = os.path.splitext(os.path.basename(self.filepath))[0]
-        options.should_import_mesh = self.should_import_mesh
-        options.should_import_extra_uvs = self.should_import_extra_uvs
-        options.should_import_vertex_colors = self.should_import_vertex_colors
-        options.should_import_vertex_normals = self.should_import_vertex_normals
-        options.vertex_color_space = self.vertex_color_space
-        options.should_import_skeleton = self.should_import_skeleton
-        options.bone_length = self.bone_length
-        options.should_import_materials = self.should_import_materials
-        options.should_import_shape_keys = self.should_import_shape_keys
-        options.scale = self.scale
-
-        if self.bdk_repository_id:
-            options.bdk_repository_id = self.bdk_repository_id
-
-        if not options.should_import_mesh and not options.should_import_skeleton:
-            self.report({'ERROR'}, 'Nothing to import')
-            return {'CANCELLED'}
-
-        result = import_psk(psk, context, options)
+        name = os.path.splitext(os.path.basename(self.filepath))[0]
+        options = get_psk_import_options_from_properties(self)
+        result = import_psk(psk, context, name, options)
 
         if len(result.warnings):
-            message = f'PSK imported with {len(result.warnings)} warning(s)\n'
+            message = f'PSK imported as "{result.root_object.name}" with {len(result.warnings)} warning(s)\n'
             message += '\n'.join(result.warnings)
             self.report({'WARNING'}, message)
         else:
-            self.report({'INFO'}, f'PSK imported ({options.name})')
+            self.report({'INFO'}, f'PSK imported as "{result.root_object.name}"')
 
         return {'FINISHED'}
 
     def draw(self, context):
-        layout = self.layout
+        psk_import_draw(self.layout, self)
 
-        row = layout.row()
 
-        col = row.column()
-        col.use_property_split = True
-        col.use_property_decorate = False
-        col.prop(self, 'scale')
+class PSK_OT_import_drag_and_drop(Operator, PskImportMixin):
+    bl_idname = 'psk.import_drag_and_drop'
+    bl_label = 'Import Drag and Drop'
+    bl_options = {'INTERNAL', 'UNDO', 'PRESET'}
+    bl_description = 'Import a PSK file by dragging and dropping it onto the 3D view'
 
-        mesh_header, mesh_panel = layout.panel('mesh_panel_id', default_closed=False)
-        mesh_header.prop(self, 'should_import_mesh')
+    directory: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE', 'HIDDEN'})
+    files: CollectionProperty(type=OperatorFileListElement, options={'SKIP_SAVE', 'HIDDEN'})
 
-        if mesh_panel and self.should_import_mesh:
-            row = mesh_panel.row()
-            col = row.column()
-            col.use_property_split = True
-            col.use_property_decorate = False
-            col.prop(self, 'should_import_materials', text='Materials')
-            col.prop(self, 'should_import_vertex_normals', text='Vertex Normals')
-            col.prop(self, 'should_import_extra_uvs', text='Extra UVs')
-            col.prop(self, 'should_import_vertex_colors', text='Vertex Colors')
-            if self.should_import_vertex_colors:
-                col.prop(self, 'vertex_color_space')
-            col.prop(self, 'should_import_shape_keys', text='Shape Keys')
+    @classmethod
+    def poll(cls, context):
+        return context.area and context.area.type == 'VIEW_3D'
 
-        skeleton_header, skeleton_panel = layout.panel('skeleton_panel_id', default_closed=False)
-        skeleton_header.prop(self, 'should_import_skeleton')
+    def draw(self, context):
+        psk_import_draw(self.layout, self)
 
-        if skeleton_panel and self.should_import_skeleton:
-            row = skeleton_panel.row()
-            col = row.column()
-            col.use_property_split = True
-            col.use_property_decorate = False
-            col.prop(self, 'bone_length')
+    def invoke(self, context, event):
+        context.window_manager.invoke_props_dialog(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        warning_count = 0
+
+        options = get_psk_import_options_from_properties(self)
+
+        for file in self.files:
+            filepath = Path(self.directory) / file.name
+            psk = read_psk(filepath)
+            name = os.path.splitext(file.name)[0]
+            result = import_psk(psk, context, name, options)
+            if result.warnings:
+                warning_count += len(result.warnings)
+
+        if warning_count > 0:
+            self.report({'WARNING'}, f'Imported {len(self.files)} PSK file(s) with {warning_count} warning(s)')
+        else:
+            self.report({'INFO'}, f'Imported {len(self.files)} PSK file(s)')
+
+        return {'FINISHED'}
 
 
 # TODO: move to another file
 class PSK_FH_import(FileHandler):
     bl_idname = 'PSK_FH_import'
     bl_label = 'Unreal PSK'
-    bl_import_operator = PSK_OT_import.bl_idname
+    bl_import_operator = PSK_OT_import_drag_and_drop.bl_idname
     bl_export_operator = 'psk.export_collection'
     bl_file_extensions = '.psk;.pskx'
 
@@ -107,7 +161,9 @@ class PSK_FH_import(FileHandler):
     def poll_drop(cls, context: Context):
         return context.area and context.area.type == 'VIEW_3D'
 
+
 classes = (
     PSK_OT_import,
+    PSK_OT_import_drag_and_drop,
     PSK_FH_import,
 )

@@ -455,8 +455,6 @@ class PSA_OT_export(Operator, ExportHelper):
 
         export_sequences: List[PsaBuildSequence] = []
 
-        selected_armature_objects = [obj for obj in context.selected_objects if obj.type == 'ARMATURE']
-
         match pg.sequence_source:
             case 'ACTIONS':
                 for action_item in filter(lambda x: x.is_selected, pg.action_list):
@@ -507,6 +505,10 @@ class PSA_OT_export(Operator, ExportHelper):
             case _:
                 raise ValueError(f'Unhandled sequence source: {pg.sequence_source}')
 
+        if len(export_sequences) == 0:
+            self.report({'ERROR'}, 'No sequences were selected for export')
+            return {'CANCELLED'}
+
         options = PsaBuildOptions()
         options.animation_data = animation_data
         options.sequences = export_sequences
@@ -529,9 +531,6 @@ class PSA_OT_export(Operator, ExportHelper):
             return {'CANCELLED'}
 
         write_psa(psa, self.filepath)
-
-        if len(psa.sequences) == 0:
-            self.report({'WARNING'}, 'No sequences were selected for export')
 
         return {'FINISHED'}
 
