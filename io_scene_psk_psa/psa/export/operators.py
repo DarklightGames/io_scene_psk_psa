@@ -530,6 +530,9 @@ class PSA_OT_export(Operator, ExportHelper):
 
         write_psa(psa, self.filepath)
 
+        if len(psa.sequences) == 0:
+            self.report({'WARNING'}, 'No sequences were selected for export')
+
         return {'FINISHED'}
 
 
