@@ -110,9 +110,9 @@ class PSK_OT_import(Operator, ImportHelper, PskImportMixin):
 
 class PSK_OT_import_drag_and_drop(Operator, PskImportMixin):
     bl_idname = 'psk.import_drag_and_drop'
-    bl_label = 'Import Drag and Drop'
+    bl_label = 'Import PSK'
     bl_options = {'INTERNAL', 'UNDO', 'PRESET'}
-    bl_description = 'Import a PSK file by dragging and dropping it onto the 3D view'
+    bl_description = 'Import PSK files by dragging and dropping them onto the 3D view'
 
     directory: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE', 'HIDDEN'})
     files: CollectionProperty(type=OperatorFileListElement, options={'SKIP_SAVE', 'HIDDEN'})

@@ -125,7 +125,7 @@ class PSA_OT_import_drag_and_drop(Operator, PsaImportMixin):
     bl_idname = 'psa.import_drag_and_drop'
     bl_label = 'Import PSA'
     bl_description = 'Import multiple PSA files'
-    bl_options = {'INTERNAL', 'UNDO'}
+    bl_options = {'INTERNAL', 'UNDO', 'PRESET'}
 
     directory: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE', 'HIDDEN'})
     files: CollectionProperty(type=OperatorFileListElement, options={'SKIP_SAVE', 'HIDDEN'})
