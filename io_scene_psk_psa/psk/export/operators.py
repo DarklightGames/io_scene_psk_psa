@@ -70,7 +70,11 @@ class PSK_OT_populate_bone_collection_list(Operator):
         if export_operator is None:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
             return {'CANCELLED'}
-        input_objects = get_psk_input_objects_for_collection(context.collection)
+        try:
+            input_objects = get_psk_input_objects_for_collection(context.collection)
+        except RuntimeError as e:
+            self.report({'ERROR_INVALID_CONTEXT'}, str(e))
+            return {'CANCELLED'}
         if input_objects.armature_object is None:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No armature found in collection')
             return {'CANCELLED'}
