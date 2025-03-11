@@ -267,7 +267,7 @@ class PSA_OT_import_all(Operator, PsaImportMixin):
 
 
 class PSA_OT_import(Operator, ImportHelper, PsaImportMixin):
-    bl_idname = 'psa.import'
+    bl_idname = 'psa.import_file'
     bl_label = 'Import'
     bl_description = 'Import the selected animations into the scene as actions'
     bl_options = {'INTERNAL', 'UNDO'}

@@ -77,7 +77,7 @@ def psk_import_draw(layout: UILayout, props: PskImportMixin):
 
 
 class PSK_OT_import(Operator, ImportHelper, PskImportMixin):
-    bl_idname = 'psk.import'
+    bl_idname = 'psk.import_file'
     bl_label = 'Import'
     bl_options = {'INTERNAL', 'UNDO', 'PRESET'}
     bl_description = 'Import a PSK file'
