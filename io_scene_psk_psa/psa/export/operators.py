@@ -11,7 +11,8 @@ from .properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_se
     get_sequences_from_name_and_frame_range
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from ..writer import write_psa
-from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range, SemanticVersion
+from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range
+from ...shared.semver import SemanticVersion
 from ...shared.ui import draw_bone_filter_mode
 
 
