@@ -31,18 +31,20 @@ def get_sequences_propnames_from_source(sequence_source: str) -> Optional[Tuple[
 
 
 def is_action_for_object(obj: Object, action: Action):
-    if len(action.fcurves) == 0:
+    if action is None or len(action.fcurves) == 0:
         return False
 
-    if obj.animation_data is None:
-        return False
-
-    if obj.type != 'ARMATURE':
+    if obj is None or obj.animation_data is None or obj.type != 'ARMATURE':
         return False
 
     version = SemanticVersion(bpy.app.version)
 
-    if version < SemanticVersion((4, 4, 0)):
+    def is_action_for_object_legacy(action: Action,  obj: Object):
+        '''
+        This is the legacy behavior before slotted actions were introduced in Blender 4.4.
+        It would simply check if it had any f-curves that corresponded to any bones in the armature.
+        @return:
+        '''
         import re
         armature_data = obj.data
         bone_names = set([x.name for x in armature_data.bones])
@@ -53,12 +55,12 @@ def is_action_for_object(obj: Object, action: Action):
             bone_name = match.group(1)
             if bone_name in bone_names:
                 return True
-    else:
-        # In 4.4.0 and later, we can check if the object's action slot handle matches an action slot handle in the action.
-        if any(obj.animation_data.action_slot_handle == slot.handle for slot in action.slots):
-            return True
 
-    return False
+    if version < SemanticVersion((4, 4, 0)):
+        return is_action_for_object_legacy(action, obj)
+
+    # If the object is a part of the slot's user list, then it is a valid action for the object.
+    return any(obj in slot.users() for slot in action.slots)
 
 
 def update_actions_and_timeline_markers(context: Context):
