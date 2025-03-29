@@ -1,5 +1,3 @@
-from typing import Optional
-
 from bpy.types import Bone, Action, PoseBone
 
 from .data import *
@@ -31,7 +29,6 @@ class PsaBuildOptions:
         self.bone_collection_indices: List[int] = []
         self.sequence_name_prefix: str = ''
         self.sequence_name_suffix: str = ''
-        self.root_motion: bool = False
         self.scale = 1.0
         self.sampling_mode: str = 'INTERPOLATED'  # One of ('INTERPOLATED', 'SUBFRAME')
         self.export_space = 'WORLD'
@@ -39,18 +36,29 @@ class PsaBuildOptions:
         self.up_axis = 'Z'
 
 
-def _get_pose_bone_location_and_rotation(pose_bone: PoseBone, armature_object: Object, root_motion: bool, scale: float, coordinate_system_transform: Matrix) -> Tuple[Vector, Quaternion]:
+def _get_pose_bone_location_and_rotation(
+        pose_bone: PoseBone,
+        armature_object: Object,
+        export_space: str,
+        scale: Vector,
+        coordinate_system_transform: Matrix) -> Tuple[Vector, Quaternion]:
     if pose_bone.parent is not None:
         pose_bone_matrix = pose_bone.matrix
         pose_bone_parent_matrix = pose_bone.parent.matrix
         pose_bone_matrix = pose_bone_parent_matrix.inverted() @ pose_bone_matrix
     else:
-        if root_motion:
-            # Get the bone's pose matrix, taking the armature object's world matrix into account.
-            pose_bone_matrix = armature_object.matrix_world @ pose_bone.matrix
-        else:
-            # Use the bind pose matrix for the root bone.
-            pose_bone_matrix = pose_bone.matrix
+        # Get the bone's pose matrix and transform it into the export space.
+        # In the case of an 'ARMATURE' export space, this will be the inverse of armature object's world matrix.
+        # Otherwise, it will be the identity matrix.
+        # TODO: taking the pose bone matrix puts this in armature space.
+        pose_bone_matrix = Matrix.Identity(4)
+        match export_space:
+            case 'ARMATURE':
+                pose_bone_matrix = pose_bone.matrix
+            case 'WORLD':
+                pose_bone_matrix = armature_object.matrix_world @ pose_bone.matrix
+            case 'ROOT':
+                pose_bone_matrix = Matrix.Identity(4)
 
         # The root bone is the only bone that should be transformed by the coordinate system transform, since all
         # other bones are relative to their parent bones.
@@ -73,6 +81,8 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
     psa = Psa()
 
     armature_object = active_object
+    evaluated_armature_object = armature_object.evaluated_get(context.evaluated_depsgraph_get())
+
     armature_data = typing.cast(Armature, armature_object.data)
     bones: List[Bone] = list(iter(armature_data.bones))
 
@@ -94,16 +104,20 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
 
     # The bone building code should be shared between the PSK and PSA exporters, since they both need to build a nearly identical bone list.
 
+    # TODO: The PSA bones are just here to validate the hierarchy. The pose information is not used by the engine.
     # Build list of PSA bones.
     psa.bones = convert_blender_bones_to_psx_bones(
         bones=bones,
         bone_class=Psa.Bone,
         export_space=options.export_space,
-        armature_object_matrix_world=armature_object.matrix_world,
+        armature_object_matrix_world=armature_object.matrix_world,  # evaluated_armature_object.matrix_world,
         scale=options.scale,
         forward_axis=options.forward_axis,
         up_axis=options.up_axis
     )
+
+    # We invert the export space matrix so that we neutralize the transform of the armature object.
+    export_space_matrix_inverse = get_export_space_matrix(options.export_space, armature_object)
 
     # Add prefixes and suffices to the names of the export sequences and strip whitespace.
     for export_sequence in options.sequences:
@@ -124,7 +138,7 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
 
     for export_sequence_index, export_sequence in enumerate(options.sequences):
         # Look up the pose bones for the bones that are going to be exported.
-        pose_bones = [(bone_names.index(bone.name), bone) for bone in export_sequence.armature_object.pose.bones]
+        pose_bones = [(bone_names.index(bone.name), bone) for bone in armature_object.pose.bones]
         pose_bones.sort(key=lambda x: x[0])
         pose_bones = [x[1] for x in pose_bones]
         pose_bones = [pose_bones[bone_index] for bone_index in bone_indices]
@@ -178,6 +192,13 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
             key.time = 1.0 / psa_sequence.fps
             psa.keys.append(key)
 
+        # TODO: In _get_pose_bone_location_and_rotation, we need to factor in the evaluated armature object's scale.
+        #  Then also, if we're in ARMATURE export space, invert the pose bone matrix so that it's the identity matrix.
+
+        # TODO: extract the scale out of the evaluated_armature_object.matrix_world.
+        _, _, scale = evaluated_armature_object.matrix_world.decompose()
+        scale *= options.scale
+
         match options.sampling_mode:
             case 'INTERPOLATED':
                 # Used as a store for the last frame's pose bone locations and rotations.
@@ -203,9 +224,9 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
                             for pose_bone in pose_bones:
                                 location, rotation = _get_pose_bone_location_and_rotation(
                                     pose_bone,
-                                    export_sequence.armature_object,
-                                    root_motion=options.root_motion,
-                                    scale=options.scale,
+                                    armature_object,
+                                    options.export_space,
+                                    scale,
                                     coordinate_system_transform=coordinate_system_transform
                                 )
                                 last_frame_bone_poses.append((location, rotation))
@@ -225,9 +246,9 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
                             for pose_bone in pose_bones:
                                 location, rotation = _get_pose_bone_location_and_rotation(
                                     pose_bone,
-                                    export_sequence.armature_object,
-                                    root_motion=options.root_motion,
-                                    scale=options.scale,
+                                    armature_object,
+                                    options.export_space,
+                                    scale,
                                     coordinate_system_transform=coordinate_system_transform
                                 )
                                 next_frame_bone_poses.append((location, rotation))
@@ -249,7 +270,13 @@ def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
                     context.scene.frame_set(frame=int(frame), subframe=frame % 1.0)
 
                     for pose_bone in pose_bones:
-                        location, rotation = _get_pose_bone_location_and_rotation(pose_bone, export_sequence.armature_object, options)
+                        location, rotation = _get_pose_bone_location_and_rotation(
+                            pose_bone,
+                            armature_object,
+                            options.export_space,
+                            scale,
+                            coordinate_system_transform=coordinate_system_transform
+                        )
                         add_key(location, rotation)
 
                     frame += frame_step

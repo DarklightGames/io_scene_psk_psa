@@ -27,7 +27,7 @@ def get_sequences_propnames_from_source(sequence_source: str) -> Optional[Tuple[
         case 'ACTIVE_ACTION':
             return 'active_action_list', 'active_action_list_index'
         case _:
-            raise ValueError(f'Unhandled sequence source: {sequence_source}')
+            assert False, f'Invalid sequence source: {sequence_source}'
 
 
 def is_action_for_object(obj: Object, action: Action):
@@ -84,7 +84,6 @@ def update_actions_and_timeline_markers(context: Context):
             continue
 
         for (name, frame_start, frame_end) in get_sequences_from_action(action):
-            print(name)
             item = pg.action_list.add()
             item.action = action
             item.name = name
@@ -151,18 +150,18 @@ def get_sequence_fps(context: Context, fps_source: str, fps_custom: float, actio
             # Get the minimum value of action metadata FPS values.
             return min([action.psa_export.fps for action in actions])
         case _:
-            raise RuntimeError(f'Invalid FPS source "{fps_source}"')
+            assert False, f'Invalid FPS source: {fps_source}'
 
 
 def get_sequence_compression_ratio(compression_ratio_source: str, compression_ratio_custom: float, actions: Iterable[Action]) -> float:
     match compression_ratio_source:
         case 'ACTION_METADATA':
             # Get the minimum value of action metadata compression ratio values.
-            return min([action.psa_export.compression_ratio for action in actions])
+            return min(map(lambda action: action.psa_export.compression_ratio, actions))
         case 'CUSTOM':
             return compression_ratio_custom
         case _:
-            raise RuntimeError(f'Invalid compression ratio source "{compression_ratio_source}"')
+            assert False, f'Invalid compression ratio source: {compression_ratio_source}'
 
 
 def get_animation_data_object(context: Context) -> Object:
@@ -389,7 +388,6 @@ class PSA_OT_export(Operator, ExportHelper):
             flow = transform_panel.grid_flow(row_major=True)
             flow.use_property_split = True
             flow.use_property_decorate = False
-            flow.prop(pg, 'root_motion')
             flow.prop(pg, 'export_space')
             flow.prop(pg, 'scale')
             flow.prop(pg, 'forward_axis')
@@ -506,7 +504,7 @@ class PSA_OT_export(Operator, ExportHelper):
                     export_sequence.key_quota = action.psa_export.key_quota
                     export_sequences.append(export_sequence)
             case _:
-                raise ValueError(f'Unhandled sequence source: {pg.sequence_source}')
+                assert False, f'Invalid sequence source: {pg.sequence_source}'
 
         if len(export_sequences) == 0:
             self.report({'ERROR'}, 'No sequences were selected for export')
@@ -516,10 +514,9 @@ class PSA_OT_export(Operator, ExportHelper):
         options.animation_data = animation_data
         options.sequences = export_sequences
         options.bone_filter_mode = pg.bone_filter_mode
-        options.bone_collection_indices = [x.index for x in pg.bone_collection_list if x.is_selected]
+        options.bone_collection_indices = [(x.armature_object_name, x.index) for x in pg.bone_collection_list if x.is_selected]
         options.sequence_name_prefix = pg.sequence_name_prefix
         options.sequence_name_suffix = pg.sequence_name_suffix
-        options.root_motion = pg.root_motion
         options.scale = pg.scale
         options.sampling_mode = pg.sampling_mode
         options.export_space = pg.export_space

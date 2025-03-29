@@ -161,13 +161,13 @@ class ForwardUpAxisMixin:
 
 export_space_items = [
     ('WORLD', 'World', 'Export in world space'),
-    ('ARMATURE', 'Armature', 'Export in armature space'),
+    ('ARMATURE', 'Armature', 'Export the local space of the armature object'),
+    ('ROOT', 'Root', 'Export in the space of the root bone')
 ]
 
 class ExportSpaceMixin:
     export_space: EnumProperty(
         name='Export Space',
-        description='Space to export the mesh in',
         items=export_space_items,
         default='WORLD'
     )

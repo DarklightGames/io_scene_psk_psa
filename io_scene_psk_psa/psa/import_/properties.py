@@ -93,7 +93,7 @@ class PsaImportMixin:
         soft_max=60.0,
         step=100,
     )
-    compression_ratio_source: EnumProperty(name='Compression Ratio Source', items=compression_ratio_source_items)
+    compression_ratio_source: EnumProperty(name='Compression Ratio Source', items=compression_ratio_source_items, default='ACTION')
     compression_ratio_custom: FloatProperty(
         default=1.0,
         name='Custom Compression Ratio',

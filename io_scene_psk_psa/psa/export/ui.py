@@ -23,13 +23,13 @@ class PSA_UL_export_sequences(UIList):
 
         row = layout.row(align=True)
         row.alignment = 'RIGHT'
-        if item.frame_end < item.frame_start:
-            row.label(text='', icon='FRAME_PREV')
-        if is_pose_marker:
-            row.label(text=item.action.name, icon='PMARKER')
+
+        row.label(text=str(abs(item.frame_end - item.frame_start) + 1), icon='FRAME_PREV' if item.frame_end < item.frame_start else 'KEYFRAME')
 
         if hasattr(item, 'armature_object') and item.armature_object is not None:
             row.label(text=item.armature_object.name, icon='ARMATURE_DATA')
+
+        # row.label(text=item.action.name, icon='PMARKER' if is_pose_marker else 'ACTION_DATA')
 
     def draw_filter(self, context, layout):
         pg = getattr(context.scene, 'psa_export')

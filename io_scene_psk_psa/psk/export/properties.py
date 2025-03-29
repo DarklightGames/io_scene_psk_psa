@@ -12,11 +12,6 @@ object_eval_state_items = (
     ('ORIGINAL', 'Original', 'Use data from original object with no modifiers applied'),
 )
 
-export_space_items = [
-    ('WORLD', 'World', 'Export in world space'),
-    ('ARMATURE', 'Armature', 'Export in armature space'),
-]
-
 class PSK_PG_material_list_item(PropertyGroup):
     material: PointerProperty(type=Material)
     index: IntProperty()
@@ -54,6 +49,11 @@ class PskExportMixin(ExportSpaceMixin, ForwardUpAxisMixin):
     bone_collection_list_index: IntProperty(default=0)
     material_name_list: CollectionProperty(type=PSK_PG_material_name_list_item)
     material_name_list_index: IntProperty(default=0)
+    root_bone_name: StringProperty(
+        name='Root Bone Name',
+        description='The name of the generated root bone when exporting multiple armatures',
+        default='ROOT',
+    )
 
 
 class PSK_PG_export(PropertyGroup, PskExportMixin):

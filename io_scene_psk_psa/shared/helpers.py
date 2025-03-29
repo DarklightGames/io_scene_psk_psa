@@ -29,7 +29,7 @@ def get_nla_strips_in_frame_range(animation_data: AnimData, frame_min: float, fr
                 yield strip
 
 
-def populate_bone_collection_list(armature_object: Object, bone_collection_list: CollectionProperty) -> None:
+def populate_bone_collection_list(armature_objects: Iterable[Object], bone_collection_list: CollectionProperty) -> None:
     """
     Updates the bone collections collection.
 
@@ -39,7 +39,7 @@ def populate_bone_collection_list(armature_object: Object, bone_collection_list:
     has_selected_collections = any([g.is_selected for g in bone_collection_list])
     unassigned_collection_is_selected, selected_assigned_collection_names = True, []
 
-    if armature_object is None:
+    if not armature_objects:
         return
 
     if has_selected_collections:
@@ -54,24 +54,27 @@ def populate_bone_collection_list(armature_object: Object, bone_collection_list:
 
     bone_collection_list.clear()
 
-    armature = cast(Armature, armature_object.data)
+    for armature_object in armature_objects:
+        armature = cast(Armature, armature_object.data)
 
-    if armature is None:
-        return
+        if armature is None:
+            return
 
-    item = bone_collection_list.add()
-    item.name = 'Unassigned'
-    item.index = -1
-    # Count the number of bones without an assigned bone collection
-    item.count = sum(map(lambda bone: 1 if len(bone.collections) == 0 else 0, armature.bones))
-    item.is_selected = unassigned_collection_is_selected
-
-    for bone_collection_index, bone_collection in enumerate(armature.collections_all):
         item = bone_collection_list.add()
-        item.name = bone_collection.name
-        item.index = bone_collection_index
-        item.count = len(bone_collection.bones)
-        item.is_selected = bone_collection.name in selected_assigned_collection_names if has_selected_collections else True
+        item.armature_object_name = armature_object.name
+        item.name = 'Unassigned' # TODO: localize
+        item.index = -1
+        # Count the number of bones without an assigned bone collection
+        item.count = sum(map(lambda bone: 1 if len(bone.collections) == 0 else 0, armature.bones))
+        item.is_selected = unassigned_collection_is_selected
+
+        for bone_collection_index, bone_collection in enumerate(armature.collections_all):
+            item = bone_collection_list.add()
+            item.armature_object_name = armature_object.name
+            item.name = bone_collection.name
+            item.index = bone_collection_index
+            item.count = len(bone_collection.bones)
+            item.is_selected = bone_collection.name in selected_assigned_collection_names if has_selected_collections else True
 
 
 def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_collection_indices: Iterable[int]) -> List[str]:
@@ -131,6 +134,7 @@ def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_c
     bone_names = [bones[x[0]].name for x in bone_indices]
 
     # Ensure that the hierarchy we are sending back has a single root bone.
+    # TODO: This is only relevant if we are exporting a single armature; how should we reorganize this call?
     bone_indices = [x[0] for x in bone_indices]
     root_bones = [bones[bone_index] for bone_index in bone_indices if bones[bone_index].parent is None]
     if len(root_bones) > 1:
@@ -159,20 +163,25 @@ def is_bdk_addon_loaded() -> bool:
     return 'bdk' in dir(bpy.ops)
 
 
+def convert_string_to_cp1252_bytes(string: str) -> bytes:
+    try:
+        return bytes(string, encoding='windows-1252')
+    except UnicodeEncodeError as e:
+        raise RuntimeError(f'The string "{string}" contains characters that cannot be encoded in the Windows-1252 codepage') from e
+
+
+# TODO: Perhaps export space should just be a transform matrix, since the below is not actually used unless we're using WORLD space.
 def convert_blender_bones_to_psx_bones(
-        bones: List[bpy.types.Bone],
+        bones: Iterable[bpy.types.Bone],
         bone_class: type,
-        export_space: str = 'WORLD',        # perhaps export space should just be a transform matrix, since the below is not actually used unless we're using WORLD space.
+        export_space: str = 'WORLD',
         armature_object_matrix_world: Matrix = Matrix.Identity(4),
         scale = 1.0,
         forward_axis: str = 'X',
-        up_axis: str = 'Z'
-) -> Iterable[type]:
-    '''
-    Function that converts a Blender bone list into a bone list that
-    @param bones:
-    @return:
-    '''
+        up_axis: str = 'Z',
+        root_bone: Optional = None,
+) -> Iterable:
+
     scale_matrix = Matrix.Scale(scale, 4)
 
     coordinate_system_transform = get_coordinate_system_transform(forward_axis, up_axis)
@@ -181,16 +190,7 @@ def convert_blender_bones_to_psx_bones(
     psx_bones = []
     for bone in bones:
         psx_bone = bone_class()
-
-        try:
-            psx_bone.name = bytes(bone.name, encoding='windows-1252')
-        except UnicodeEncodeError:
-            raise RuntimeError(
-                f'Bone name "{bone.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
-
-        # TODO: flags & children_count should be initialized to zero anyways, so we can probably remove these lines?
-        psx_bone.flags = 0
-        psx_bone.children_count = 0
+        psx_bone.name = convert_string_to_cp1252_bytes(bone.name)
 
         try:
             parent_index = bones.index(bone.parent)
@@ -205,6 +205,22 @@ def convert_blender_bones_to_psx_bones(
             parent_head = inverse_parent_rotation @ bone.parent.head
             parent_tail = inverse_parent_rotation @ bone.parent.tail
             location = (parent_tail - parent_head) + bone.head
+        elif bone.parent is None and root_bone is not None:
+            # This is a special case for the root bone when export
+            # Because the root bone and child bones are in different spaces, we need to treat the root bone of this
+            # armature as though it were a child bone.
+            bone_rotation = bone.matrix.to_quaternion().conjugated()
+            local_rotation = armature_object_matrix_world.to_3x3().to_quaternion().conjugated()
+            rotation = bone_rotation @ local_rotation
+            translation, _, scale = armature_object_matrix_world.decompose()
+            # Invert the scale of the armature object matrix.
+            inverse_scale_matrix = Matrix.Identity(4)
+            inverse_scale_matrix[0][0] = 1.0 / scale.x
+            inverse_scale_matrix[1][1] = 1.0 / scale.y
+            inverse_scale_matrix[2][2] = 1.0 / scale.z
+
+            translation = translation @ inverse_scale_matrix
+            location = translation + bone.head
         else:
             def get_armature_local_matrix():
                 match export_space:
@@ -212,8 +228,10 @@ def convert_blender_bones_to_psx_bones(
                         return armature_object_matrix_world
                     case 'ARMATURE':
                         return Matrix.Identity(4)
+                    case 'ROOT':
+                        return bone.matrix.inverted()
                     case _:
-                        raise ValueError(f'Invalid export space: {export_space}')
+                        assert False, f'Invalid export space: {export_space}'
 
             armature_local_matrix = get_armature_local_matrix()
             location = armature_local_matrix @ bone.head
@@ -244,3 +262,23 @@ def convert_blender_bones_to_psx_bones(
         psx_bones.append(psx_bone)
 
     return psx_bones
+
+
+# TODO: we need two different ones for the PSK and PSA.
+# TODO: Figure out in what "space" the root bone is in for PSA animations.
+#  Maybe make a set of space-switching functions to make this easier to follow and figure out.
+def get_export_space_matrix(export_space: str, armature_object: Optional[Object] = None) -> Matrix:
+    match export_space:
+        case 'WORLD':
+            return Matrix.Identity(4)
+        case 'ARMATURE':
+            # We do not care about the scale when dealing with export spaces, only the translation and rotation.
+            if armature_object is not None:
+                translation, rotation, _ = armature_object.matrix_world.decompose()
+                return (rotation.to_matrix().to_4x4() @ Matrix.Translation(translation)).inverted()
+            else:
+                return Matrix.Identity(4)
+        case 'ROOT':
+            pass
+        case _:
+            assert False, f'Invalid export space: {export_space}'

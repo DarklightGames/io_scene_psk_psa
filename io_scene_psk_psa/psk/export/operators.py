@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Optional, cast, Iterable
 
 import bpy
@@ -75,10 +76,10 @@ class PSK_OT_populate_bone_collection_list(Operator):
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
-        if input_objects.armature_object is None:
-            self.report({'ERROR_INVALID_CONTEXT'}, 'No armature found in collection')
+        if not input_objects.armature_objects:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'No armature modifiers found on mesh objects')
             return {'CANCELLED'}
-        populate_bone_collection_list(input_objects.armature_object, export_operator.bone_collection_list)
+        populate_bone_collection_list(input_objects.armature_objects, export_operator.bone_collection_list)
         return {'FINISHED'}
 
 
@@ -236,10 +237,11 @@ def get_psk_build_options_from_property_group(pg: 'PSK_PG_export') -> PskBuildOp
     options.object_eval_state = pg.object_eval_state
     options.export_space = pg.export_space
     options.bone_filter_mode = pg.bone_filter_mode
-    options.bone_collection_indices = [x.index for x in pg.bone_collection_list if x.is_selected]
+    options.bone_collection_indices = [(x.armature_object_name, x.index) for x in pg.bone_collection_list if x.is_selected]
     options.scale = pg.scale
     options.forward_axis = pg.forward_axis
     options.up_axis = pg.up_axis
+    options.root_bone_name = pg.root_bone_name
 
     # TODO: perhaps move this into the build function and replace the materials list with a material names list.
     # materials = get_materials_for_mesh_objects(depsgraph, mesh_objects)
@@ -276,12 +278,13 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
             return {'CANCELLED'}
 
         options = get_psk_build_options_from_property_group(self)
+        filepath = str(Path(self.filepath).resolve())
 
         try:
             result = build_psk(context, input_objects, options)
             for warning in result.warnings:
                 self.report({'WARNING'}, warning)
-            write_psk(result.psk, self.filepath)
+            write_psk(result.psk, filepath)
             if len(result.warnings) > 0:
                 self.report({'WARNING'}, f'PSK export successful with {len(result.warnings)} warnings')
             else:
@@ -299,7 +302,7 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
         flow.use_property_split = True
         flow.use_property_decorate = False
 
-        # MESH
+        # Mesh
         mesh_header, mesh_panel = layout.panel('Mesh', default_closed=False)
         mesh_header.label(text='Mesh', icon='MESH_DATA')
         if mesh_panel:
@@ -309,17 +312,26 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
             flow.prop(self, 'object_eval_state', text='Data')
             flow.prop(self, 'should_exclude_hidden_meshes')
 
-        # BONES
+        # Bones
         bones_header, bones_panel = layout.panel('Bones', default_closed=False)
         bones_header.label(text='Bones', icon='BONE_DATA')
         if bones_panel:
             draw_bone_filter_mode(bones_panel, self, True)
+
             if self.bone_filter_mode == 'BONE_COLLECTIONS':
                 bones_panel.operator(PSK_OT_populate_bone_collection_list.bl_idname, icon='FILE_REFRESH')
                 rows = max(3, min(len(self.bone_collection_list), 10))
                 bones_panel.template_list('PSX_UL_bone_collection_list', '', self, 'bone_collection_list', self, 'bone_collection_list_index', rows=rows)
 
-        # MATERIALS
+            advanced_bones_header, advanced_bones_panel = bones_panel.panel('Advanced', default_closed=True)
+            advanced_bones_header.label(text='Advanced')
+            if advanced_bones_panel:
+                flow = advanced_bones_panel.grid_flow(row_major=True)
+                flow.use_property_split = True
+                flow.use_property_decorate = False
+                flow.prop(self, 'root_bone_name')
+
+        # Materials
         materials_header, materials_panel = layout.panel('Materials', default_closed=False)
         materials_header.label(text='Materials', icon='MATERIAL')
 
@@ -334,7 +346,7 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
             col.separator()
             col.operator(PSK_OT_material_list_name_add.bl_idname, text='', icon='ADD')
 
-        # TRANSFORM
+        # Transform
         transform_header, transform_panel = layout.panel('Transform', default_closed=False)
         transform_header.label(text='Transform')
         if transform_panel:
@@ -368,13 +380,9 @@ class PSK_OT_export(Operator, ExportHelper):
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
-        if len(input_objects.mesh_objects) == 0:
-            self.report({'ERROR_INVALID_CONTEXT'}, 'No mesh objects selected')
-            return {'CANCELLED'}
-
         pg = getattr(context.scene, 'psk_export')
 
-        populate_bone_collection_list(input_objects.armature_object, pg.bone_collection_list)
+        populate_bone_collection_list(input_objects.armature_objects, pg.bone_collection_list)
 
         depsgraph = context.evaluated_depsgraph_get()
 
@@ -393,7 +401,7 @@ class PSK_OT_export(Operator, ExportHelper):
 
         pg = getattr(context.scene, 'psk_export')
 
-        # MESH
+        # Mesh
         mesh_header, mesh_panel = layout.panel('Mesh', default_closed=False)
         mesh_header.label(text='Mesh', icon='MESH_DATA')
         if mesh_panel:
@@ -402,7 +410,7 @@ class PSK_OT_export(Operator, ExportHelper):
             flow.use_property_decorate = False
             flow.prop(pg, 'object_eval_state', text='Data')
 
-        # BONES
+        # Bones
         bones_header, bones_panel = layout.panel('Bones', default_closed=False)
         bones_header.label(text='Bones', icon='BONE_DATA')
         if bones_panel:
@@ -412,7 +420,7 @@ class PSK_OT_export(Operator, ExportHelper):
                 rows = max(3, min(len(pg.bone_collection_list), 10))
                 row.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index', rows=rows)
 
-        # MATERIALS
+        # Materials
         materials_header, materials_panel = layout.panel('Materials', default_closed=False)
         materials_header.label(text='Materials', icon='MATERIAL')
         if materials_panel:
@@ -422,6 +430,18 @@ class PSK_OT_export(Operator, ExportHelper):
             col = row.column(align=True)
             col.operator(PSK_OT_material_list_move_up.bl_idname, text='', icon='TRIA_UP')
             col.operator(PSK_OT_material_list_move_down.bl_idname, text='', icon='TRIA_DOWN')
+
+        # Transform
+        transform_header, transform_panel = layout.panel('Transform', default_closed=False)
+        transform_header.label(text='Transform')
+        if transform_panel:
+            flow = transform_panel.grid_flow(row_major=True)
+            flow.use_property_split = True
+            flow.use_property_decorate = False
+            flow.prop(pg, 'export_space')
+            flow.prop(pg, 'scale')
+            flow.prop(pg, 'forward_axis')
+            flow.prop(pg, 'up_axis')
 
     def execute(self, context):
         pg = getattr(context.scene, 'psk_export')

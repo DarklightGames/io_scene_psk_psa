@@ -1,3 +1,4 @@
+import bpy
 from bpy.props import StringProperty, IntProperty, BoolProperty, FloatProperty
 from bpy.types import PropertyGroup, UIList, UILayout, Context, AnyType, Panel
 
@@ -7,11 +8,19 @@ class PSX_UL_bone_collection_list(UIList):
     def draw_item(self, context: Context, layout: UILayout, data: AnyType, item: AnyType, icon: int,
                   active_data: AnyType, active_property: str, index: int = 0, flt_flag: int = 0):
         row = layout.row()
+
         row.prop(item, 'is_selected', text=getattr(item, 'name'))
         row.label(text=str(getattr(item, 'count')), icon='BONE_DATA')
 
+        armature_object = bpy.data.objects.get(item.armature_object_name, None)
+        if armature_object is None:
+            row.label(icon='ERROR')
+        else:
+            row.label(text=armature_object.name, icon='ARMATURE_DATA')
+
 
 class PSX_PG_bone_collection_list_item(PropertyGroup):
+    armature_object_name: StringProperty()
     name: StringProperty()
     index: IntProperty()
     count: IntProperty()

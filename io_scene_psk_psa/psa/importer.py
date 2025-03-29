@@ -260,7 +260,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             case 'SEQUENCE':
                 target_fps = sequence.fps
             case _:
-                raise ValueError(f'Unknown FPS source: {options.fps_source}')
+                assert False, f'Invalid FPS source: {options.fps_source}'
 
         if options.should_write_keyframes:
             # Remove existing f-curves.
