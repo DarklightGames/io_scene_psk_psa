@@ -12,6 +12,11 @@ object_eval_state_items = (
     ('ORIGINAL', 'Original', 'Use data from original object with no modifiers applied'),
 )
 
+material_order_mode_items = (
+    ('AUTOMATIC', 'Automatic', 'Automatically order the materials'),
+    ('MANUAL', 'Manual', 'Manually arrange the materials'),
+)
+
 class PSK_PG_material_list_item(PropertyGroup):
     material: PointerProperty(type=Material)
     index: IntProperty()
@@ -47,6 +52,12 @@ class PskExportMixin(ExportSpaceMixin, ForwardUpAxisMixin):
     )
     bone_collection_list: CollectionProperty(type=PSX_PG_bone_collection_list_item)
     bone_collection_list_index: IntProperty(default=0)
+    material_order_mode: EnumProperty(
+        name='Material Order',
+        description='The order in which to export the materials',
+        items=material_order_mode_items,
+        default='AUTOMATIC'
+    )
     material_name_list: CollectionProperty(type=PSK_PG_material_name_list_item)
     material_name_list_index: IntProperty(default=0)
     root_bone_name: StringProperty(

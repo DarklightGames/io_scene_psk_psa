@@ -53,7 +53,7 @@ def read_psk(path: str) -> Psk:
                 case b'MATT0000':
                     _read_types(fp, Psk.Material, section, psk.materials)
                 case b'REFSKELT':
-                    _read_types(fp, Psk.Bone, section, psk.bones)
+                    _read_types(fp, PsxBone, section, psk.bones)
                 case b'RAWWEIGHTS':
                     _read_types(fp, Psk.Weight, section, psk.weights)
                 case b'FACE3200':

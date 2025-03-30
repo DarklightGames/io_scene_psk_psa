@@ -3,7 +3,7 @@ from ctypes import Structure, sizeof
 from typing import Type
 
 from .data import Psk
-from ..shared.data import Section, Vector3
+from ..shared.data import Section, Vector3, PsxBone
 
 MAX_WEDGE_COUNT = 65536
 MAX_POINT_COUNT = 4294967296
@@ -55,7 +55,7 @@ def write_psk(psk: Psk, path: str):
             _write_section(fp, b'VTXW0000', Psk.Wedge16, wedges)
             _write_section(fp, b'FACE0000', Psk.Face, psk.faces)
             _write_section(fp, b'MATT0000', Psk.Material, psk.materials)
-            _write_section(fp, b'REFSKELT', Psk.Bone, psk.bones)
+            _write_section(fp, b'REFSKELT', PsxBone, psk.bones)
             _write_section(fp, b'RAWWEIGHTS', Psk.Weight, psk.weights)
     except PermissionError as e:
         raise RuntimeError(f'The current user "{os.getlogin()}" does not have permission to write to "{path}"') from e

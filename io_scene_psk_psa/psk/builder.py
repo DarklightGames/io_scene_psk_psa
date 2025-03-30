@@ -1,22 +1,23 @@
 import typing
-from collections import Counter
-from typing import Dict, Generator, Set, Iterable, Optional, cast
+from typing import Dict, Generator, Set, Iterable, Optional, cast, Tuple
 
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import Material, Collection, Context, Object, Armature, Bone
+from bpy.types import Collection, Context, Object, Armature
+from mathutils import Matrix
 
 from .data import *
+from .export.operators import get_materials_for_mesh_objects
 from .properties import triangle_type_and_bit_flags_to_poly_flags
 from ..shared.dfs import dfs_collection_objects, dfs_view_layer_objects, DfsObject
-from ..shared.helpers import get_coordinate_system_transform, convert_string_to_cp1252_bytes, \
-    get_export_bone_names, convert_blender_bones_to_psx_bones
+from ..shared.helpers import convert_string_to_cp1252_bytes, \
+    create_psx_bones, get_coordinate_system_transform
 
 
 class PskInputObjects(object):
     def __init__(self):
-        self.mesh_objects: List[DfsObject] = []
+        self.mesh_dfs_objects: List[DfsObject] = []
         self.armature_objects: Set[Object] = set()
 
 
@@ -25,7 +26,8 @@ class PskBuildOptions(object):
         self.bone_filter_mode = 'ALL'
         self.bone_collection_indices: List[Tuple[str, int]] = []
         self.object_eval_state = 'EVALUATED'
-        self.materials: List[Material] = []
+        self.material_order_mode = 'AUTOMATIC'
+        self.material_name_list: List[str] = []
         self.scale = 1.0
         self.export_space = 'WORLD'
         self.forward_axis = 'X'
@@ -63,14 +65,14 @@ def get_armatures_for_mesh_objects(mesh_objects: Iterable[Object]) -> Generator[
         yield modifiers[0].object
 
 
-def _get_psk_input_objects(mesh_objects: Iterable[DfsObject]) -> PskInputObjects:
-    mesh_objects = list(mesh_objects)
-    if len(mesh_objects) == 0:
+def _get_psk_input_objects(mesh_dfs_objects: Iterable[DfsObject]) -> PskInputObjects:
+    mesh_dfs_objects = list(mesh_dfs_objects)
+    if len(mesh_dfs_objects) == 0:
         raise RuntimeError('At least one mesh must be selected')
 
     input_objects = PskInputObjects()
-    input_objects.mesh_objects = mesh_objects
-    input_objects.armature_objects |= set(get_armatures_for_mesh_objects(map(lambda x: x.obj, mesh_objects)))
+    input_objects.mesh_dfs_objects = mesh_dfs_objects
+    input_objects.armature_objects |= set(get_armatures_for_mesh_objects(map(lambda x: x.obj, mesh_dfs_objects)))
 
     return input_objects
 
@@ -133,98 +135,39 @@ def _get_material_name_indices(obj: Object, material_names: List[str]) -> Iterab
                 yield 0
 
 
-def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions) -> PskBuildResult:
+def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuildOptions) -> PskBuildResult:
     armature_objects = list(input_objects.armature_objects)
 
     result = PskBuildResult()
     psk = Psk()
-    bones: List[Bone] = []
 
-    if options.export_space != 'WORLD' and len(armature_objects) > 1:
-        raise RuntimeError('When exporting multiple armatures, the Export Space must be World')
+    psx_bone_create_result = create_psx_bones(
+        armature_objects=armature_objects,
+        export_space=options.export_space,
+        forward_axis=options.forward_axis,
+        up_axis=options.up_axis,
+        scale=options.scale,
+        root_bone_name=options.root_bone_name,
+        bone_filter_mode=options.bone_filter_mode,
+        bone_collection_indices=options.bone_collection_indices
+    )
 
-    coordinate_system_matrix = get_coordinate_system_transform(options.forward_axis, options.up_axis)
-    coordinate_system_default_rotation = coordinate_system_matrix.to_quaternion()
-
-    scale_matrix = Matrix.Scale(options.scale, 4)
-
-    total_bone_count = sum(len(armature_object.data.bones) for armature_object in armature_objects)
-
-    # Store the index of the root bone for each armature object.
-    # We will need this later to correctly assign vertex weights.
-    armature_object_root_bone_indices = dict()
-
-    # Store the bone names to be exported for each armature object.
-    armature_object_bone_names: Dict[Object, List[str]] = dict()
-    for armature_object in  armature_objects:
-        bone_collection_indices = [x[1] for x in options.bone_collection_indices if x[0] == armature_object.name]
-        bone_names = get_export_bone_names(armature_object, options.bone_filter_mode, bone_collection_indices)
-        armature_object_bone_names[armature_object] = bone_names
-
-    if len(armature_objects) == 0 or total_bone_count == 0:
-        # If the mesh has no armature object or no bones, simply assign it a dummy bone at the root to satisfy the
-        # requirement that a PSK file must have at least one bone.
-        psk_bone = Psk.Bone()
-        psk_bone.name = convert_string_to_cp1252_bytes(options.root_bone_name)
-        psk_bone.flags = 0
-        psk_bone.children_count = 0
-        psk_bone.parent_index = 0
-        psk_bone.location = Vector3.zero()
-        psk_bone.rotation = Quaternion.from_bpy_quaternion(coordinate_system_default_rotation)
-        psk.bones.append(psk_bone)
-
-        armature_object_root_bone_indices[None] = 0
-    else:
-        # If we have multiple armature objects, create a root bone at the world origin.
-        if len(armature_objects) > 1:
-            psk_bone = Psk.Bone()
-            psk_bone.name = convert_string_to_cp1252_bytes(options.root_bone_name)
-            psk_bone.flags = 0
-            psk_bone.children_count = total_bone_count
-            psk_bone.parent_index = 0
-            psk_bone.location = Vector3.zero()
-            psk_bone.rotation = Quaternion.from_bpy_quaternion(coordinate_system_default_rotation)
-            psk.bones.append(psk_bone)
-
-            armature_object_root_bone_indices[None] = 0
-
-        root_bone = psk.bones[0] if len(psk.bones) > 0 else None
-
-        for armature_object in armature_objects:
-            bone_names = armature_object_bone_names[armature_object]
-            armature_data = typing.cast(Armature, armature_object.data)
-            bones = [armature_data.bones[bone_name] for bone_name in bone_names]
-
-            psk_bones = convert_blender_bones_to_psx_bones(
-                bones=bones,
-                bone_class=Psk.Bone,
-                export_space=options.export_space,
-                armature_object_matrix_world=armature_object.matrix_world,
-                scale=options.scale,
-                forward_axis=options.forward_axis,
-                up_axis=options.up_axis,
-                root_bone=root_bone,
-            )
-
-            # If we are appending these bones to an existing list of bones, we need to adjust the parent indices.
-            if len(psk.bones) > 0:
-                parent_index_offset = len(psk.bones)
-                for bone in psk_bones[1:]:
-                    bone.parent_index += parent_index_offset
-
-            armature_object_root_bone_indices[armature_object] = len(psk.bones)
-
-            psk.bones.extend(psk_bones)
-
-    # Check if there are bone name conflicts between armatures.
-    bone_name_counts = Counter(x.name.decode('windows-1252').upper() for x in psk.bones)
-
-    for bone_name, count in bone_name_counts.items():
-        if count > 1:
-            raise RuntimeError(f'Found {count} bones with the name "{bone_name}". Bone names must be unique when compared case-insensitively.')
+    psk.bones = [psx_bone for psx_bone, _ in psx_bone_create_result.bones]
 
     # Materials
-    for material in options.materials:
+    match options.material_order_mode:
+        case 'AUTOMATIC':
+            mesh_objects = [dfs_object.obj for dfs_object in input_objects.mesh_dfs_objects]
+            materials = list(get_materials_for_mesh_objects(context.evaluated_depsgraph_get(), mesh_objects))
+        case 'MANUAL':
+            # The material name list may contain materials that are not on the mesh objects.
+            # Therefore, we can take the material_name_list as gospel and simply use it as a lookup table.
+            # If a look-up fails, replace it with an empty material.
+            materials = [bpy.data.materials.get(x.material_name, None) for x in options.material_name_list]
+        case _:
+            assert False, f'Invalid material order mode: {options.material_order_mode}'
+
+    for material in materials:
         psk_material = Psk.Material()
         psk_material.name = convert_string_to_cp1252_bytes(material.name)
         psk_material.texture_index = len(psk.materials)
@@ -243,9 +186,11 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
         psk_material.name = convert_string_to_cp1252_bytes('None')
         psk.materials.append(psk_material)
 
-    context.window_manager.progress_begin(0, len(input_objects.mesh_objects))
+    context.window_manager.progress_begin(0, len(input_objects.mesh_dfs_objects))
 
+    coordinate_system_matrix = get_coordinate_system_transform(options.forward_axis, options.up_axis)
     mesh_export_space_matrix = _get_mesh_export_space_matrix(armature_objects, options.export_space)
+    scale_matrix = Matrix.Scale(options.scale, 4)
     vertex_transform_matrix = scale_matrix @ coordinate_system_matrix @ mesh_export_space_matrix
 
     original_armature_object_pose_positions = {armature_object: armature_object.data.pose_position for armature_object in armature_objects}
@@ -255,9 +200,9 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
     for armature_object in armature_objects:
         armature_object.data.pose_position = 'REST'
 
-    material_names = [m.name for m in options.materials]
+    material_names = [m.name for m in materials]
 
-    for object_index, input_mesh_object in enumerate(input_objects.mesh_objects):
+    for object_index, input_mesh_object in enumerate(input_objects.mesh_dfs_objects):
         obj, instance_objects, matrix_world = input_mesh_object.obj, input_mesh_object.instance_objects, input_mesh_object.matrix_world
 
         armature_object = get_armature_for_mesh_object(obj)
@@ -384,11 +329,11 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
         # Weights
         if armature_object is not None:
             armature_data = typing.cast(Armature, armature_object.data)
-            bone_index_offset = armature_object_root_bone_indices[armature_object]
+            bone_index_offset = psx_bone_create_result.armature_object_root_bone_indices[armature_object]
             # Because the vertex groups may contain entries for which there is no matching bone in the armature,
             # we must filter them out and not export any weights for these vertex groups.
 
-            bone_names = armature_object_bone_names[armature_object]
+            bone_names = psx_bone_create_result.armature_object_bone_names[armature_object]
             vertex_group_names = [x.name for x in mesh_object.vertex_groups]
             vertex_group_bone_indices: Dict[int, int] = dict()
             for vertex_group_index, vertex_group_name in enumerate(vertex_group_names):
@@ -433,7 +378,7 @@ def build_psk(context, input_objects: PskInputObjects, options: PskBuildOptions)
                     vertices_assigned_weights[vertex_index] = True
 
             # Assign vertices that have not been assigned weights to the root bone of the armature.
-            fallback_weight_bone_index = armature_object_root_bone_indices[armature_object]
+            fallback_weight_bone_index = psx_bone_create_result.armature_object_root_bone_indices[armature_object]
             for vertex_index, assigned in enumerate(vertices_assigned_weights):
                 if not assigned:
                     w = Psk.Weight()

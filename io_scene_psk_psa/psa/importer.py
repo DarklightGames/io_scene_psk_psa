@@ -7,8 +7,8 @@ from bpy.types import FCurve, Object, Context
 from mathutils import Vector, Quaternion
 
 from .config import PsaConfig, REMOVE_TRACK_LOCATION, REMOVE_TRACK_ROTATION
-from .data import Psa
 from .reader import PsaReader
+from ..shared.data import PsxBone
 
 
 class PsaImportOptions(object):
@@ -45,8 +45,8 @@ class PsaImportOptions(object):
 
 
 class ImportBone(object):
-    def __init__(self, psa_bone: Psa.Bone):
-        self.psa_bone: Psa.Bone = psa_bone
+    def __init__(self, psa_bone: PsxBone):
+        self.psa_bone: PsxBone = psa_bone
         self.parent: Optional[ImportBone] = None
         self.armature_bone = None
         self.pose_bone = None

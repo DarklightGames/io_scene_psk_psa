@@ -3,9 +3,8 @@ from typing import List, Iterable, Dict, Tuple, Optional
 
 import bpy
 from bpy.props import StringProperty
-from bpy.types import Context, Action, Object, AnimData, TimelineMarker
+from bpy.types import Context, Action, Object, AnimData, TimelineMarker, Operator
 from bpy_extras.io_utils import ExportHelper
-from bpy_types import Operator
 
 from .properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_sequences, \
     get_sequences_from_name_and_frame_range
@@ -63,7 +62,7 @@ def is_action_for_object(obj: Object, action: Action):
     return any(obj in slot.users() for slot in action.slots)
 
 
-def update_actions_and_timeline_markers(context: Context):
+def update_actions_and_timeline_markers(context: Context, armature_objects: Iterable[Object]):
     pg = getattr(context.scene, 'psa_export')
 
     # Clear actions and markers.
@@ -72,6 +71,7 @@ def update_actions_and_timeline_markers(context: Context):
     pg.active_action_list.clear()
 
     # Get animation data.
+    # TODO: Not sure how to handle this with multiple armatures.
     animation_data_object = get_animation_data_object(context)
     animation_data = animation_data_object.animation_data if animation_data_object else None
 
@@ -80,7 +80,8 @@ def update_actions_and_timeline_markers(context: Context):
 
     # Populate actions list.
     for action in bpy.data.actions:
-        if not is_action_for_object(context.active_object, action):
+        if not any(map(lambda armature_object: is_action_for_object(armature_object, action), armature_objects)):
+            # This action is not applicable to any of the selected armatures.
             continue
 
         for (name, frame_start, frame_end) in get_sequences_from_action(action):
@@ -170,7 +171,7 @@ def get_animation_data_object(context: Context) -> Object:
     active_object = context.view_layer.objects.active
 
     if active_object.type != 'ARMATURE':
-        raise RuntimeError('Selected object must be an Armature')
+        raise RuntimeError('Active object must be an Armature')
 
     if pg.sequence_source != 'ACTIONS' and pg.should_override_animation_data:
         animation_data_object = pg.animation_data_override
@@ -275,7 +276,7 @@ class PSA_OT_export(Operator, ExportHelper):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.armature_object = None
+        self.armature_objects: List[Object] = []
 
     @classmethod
     def poll(cls, context):
@@ -380,6 +381,14 @@ class PSA_OT_export(Operator, ExportHelper):
                 bones_panel.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index',
                                      rows=rows)
 
+            bones_advanced_header, bones_advanced_panel = layout.panel('Advanced', default_closed=False)
+            bones_advanced_header.label(text='Advanced')
+            if bones_advanced_panel:
+                flow = bones_advanced_panel.grid_flow()
+                flow.use_property_split = True
+                flow.use_property_decorate = False
+                flow.prop(pg, 'root_bone_name', text='Root Bone Name')
+
         # TRANSFORM
         transform_header, transform_panel = layout.panel('Advanced', default_closed=False)
         transform_header.label(text='Transform')
@@ -401,17 +410,9 @@ class PSA_OT_export(Operator, ExportHelper):
         if context.view_layer.objects.active.type != 'ARMATURE':
             raise RuntimeError('The active object must be an armature')
 
-        # If we have multiple armatures selected, make sure that they all use the same underlying armature data.
-        armature_objects = [obj for obj in context.selected_objects if obj.type == 'ARMATURE']
-
-        for obj in armature_objects:
-            if obj.data != context.view_layer.objects.active.data:
-                raise RuntimeError(f'All selected armatures must use the same armature data block.\n\n'
-                                   f'\The armature data block for "{obj.name}\" (\'{obj.data.name}\') does not match '
-                                   f'the active armature data block (\'{context.view_layer.objects.active.name}\')')
-
         if context.scene.is_nla_tweakmode:
             raise RuntimeError('Cannot export PSA while in NLA tweak mode')
+
 
     def invoke(self, context, _event):
         try:
@@ -421,16 +422,16 @@ class PSA_OT_export(Operator, ExportHelper):
 
         pg: PSA_PG_export = getattr(context.scene, 'psa_export')
 
-        self.armature_object = context.view_layer.objects.active
+        self.armature_objects = [x for x in context.view_layer.objects.selected if x.type == 'ARMATURE']
 
-        if self.armature_object.animation_data is None:
+        for armature_object in self.armature_objects:
             # This is required otherwise the action list will be empty if the armature has never had its animation
             # data created before (i.e. if no action was ever assigned to it).
-            self.armature_object.animation_data_create()
+            if armature_object.animation_data is None:
+                armature_object.animation_data_create()
 
-        update_actions_and_timeline_markers(context)
-
-        populate_bone_collection_list(self.armature_object, pg.bone_collection_list)
+        update_actions_and_timeline_markers(context, self.armature_objects)
+        populate_bone_collection_list(self.armature_objects, pg.bone_collection_list)
 
         context.window_manager.fileselect_add(self)
 
@@ -442,9 +443,11 @@ class PSA_OT_export(Operator, ExportHelper):
         # Ensure that we actually have items that we are going to be exporting.
         if pg.sequence_source == 'ACTIONS' and len(pg.action_list) == 0:
             raise RuntimeError('No actions were selected for export')
-        elif pg.sequence_source == 'TIMELINE_MARKERS' and len(pg.marker_list) == 0:
+
+        if pg.sequence_source == 'TIMELINE_MARKERS' and len(pg.marker_list) == 0:
             raise RuntimeError('No timeline markers were selected for export')
-        elif pg.sequence_source == 'NLA_TRACK_STRIPS' and len(pg.nla_strip_list) == 0:
+
+        if pg.sequence_source == 'NLA_TRACK_STRIPS' and len(pg.nla_strip_list) == 0:
             raise RuntimeError('No NLA track strips were selected for export')
 
         # Populate the export sequence list.
@@ -511,6 +514,7 @@ class PSA_OT_export(Operator, ExportHelper):
             return {'CANCELLED'}
 
         options = PsaBuildOptions()
+        options.armature_objects = self.armature_objects
         options.animation_data = animation_data
         options.sequences = export_sequences
         options.bone_filter_mode = pg.bone_filter_mode
@@ -522,6 +526,7 @@ class PSA_OT_export(Operator, ExportHelper):
         options.export_space = pg.export_space
         options.forward_axis = pg.forward_axis
         options.up_axis = pg.up_axis
+        options.root_bone_name = pg.root_bone_name
 
         try:
             psa = build_psa(context, options)

@@ -1,8 +1,9 @@
-import ctypes
+from ctypes import sizeof
+from typing import List
 
 import numpy as np
 
-from .data import *
+from .data import Psa, Section, PsxBone
 
 
 def _try_fix_cue4parse_issue_103(sequences) -> bool:
@@ -101,11 +102,11 @@ class PsaReader(object):
         psa = Psa()
         while fp.read(1):
             fp.seek(-1, 1)
-            section = Section.from_buffer_copy(fp.read(ctypes.sizeof(Section)))
+            section = Section.from_buffer_copy(fp.read(sizeof(Section)))
             if section.name == b'ANIMHEAD':
                 pass
             elif section.name == b'BONENAMES':
-                PsaReader._read_types(fp, Psa.Bone, section, psa.bones)
+                PsaReader._read_types(fp, PsxBone, section, psa.bones)
             elif section.name == b'ANIMINFO':
                 sequences = []
                 PsaReader._read_types(fp, Psa.Sequence, section, sequences)

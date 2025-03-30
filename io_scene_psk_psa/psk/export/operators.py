@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List, Optional, cast, Iterable
 
 import bpy
-from bpy.props import StringProperty
+from bpy.props import StringProperty, BoolProperty
 from bpy.types import Operator, Context, Object, Collection, SpaceProperties, Depsgraph, Material
 from bpy_extras.io_utils import ExportHelper
 
@@ -27,8 +27,14 @@ def get_materials_for_mesh_objects(depsgraph: Depsgraph, mesh_objects: Iterable[
                 yield material
 
 
-def populate_material_name_list(depsgraph: Depsgraph, mesh_objects, material_list):
-    materials = get_materials_for_mesh_objects(depsgraph, mesh_objects)
+def populate_material_name_list(depsgraph: Depsgraph, mesh_objects: Iterable[Object], material_list):
+    materials = list(get_materials_for_mesh_objects(depsgraph, mesh_objects))
+
+    # Order the mesh object materials by the order any existing entries in the material list.
+    # This way, if the user has already set up the material list, we don't change the order.
+    material_names = [x.material_name for x in material_list]
+    materials = get_sorted_materials_by_names(materials, material_names)
+
     material_list.clear()
     for index, material in enumerate(materials):
         m = material_list.add()
@@ -60,8 +66,8 @@ def get_collection_export_operator_from_context(context: Context) -> Optional[ob
     return exporter.export_properties
 
 
-class PSK_OT_populate_bone_collection_list(Operator):
-    bl_idname = 'psk.export_populate_bone_collection_list'
+class PSK_OT_bone_collection_list_populate(Operator):
+    bl_idname = 'psk.bone_collection_list_populate'
     bl_label = 'Populate Bone Collection List'
     bl_description = 'Populate the bone collection list from the armature that will be used in this collection export'
     bl_options = {'INTERNAL'}
@@ -83,6 +89,24 @@ class PSK_OT_populate_bone_collection_list(Operator):
         return {'FINISHED'}
 
 
+class PSK_OT_bone_collection_list_select_all(Operator):
+    bl_idname = 'psk.bone_collection_list_select_all'
+    bl_label = 'Select All'
+    bl_description = 'Select all bone collections'
+    bl_options = {'INTERNAL'}
+
+    is_selected: BoolProperty(default=True)
+
+    def execute(self, context):
+        export_operator = get_collection_export_operator_from_context(context)
+        if export_operator is None:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
+            return {'CANCELLED'}
+        for item in export_operator.bone_collection_list:
+            item.is_selected = self.is_selected
+        return {'FINISHED'}
+
+
 class PSK_OT_populate_material_name_list(Operator):
     bl_idname = 'psk.export_populate_material_name_list'
     bl_label = 'Populate Material Name List'
@@ -97,7 +121,7 @@ class PSK_OT_populate_material_name_list(Operator):
         depsgraph = context.evaluated_depsgraph_get()
         input_objects = get_psk_input_objects_for_collection(context.collection)
         try:
-            populate_material_name_list(depsgraph, [x.obj for x in input_objects.mesh_objects], export_operator.material_name_list)
+            populate_material_name_list(depsgraph, [x.obj for x in input_objects.mesh_dfs_objects], export_operator.material_name_list)
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
@@ -116,7 +140,7 @@ class PSK_OT_material_list_name_add(Operator):
     bl_description = 'Add a material to the material name list (useful if you want to add a material slot that is not actually used in the mesh)'
     bl_options = {'INTERNAL'}
 
-    name: StringProperty(search=material_list_names_search_cb)
+    name: StringProperty(search=material_list_names_search_cb, name='Material Name', default='None')
 
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
@@ -232,7 +256,7 @@ def get_sorted_materials_by_names(materials: Iterable[Material], material_names:
     return materials_in_collection + materials_not_in_collection
 
 
-def get_psk_build_options_from_property_group(pg: 'PSK_PG_export') -> PskBuildOptions:
+def get_psk_build_options_from_property_group(pg: PskExportMixin) -> PskBuildOptions:
     options = PskBuildOptions()
     options.object_eval_state = pg.object_eval_state
     options.export_space = pg.export_space
@@ -242,15 +266,8 @@ def get_psk_build_options_from_property_group(pg: 'PSK_PG_export') -> PskBuildOp
     options.forward_axis = pg.forward_axis
     options.up_axis = pg.up_axis
     options.root_bone_name = pg.root_bone_name
-
-    # TODO: perhaps move this into the build function and replace the materials list with a material names list.
-    # materials = get_materials_for_mesh_objects(depsgraph, mesh_objects)
-
-    # The material name list may contain materials that are not on the mesh objects.
-    # Therefore, we can perhaps take the material_name_list as gospel and simply use it as a lookup table.
-    # If a look-up fails, replace it with an empty material.
-    options.materials = [bpy.data.materials.get(x.material_name, None) for x in pg.material_name_list]
-
+    options.material_order_mode = pg.material_order_mode
+    options.material_name_list = pg.material_name_list
     return options
 
 
@@ -319,9 +336,16 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
             draw_bone_filter_mode(bones_panel, self, True)
 
             if self.bone_filter_mode == 'BONE_COLLECTIONS':
-                bones_panel.operator(PSK_OT_populate_bone_collection_list.bl_idname, icon='FILE_REFRESH')
+                row = bones_panel.row()
                 rows = max(3, min(len(self.bone_collection_list), 10))
-                bones_panel.template_list('PSX_UL_bone_collection_list', '', self, 'bone_collection_list', self, 'bone_collection_list_index', rows=rows)
+                row.template_list('PSX_UL_bone_collection_list', '', self, 'bone_collection_list', self, 'bone_collection_list_index', rows=rows)
+                col = row.column(align=True)
+                col.operator(PSK_OT_bone_collection_list_populate.bl_idname, text='', icon='FILE_REFRESH')
+                col.separator()
+                op = col.operator(PSK_OT_bone_collection_list_select_all.bl_idname, text='', icon='CHECKBOX_HLT')
+                op.is_selected = True
+                op = col.operator(PSK_OT_bone_collection_list_select_all.bl_idname, text='', icon='CHECKBOX_DEHLT')
+                op.is_selected = False
 
             advanced_bones_header, advanced_bones_panel = bones_panel.panel('Advanced', default_closed=True)
             advanced_bones_header.label(text='Advanced')
@@ -336,15 +360,22 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
         materials_header.label(text='Materials', icon='MATERIAL')
 
         if materials_panel:
-            materials_panel.operator(PSK_OT_populate_material_name_list.bl_idname, icon='FILE_REFRESH')
-            rows = max(3, min(len(self.material_name_list), 10))
-            row = materials_panel.row()
-            row.template_list('PSK_UL_material_names', '', self, 'material_name_list', self, 'material_name_list_index', rows=rows)
-            col = row.column(align=True)
-            col.operator(PSK_OT_material_list_name_move_up.bl_idname, text='', icon='TRIA_UP')
-            col.operator(PSK_OT_material_list_name_move_down.bl_idname, text='', icon='TRIA_DOWN')
-            col.separator()
-            col.operator(PSK_OT_material_list_name_add.bl_idname, text='', icon='ADD')
+            flow = materials_panel.grid_flow(row_major=True)
+            flow.use_property_split = True
+            flow.use_property_decorate = False
+            flow.prop(self, 'material_order_mode', text='Material Order')
+
+            if self.material_order_mode == 'MANUAL':
+                rows = max(3, min(len(self.material_name_list), 10))
+                row = materials_panel.row()
+                row.template_list('PSK_UL_material_names', '', self, 'material_name_list', self, 'material_name_list_index', rows=rows)
+                col = row.column(align=True)
+                col.operator(PSK_OT_populate_material_name_list.bl_idname, text='', icon='FILE_REFRESH')
+                col.separator()
+                col.operator(PSK_OT_material_list_name_move_up.bl_idname, text='', icon='TRIA_UP')
+                col.operator(PSK_OT_material_list_name_move_down.bl_idname, text='', icon='TRIA_DOWN')
+                col.separator()
+                col.operator(PSK_OT_material_list_name_add.bl_idname, text='', icon='ADD')
 
         # Transform
         transform_header, transform_panel = layout.panel('Transform', default_closed=False)
@@ -364,7 +395,7 @@ class PSK_OT_export(Operator, ExportHelper):
     bl_idname = 'psk.export'
     bl_label = 'Export'
     bl_options = {'INTERNAL', 'UNDO'}
-    bl_description = 'Export mesh and armature to PSK'
+    bl_description = 'Export selected meshes to PSK'
     filename_ext = '.psk'
     filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
     filepath: StringProperty(
@@ -387,7 +418,7 @@ class PSK_OT_export(Operator, ExportHelper):
         depsgraph = context.evaluated_depsgraph_get()
 
         try:
-            populate_material_name_list(depsgraph, [x.obj for x in input_objects.mesh_objects], pg.material_name_list)
+            populate_material_name_list(depsgraph, [x.obj for x in input_objects.mesh_dfs_objects], pg.material_name_list)
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
@@ -419,17 +450,30 @@ class PSK_OT_export(Operator, ExportHelper):
                 row = bones_panel.row()
                 rows = max(3, min(len(pg.bone_collection_list), 10))
                 row.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index', rows=rows)
+            bones_advanced_header, bones_advanced_panel = bones_panel.panel('Advanced', default_closed=True)
+            bones_advanced_header.label(text='Advanced')
+            if bones_advanced_panel:
+                flow = bones_advanced_panel.grid_flow(row_major=True)
+                flow.use_property_split = True
+                flow.use_property_decorate = False
+                flow.prop(pg, 'root_bone_name')
 
         # Materials
         materials_header, materials_panel = layout.panel('Materials', default_closed=False)
         materials_header.label(text='Materials', icon='MATERIAL')
         if materials_panel:
-            row = materials_panel.row()
-            rows = max(3, min(len(pg.bone_collection_list), 10))
-            row.template_list('PSK_UL_material_names', '', pg, 'material_name_list', pg, 'material_name_list_index', rows=rows)
-            col = row.column(align=True)
-            col.operator(PSK_OT_material_list_move_up.bl_idname, text='', icon='TRIA_UP')
-            col.operator(PSK_OT_material_list_move_down.bl_idname, text='', icon='TRIA_DOWN')
+            flow = materials_panel.grid_flow(row_major=True)
+            flow.use_property_split = True
+            flow.use_property_decorate = False
+            flow.prop(pg, 'material_order_mode', text='Material Order')
+
+            if pg.material_order_mode == 'MANUAL':
+                row = materials_panel.row()
+                rows = max(3, min(len(pg.bone_collection_list), 10))
+                row.template_list('PSK_UL_material_names', '', pg, 'material_name_list', pg, 'material_name_list_index', rows=rows)
+                col = row.column(align=True)
+                col.operator(PSK_OT_material_list_move_up.bl_idname, text='', icon='TRIA_UP')
+                col.operator(PSK_OT_material_list_move_down.bl_idname, text='', icon='TRIA_DOWN')
 
         # Transform
         transform_header, transform_panel = layout.panel('Transform', default_closed=False)
@@ -470,7 +514,8 @@ classes = (
     PSK_OT_material_list_move_down,
     PSK_OT_export,
     PSK_OT_export_collection,
-    PSK_OT_populate_bone_collection_list,
+    PSK_OT_bone_collection_list_populate,
+    PSK_OT_bone_collection_list_select_all,
     PSK_OT_populate_material_name_list,
     PSK_OT_material_list_name_move_up,
     PSK_OT_material_list_name_move_down,

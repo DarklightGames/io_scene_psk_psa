@@ -1,6 +1,7 @@
+from ctypes import Structure, c_uint32, c_float, c_int32, c_uint8, c_int8, c_int16, c_char, c_uint16
 from typing import List
 
-from ..shared.data import *
+from ..shared.data import Vector3, Quaternion, Color, Vector2, PsxBone
 
 
 class Psk(object):
@@ -118,7 +119,7 @@ class Psk(object):
         self.faces: List[Psk.Face] = []
         self.materials: List[Psk.Material] = []
         self.weights: List[Psk.Weight] = []
-        self.bones: List[Psk.Bone] = []
+        self.bones: List[PsxBone] = []
         self.extra_uvs: List[Vector2] = []
         self.vertex_colors: List[Color] = []
         self.vertex_normals: List[Vector3] = []

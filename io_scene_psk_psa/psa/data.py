@@ -11,16 +11,6 @@ Use the PsaReader::get_sequence_keys to get the keys for a sequence.
 
 
 class Psa:
-    class Bone(Structure):
-        _fields_ = [
-            ('name', c_char * 64),
-            ('flags', c_int32),
-            ('children_count', c_int32),
-            ('parent_index', c_int32),
-            ('rotation', Quaternion),
-            ('location', Vector3),
-            ('padding', c_char * 16)
-        ]
 
     class Sequence(Structure):
         _fields_ = [
@@ -59,6 +49,6 @@ class Psa:
             return repr((self.location, self.rotation, self.time))
 
     def __init__(self):
-        self.bones: List[Psa.Bone] = []
+        self.bones: List[PsxBone] = []
         self.sequences: typing.OrderedDict[str, Psa.Sequence] = OrderedDict()
         self.keys: List[Psa.Key] = []

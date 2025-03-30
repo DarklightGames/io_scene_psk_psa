@@ -8,6 +8,7 @@ from mathutils import Quaternion, Vector, Matrix
 
 from .data import Psk
 from .properties import poly_flags_to_triangle_type_and_bit_flags
+from ..shared.data import PsxBone
 from ..shared.helpers import rgb_to_srgb, is_bdk_addon_loaded
 
 
@@ -31,9 +32,9 @@ class ImportBone:
     '''
     Intermediate bone type for the purpose of construction.
     '''
-    def __init__(self, index: int, psk_bone: Psk.Bone):
+    def __init__(self, index: int, psk_bone: PsxBone):
         self.index: int = index
-        self.psk_bone: Psk.Bone = psk_bone
+        self.psk_bone: PsxBone = psk_bone
         self.parent: Optional[ImportBone] = None
         self.local_rotation: Quaternion = Quaternion()
         self.local_translation: Vector = Vector()

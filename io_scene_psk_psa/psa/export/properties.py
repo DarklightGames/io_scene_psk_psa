@@ -217,6 +217,11 @@ class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin):
         ),
         default='INTERPOLATED'
     )
+    root_bone_name: StringProperty(
+        name='Root Bone Name',
+        description='The name of the generated root bone when exporting multiple armatures',
+        default='ROOT',
+    )
 
 
 def filter_sequences(pg: PSA_PG_export, sequences) -> List[int]:

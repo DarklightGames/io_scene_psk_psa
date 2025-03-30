@@ -2,7 +2,7 @@ from ctypes import *
 from typing import Tuple
 
 from bpy.props import EnumProperty
-from mathutils import Vector, Matrix, Quaternion as BpyQuaternion
+from mathutils import Quaternion as BpyQuaternion
 
 
 class Color(Structure):
@@ -94,6 +94,19 @@ class Quaternion(Structure):
         return quaternion
 
 
+class PsxBone(Structure):
+    _fields_ = [
+        ('name', c_char * 64),
+        ('flags', c_int32),
+        ('children_count', c_int32),
+        ('parent_index', c_int32),
+        ('rotation', Quaternion),
+        ('location', Vector3),
+        ('length', c_float),
+        ('size', Vector3)
+    ]
+
+
 class Section(Structure):
     _fields_ = [
         ('name', c_char * 20),
@@ -171,30 +184,3 @@ class ExportSpaceMixin:
         items=export_space_items,
         default='WORLD'
     )
-
-def get_vector_from_axis_identifier(axis_identifier: str) -> Vector:
-    match axis_identifier:
-        case 'X':
-            return Vector((1.0, 0.0, 0.0))
-        case 'Y':
-            return Vector((0.0, 1.0, 0.0))
-        case 'Z':
-            return Vector((0.0, 0.0, 1.0))
-        case '-X':
-            return Vector((-1.0, 0.0, 0.0))
-        case '-Y':
-            return Vector((0.0, -1.0, 0.0))
-        case '-Z':
-            return Vector((0.0, 0.0, -1.0))
-
-
-def get_coordinate_system_transform(forward_axis: str = 'X', up_axis: str = 'Z') -> Matrix:
-    forward = get_vector_from_axis_identifier(forward_axis)
-    up = get_vector_from_axis_identifier(up_axis)
-    left = up.cross(forward)
-    return Matrix((
-        (forward.x, forward.y, forward.z, 0.0),
-        (left.x, left.y, left.z, 0.0),
-        (up.x, up.y, up.z, 0.0),
-        (0.0, 0.0, 0.0, 1.0)
-    ))

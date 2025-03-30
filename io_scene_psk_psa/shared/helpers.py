@@ -1,12 +1,14 @@
-from typing import List, Iterable, cast, Optional
+from collections import Counter
+from typing import List, Iterable, cast, Optional, Dict, Tuple
 
 import bpy
 from bpy.props import CollectionProperty
 from bpy.types import AnimData, Object
 from bpy.types import Armature
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 
-from .data import get_coordinate_system_transform
+from .data import Vector3, Quaternion
+from ..shared.data import PsxBone
 
 
 def rgb_to_srgb(c: float):
@@ -171,16 +173,15 @@ def convert_string_to_cp1252_bytes(string: str) -> bytes:
 
 
 # TODO: Perhaps export space should just be a transform matrix, since the below is not actually used unless we're using WORLD space.
-def convert_blender_bones_to_psx_bones(
-        bones: Iterable[bpy.types.Bone],
-        bone_class: type,
+def create_psx_bones_from_blender_bones(
+        bones: List[bpy.types.Bone],
         export_space: str = 'WORLD',
         armature_object_matrix_world: Matrix = Matrix.Identity(4),
         scale = 1.0,
         forward_axis: str = 'X',
         up_axis: str = 'Z',
         root_bone: Optional = None,
-) -> Iterable:
+) -> List[PsxBone]:
 
     scale_matrix = Matrix.Scale(scale, 4)
 
@@ -189,7 +190,7 @@ def convert_blender_bones_to_psx_bones(
 
     psx_bones = []
     for bone in bones:
-        psx_bone = bone_class()
+        psx_bone = PsxBone()
         psx_bone.name = convert_string_to_cp1252_bytes(bone.name)
 
         try:
@@ -282,3 +283,148 @@ def get_export_space_matrix(export_space: str, armature_object: Optional[Object]
             pass
         case _:
             assert False, f'Invalid export space: {export_space}'
+
+
+class PsxBoneCreateResult:
+    def __init__(self,
+                 bones: List[Tuple[PsxBone, Optional[Object]]],  # List of tuples of (psx_bone, armature_object)
+                 armature_object_root_bone_indices: Dict[Object, int],
+                 armature_object_bone_names: Dict[Object, List[str]],
+                 ):
+        self.bones = bones
+        self.armature_object_root_bone_indices = armature_object_root_bone_indices
+        self.armature_object_bone_names = armature_object_bone_names
+
+
+def create_psx_bones(
+        armature_objects: List[Object],
+        export_space: str = 'WORLD',
+        root_bone_name: str = 'ROOT',
+        forward_axis: str = 'X',
+        up_axis: str = 'Z',
+        scale: float = 1.0,
+        bone_filter_mode: str = 'ALL',
+        bone_collection_indices: Optional[List[Tuple[str, int]]] = None,
+) -> PsxBoneCreateResult:
+    '''
+    Creates a list of PSX bones from the given armature objects and options.
+    This function will throw a RuntimeError if multiple armature objects are passed in and the export space is not WORLD.
+    It will also throw a RuntimeError if the bone names are not unique when compared case-insensitively.
+    '''
+    if bone_collection_indices is None:
+        bone_collection_indices = []
+
+    bones: List[Tuple[PsxBone, Optional[Object]]] = []
+
+    if export_space != 'WORLD' and len(armature_objects) > 1:
+        raise RuntimeError('When exporting multiple armatures, the Export Space must be World')
+
+    coordinate_system_matrix = get_coordinate_system_transform(forward_axis, up_axis)
+    coordinate_system_default_rotation = coordinate_system_matrix.to_quaternion()
+
+    total_bone_count = sum(len(armature_object.data.bones) for armature_object in armature_objects)
+
+    # Store the index of the root bone for each armature object.
+    # We will need this later to correctly assign vertex weights.
+    armature_object_root_bone_indices = dict()
+
+    # Store the bone names to be exported for each armature object.
+    armature_object_bone_names: Dict[Object, List[str]] = dict()
+    for armature_object in  armature_objects:
+        armature_bone_collection_indices = [x[1] for x in bone_collection_indices if x[0] == armature_object.name]
+        bone_names = get_export_bone_names(armature_object, bone_filter_mode, armature_bone_collection_indices)
+        armature_object_bone_names[armature_object] = bone_names
+
+    if len(armature_objects) == 0 or total_bone_count == 0:
+        # If the mesh has no armature object or no bones, simply assign it a dummy bone at the root to satisfy the
+        # requirement that a PSK file must have at least one bone.
+        psx_bone = PsxBone()
+        psx_bone.name = convert_string_to_cp1252_bytes(root_bone_name)
+        psx_bone.flags = 0
+        psx_bone.children_count = 0
+        psx_bone.parent_index = 0
+        psx_bone.location = Vector3.zero()
+        psx_bone.rotation = Quaternion.from_bpy_quaternion(coordinate_system_default_rotation)
+        bones.append((psx_bone, None))
+
+        armature_object_root_bone_indices[None] = 0
+    else:
+        # If we have multiple armature objects, create a root bone at the world origin.
+        if len(armature_objects) > 1:
+            psx_bone = PsxBone()
+            psx_bone.name = convert_string_to_cp1252_bytes(root_bone_name)
+            psx_bone.flags = 0
+            psx_bone.children_count = total_bone_count
+            psx_bone.parent_index = 0
+            psx_bone.location = Vector3.zero()
+            psx_bone.rotation = Quaternion.from_bpy_quaternion(coordinate_system_default_rotation)
+            bones.append((psx_bone, None))
+
+            armature_object_root_bone_indices[None] = 0
+
+        root_bone = bones[0][0] if len(bones) > 0 else None
+
+        for armature_object in armature_objects:
+            bone_names = armature_object_bone_names[armature_object]
+            armature_data = cast(Armature, armature_object.data)
+            armature_bones = [armature_data.bones[bone_name] for bone_name in bone_names]
+
+            armature_psx_bones = create_psx_bones_from_blender_bones(
+                bones=armature_bones,
+                export_space=export_space,
+                armature_object_matrix_world=armature_object.matrix_world,
+                scale=scale,
+                forward_axis=forward_axis,
+                up_axis=up_axis,
+                root_bone=root_bone,
+            )
+
+            # If we are appending these bones to an existing list of bones, we need to adjust the parent indices.
+            if len(bones) > 0:
+                parent_index_offset = len(bones)
+                for bone in armature_psx_bones[1:]:
+                    bone.parent_index += parent_index_offset
+
+            armature_object_root_bone_indices[armature_object] = len(bones)
+
+            bones.extend((psx_bone, armature_object) for psx_bone in armature_psx_bones)
+
+    # Check if there are bone name conflicts between armatures.
+    bone_name_counts = Counter(bone[0].name.decode('windows-1252').upper() for bone in bones)
+    for bone_name, count in bone_name_counts.items():
+        if count > 1:
+            raise RuntimeError(f'Found {count} bones with the name "{bone_name}". Bone names must be unique when compared case-insensitively.')
+
+    return PsxBoneCreateResult(
+        bones=bones,
+        armature_object_root_bone_indices=armature_object_root_bone_indices,
+        armature_object_bone_names=armature_object_bone_names,
+    )
+
+
+def get_vector_from_axis_identifier(axis_identifier: str) -> Vector:
+    match axis_identifier:
+        case 'X':
+            return Vector((1.0, 0.0, 0.0))
+        case 'Y':
+            return Vector((0.0, 1.0, 0.0))
+        case 'Z':
+            return Vector((0.0, 0.0, 1.0))
+        case '-X':
+            return Vector((-1.0, 0.0, 0.0))
+        case '-Y':
+            return Vector((0.0, -1.0, 0.0))
+        case '-Z':
+            return Vector((0.0, 0.0, -1.0))
+
+
+def get_coordinate_system_transform(forward_axis: str = 'X', up_axis: str = 'Z') -> Matrix:
+    forward = get_vector_from_axis_identifier(forward_axis)
+    up = get_vector_from_axis_identifier(up_axis)
+    left = up.cross(forward)
+    return Matrix((
+        (forward.x, forward.y, forward.z, 0.0),
+        (left.x, left.y, left.z, 0.0),
+        (up.x, up.y, up.z, 0.0),
+        (0.0, 0.0, 0.0, 1.0)
+    ))
