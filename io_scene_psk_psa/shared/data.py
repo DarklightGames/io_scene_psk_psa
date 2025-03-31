@@ -1,4 +1,4 @@
-from ctypes import *
+from ctypes import Structure, c_char, c_int32, c_float, c_ubyte
 from typing import Tuple
 
 from bpy.props import EnumProperty

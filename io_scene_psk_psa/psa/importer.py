@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import bpy
 import numpy as np
-from bpy.types import FCurve, Object, Context
+from bpy.types import Context, FCurve, Object
 from mathutils import Vector, Quaternion
 
 from .config import PsaConfig, REMOVE_TRACK_LOCATION, REMOVE_TRACK_ROTATION

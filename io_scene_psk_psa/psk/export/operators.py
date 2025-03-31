@@ -1,30 +1,17 @@
 from pathlib import Path
-from typing import List, Optional, cast, Iterable
+from typing import Iterable, List, Optional, cast
 
 import bpy
-from bpy.props import StringProperty, BoolProperty
-from bpy.types import Operator, Context, Object, Collection, SpaceProperties, Depsgraph, Material
+from bpy.props import BoolProperty, StringProperty
+from bpy.types import Collection, Context, Depsgraph, Material, Object, Operator, SpaceProperties
 from bpy_extras.io_utils import ExportHelper
 
 from .properties import PskExportMixin
-from ..builder import build_psk, PskBuildOptions, get_psk_input_objects_for_context, \
-    get_psk_input_objects_for_collection
+from ..builder import PskBuildOptions, build_psk, get_psk_input_objects_for_context, \
+    get_psk_input_objects_for_collection, get_materials_for_mesh_objects
 from ..writer import write_psk
 from ...shared.helpers import populate_bone_collection_list
 from ...shared.ui import draw_bone_filter_mode
-
-
-def get_materials_for_mesh_objects(depsgraph: Depsgraph, mesh_objects: Iterable[Object]):
-    yielded_materials = set()
-    for mesh_object in mesh_objects:
-        evaluated_mesh_object = mesh_object.evaluated_get(depsgraph)
-        for i, material_slot in enumerate(evaluated_mesh_object.material_slots):
-            material = material_slot.material
-            if material is None:
-                raise RuntimeError('Material slot cannot be empty (index ' + str(i) + ')')
-            if material not in yielded_materials:
-                yielded_materials.add(material)
-                yield material
 
 
 def populate_material_name_list(depsgraph: Depsgraph, mesh_objects: Iterable[Object], material_list):

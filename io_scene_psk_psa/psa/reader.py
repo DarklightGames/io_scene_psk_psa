@@ -3,7 +3,8 @@ from typing import List
 
 import numpy as np
 
-from .data import Psa, Section, PsxBone
+from .data import Psa, PsxBone
+from ..shared.data import Section
 
 
 def _try_fix_cue4parse_issue_103(sequences) -> bool:

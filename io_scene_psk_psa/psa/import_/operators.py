@@ -2,13 +2,13 @@ import os
 from pathlib import Path
 from typing import Iterable
 
-from bpy.props import StringProperty, CollectionProperty
-from bpy.types import Operator, Event, Context, FileHandler, OperatorFileListElement, Object
+from bpy.props import CollectionProperty, StringProperty
+from bpy.types import Context, Event, FileHandler, Object, Operator, OperatorFileListElement
 from bpy_extras.io_utils import ImportHelper
 
-from .properties import get_visible_sequences, PsaImportMixin
+from .properties import PsaImportMixin, get_visible_sequences
 from ..config import read_psa_config
-from ..importer import import_psa, PsaImportOptions
+from ..importer import PsaImportOptions, import_psa
 from ..reader import PsaReader
 
 

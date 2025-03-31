@@ -1,15 +1,15 @@
 import typing
-from typing import Dict, Generator, Set, Iterable, Optional, cast, Tuple
+from typing import Dict, Generator, Set, Iterable, Optional, cast, Tuple, List
 
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import Collection, Context, Object, Armature
+from bpy.types import Collection, Context, Object, Armature, Depsgraph
 from mathutils import Matrix
 
-from .data import *
-from .export.operators import get_materials_for_mesh_objects
+from .data import Psk
 from .properties import triangle_type_and_bit_flags_to_poly_flags
+from ..shared.data import Vector3
 from ..shared.dfs import dfs_collection_objects, dfs_view_layer_objects, DfsObject
 from ..shared.helpers import convert_string_to_cp1252_bytes, \
     create_psx_bones, get_coordinate_system_transform
@@ -33,6 +33,19 @@ class PskBuildOptions(object):
         self.forward_axis = 'X'
         self.up_axis = 'Z'
         self.root_bone_name = 'ROOT'
+
+
+def get_materials_for_mesh_objects(depsgraph: Depsgraph, mesh_objects: Iterable[Object]):
+    yielded_materials = set()
+    for mesh_object in mesh_objects:
+        evaluated_mesh_object = mesh_object.evaluated_get(depsgraph)
+        for i, material_slot in enumerate(evaluated_mesh_object.material_slots):
+            material = material_slot.material
+            if material is None:
+                raise RuntimeError('Material slot cannot be empty (index ' + str(i) + ')')
+            if material not in yielded_materials:
+                yielded_materials.add(material)
+                yield material
 
 
 def get_mesh_objects_for_collection(collection: Collection) -> Iterable[DfsObject]:
@@ -95,8 +108,8 @@ class PskBuildResult(object):
         self.warnings: List[str] = []
 
 
-def _get_mesh_export_space_matrix(armature_objects: Iterable[Object], export_space: str) -> Matrix:
-    if not armature_objects:
+def _get_mesh_export_space_matrix(armature_object: Object, export_space: str) -> Matrix:
+    if armature_object is None:
         return Matrix.Identity(4)
 
     def get_object_space_space_matrix(obj: Object) -> Matrix:
@@ -104,15 +117,12 @@ def _get_mesh_export_space_matrix(armature_objects: Iterable[Object], export_spa
         # We neutralize the scale here because the scale is already applied to the mesh objects implicitly.
         return Matrix.Translation(translation) @ rotation.to_matrix().to_4x4()
 
-
     match export_space:
         case 'WORLD':
             return Matrix.Identity(4)
         case 'ARMATURE':
-            return get_object_space_space_matrix(armature_objects[0]).inverted()
+            return get_object_space_space_matrix(armature_object).inverted()
         case 'ROOT':
-            # TODO: multiply this by the root bone's local matrix
-            armature_object = armature_objects[0]
             armature_data = cast(armature_object.data, Armature)
             armature_space_matrix = get_object_space_space_matrix(armature_object) @ armature_data.bones[0].matrix_local
             return armature_space_matrix.inverted()
@@ -189,9 +199,14 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
     context.window_manager.progress_begin(0, len(input_objects.mesh_dfs_objects))
 
     coordinate_system_matrix = get_coordinate_system_transform(options.forward_axis, options.up_axis)
-    mesh_export_space_matrix = _get_mesh_export_space_matrix(armature_objects, options.export_space)
+
+    # TODO: we need to store this per armature
+    armature_mesh_export_space_matrices: Dict[Optional[Object], Matrix] = dict()
+
+    for armature_object in armature_objects:
+        armature_mesh_export_space_matrices[armature_object] = _get_mesh_export_space_matrix(armature_object, options.export_space)
+
     scale_matrix = Matrix.Scale(options.scale, 4)
-    vertex_transform_matrix = scale_matrix @ coordinate_system_matrix @ mesh_export_space_matrix
 
     original_armature_object_pose_positions = {armature_object: armature_object.data.pose_position for armature_object in armature_objects}
 
@@ -265,7 +280,8 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             case _:
                 assert False, f'Invalid object evaluation state: {options.object_eval_state}'
 
-        vertex_offset = len(psk.points)
+        mesh_export_space_matrix = armature_mesh_export_space_matrices[armature_object]
+        vertex_transform_matrix = scale_matrix @ coordinate_system_matrix @ mesh_export_space_matrix
         point_transform_matrix = vertex_transform_matrix @ mesh_object.matrix_world
 
         # Vertices
@@ -281,6 +297,8 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
         # Wedges
         mesh_data.calc_loop_triangles()
+
+        vertex_offset = len(psk.points)
 
         # Build a list of non-unique wedges.
         wedges = []

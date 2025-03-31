@@ -2,15 +2,15 @@ import typing
 from collections import OrderedDict
 from typing import List
 
-from ..shared.data import *
-
-'''
-Note that keys are not stored within the Psa object.
-Use the PsaReader::get_sequence_keys to get the keys for a sequence.
-'''
+from ctypes import Structure, c_char, c_int32, c_float
+from ..shared.data import PsxBone, Quaternion, Vector3
 
 
 class Psa:
+    '''
+    Note that keys are not stored within the Psa object.
+    Use the PsaReader::get_sequence_keys to get the keys for a sequence.
+    '''
 
     class Sequence(Structure):
         _fields_ = [

@@ -1,7 +1,10 @@
-from bpy.types import Action, PoseBone
+from bpy.types import Action, AnimData, Context, Object, PoseBone
 
 from .data import Psa
-from ..shared.helpers import *
+from typing import Dict, List, Optional, Tuple
+from mathutils import Matrix, Quaternion, Vector
+
+from ..shared.helpers import create_psx_bones, get_coordinate_system_transform
 
 
 class PsaBuildSequence:
@@ -62,7 +65,6 @@ def _get_pose_bone_location_and_rotation(
             # Get the bone's pose matrix and transform it into the export space.
             # In the case of an 'ARMATURE' export space, this will be the inverse of armature object's world matrix.
             # Otherwise, it will be the identity matrix.
-            # TODO: taking the pose bone matrix puts this in armature space.
             match export_space:
                 case 'ARMATURE':
                     pose_bone_matrix = pose_bone.matrix
@@ -81,7 +83,7 @@ def _get_pose_bone_location_and_rotation(
     rotation = pose_bone_matrix.to_quaternion().normalized()
 
     # TODO: this has gotten way more complicated than it needs to be.
-    # TODO: don't apply scale to the root bone of armatures if we have a false root:
+    # Don't apply scale to the root bone of armatures if we have a false root.
     if not has_false_root_bone or (pose_bone is None or pose_bone.parent is not None):
         location *= scale
 
@@ -96,7 +98,7 @@ def _get_pose_bone_location_and_rotation(
     return location, rotation
 
 
-def build_psa(context: bpy.types.Context, options: PsaBuildOptions) -> Psa:
+def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
     psa = Psa()
 
     psx_bone_create_result = create_psx_bones(

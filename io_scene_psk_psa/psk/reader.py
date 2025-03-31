@@ -3,8 +3,10 @@ import os
 import re
 import warnings
 from pathlib import Path
+from typing import List
 
-from .data import *
+from ..shared.data import Section
+from .data import Color, Psk, PsxBone, Vector2, Vector3
 
 
 def _read_types(fp, data_class, section: Section, data):
