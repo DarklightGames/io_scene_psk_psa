@@ -130,6 +130,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
             for material_index, psk_material in enumerate(psk.materials):
                 material_name = psk_material.name.decode('utf-8')
                 material = None
+
                 if options.should_reuse_materials and material_name in bpy.data.materials:
                     # Material already exists, just re-use it.
                     material = bpy.data.materials[material_name]
@@ -140,13 +141,15 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
                     repository_id = options.bdk_repository_id if options.bdk_repository_id is not None else ''
                     if material_reference and bpy.ops.bdk.link_material(reference=material_reference, repository_id=repository_id) == {'FINISHED'}:
                         material = bpy.data.materials[material_name]
-                else:
-                    # Just create a blank material.
+                
+                if material is None:
+                    # Material was unable to be loaded, so just create a blank material.
                     material = bpy.data.materials.new(material_name)
                     mesh_triangle_type, mesh_triangle_bit_flags = poly_flags_to_triangle_type_and_bit_flags(psk_material.poly_flags)
                     material.psk.mesh_triangle_type = mesh_triangle_type
                     material.psk.mesh_triangle_bit_flags = mesh_triangle_bit_flags
                     material.use_nodes = True
+                
                 mesh_data.materials.append(material)
 
         bm = bmesh.new()
