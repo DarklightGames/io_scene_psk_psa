@@ -131,10 +131,10 @@ def _get_mesh_export_space_matrix(armature_object: Optional[Object], export_spac
 
 
 def _get_material_name_indices(obj: Object, material_names: List[str]) -> Iterable[int]:
-    '''
+    """
     Returns the index of the material in the list of material names.
     If the material is not found, the index 0 is returned.
-    '''
+    """
     for material_slot in obj.material_slots:
         if material_slot.material is None:
             yield 0

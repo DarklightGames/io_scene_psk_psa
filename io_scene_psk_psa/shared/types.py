@@ -5,8 +5,8 @@ from bpy.types import PropertyGroup, UIList, UILayout, Context, AnyType, Panel
 
 class PSX_UL_bone_collection_list(UIList):
 
-    def draw_item(self, context: Context, layout: UILayout, data: AnyType, item: AnyType, icon: int,
-                  active_data: AnyType, active_property: str, index: int = 0, flt_flag: int = 0):
+    def draw_item(self, _context: Context, layout: UILayout, _data: AnyType, item: AnyType, _icon: int,
+                  _active_data: AnyType, _active_property: str, _index: int = 0, _flt_flag: int = 0):
         row = layout.row()
 
         row.prop(item, 'is_selected', text=getattr(item, 'name'))
@@ -81,13 +81,13 @@ up_items = (
 )
 
 
-def forward_axis_update(self, _context):
+def forward_axis_update(self, __context):
     if self.forward_axis == self.up_axis:
         # Automatically set the up axis to the next available axis
         self.up_axis = next((axis for axis in axis_identifiers if axis != self.forward_axis), 'Z')
 
 
-def up_axis_update(self, _context):
+def up_axis_update(self, __context):
     if self.up_axis == self.forward_axis:
         # Automatically set the forward axis to the next available axis
         self.forward_axis = next((axis for axis in axis_identifiers if axis != self.up_axis), 'X')
@@ -134,10 +134,9 @@ class PsxBoneExportMixin:
     bone_collection_list_index: IntProperty(default=0, name='', description='')
     root_bone_name: StringProperty(
         name='Root Bone Name',
-        description='The name of the generated root bone when exporting multiple armatures',
+        description='The name of the root bone when exporting a PSK with either no armature or multiple armatures',
         default='ROOT',
     )
-
 
 
 classes = (

@@ -283,11 +283,11 @@ def create_psx_bones(
         bone_filter_mode: str = 'ALL',
         bone_collection_indices: Optional[List[Tuple[str, int]]] = None,
 ) -> PsxBoneCreateResult:
-    '''
+    """
     Creates a list of PSX bones from the given armature objects and options.
     This function will throw a RuntimeError if multiple armature objects are passed in and the export space is not WORLD.
     It will also throw a RuntimeError if the bone names are not unique when compared case-insensitively.
-    '''
+    """
     if bone_collection_indices is None:
         bone_collection_indices = []
 

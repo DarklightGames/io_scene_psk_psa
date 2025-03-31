@@ -29,9 +29,9 @@ class PskImportOptions:
 
 
 class ImportBone:
-    '''
+    """
     Intermediate bone type for the purpose of construction.
-    '''
+    """
     def __init__(self, index: int, psk_bone: PsxBone):
         self.index: int = index
         self.psk_bone: PsxBone = psk_bone
@@ -63,7 +63,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
     mesh_object = None
 
     if options.should_import_skeleton:
-        # ARMATURE
+        # Armature
         armature_data = bpy.data.armatures.new(name)
         armature_object = bpy.data.objects.new(name, armature_data)
         armature_object.show_in_front = True
@@ -120,12 +120,12 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
             edit_bone_matrix.translation = import_bone.world_matrix.translation
             edit_bone.matrix = edit_bone_matrix
 
-    # MESH
+    # Mesh
     if options.should_import_mesh:
         mesh_data = bpy.data.meshes.new(name)
         mesh_object = bpy.data.objects.new(name, mesh_data)
 
-        # MATERIALS
+        # Materials
         if options.should_import_materials:
             for material_index, psk_material in enumerate(psk.materials):
                 material_name = psk_material.name.decode('utf-8')
@@ -154,13 +154,13 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
 
         bm = bmesh.new()
 
-        # VERTICES
+        # Vertices
         for point in psk.points:
             bm.verts.new(tuple(point))
 
         bm.verts.ensure_lookup_table()
 
-        # FACES
+        # Faces
         invalid_face_indices = set()
         for face_index, face in enumerate(psk.faces):
             point_indices = map(lambda i: psk.wedges[i].point_index, reversed(face.wedge_indices))
@@ -180,7 +180,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
 
         bm.to_mesh(mesh_data)
 
-        # TEXTURE COORDINATES
+        # Texture Coordinates
         uv_layer_data_index = 0
         uv_layer = mesh_data.uv_layers.new(name='UVMap')
         for face_index, face in enumerate(psk.faces):
@@ -191,7 +191,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
                 uv_layer.data[uv_layer_data_index].uv = wedge.u, 1.0 - wedge.v
                 uv_layer_data_index += 1
 
-        # EXTRA UVS
+        # Extra UVs
         if psk.has_extra_uvs and options.should_import_extra_uvs:
             extra_uv_channel_count = int(len(psk.extra_uvs) / len(psk.wedges))
             wedge_index_offset = 0
@@ -207,7 +207,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
                         uv_layer_data_index += 1
                 wedge_index_offset += len(psk.wedges)
 
-        # VERTEX COLORS
+        # Vertex Colors
         if psk.has_vertex_colors and options.should_import_vertex_colors:
             # Convert vertex colors to sRGB if necessary.
             psk_vertex_colors = np.zeros((len(psk.vertex_colors), 4))
@@ -235,7 +235,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
             face_corner_color_attribute = mesh_data.attributes.new(name='VERTEXCOLOR', type='FLOAT_COLOR', domain='CORNER')
             face_corner_color_attribute.data.foreach_set('color', face_corner_colors.flatten())
 
-        # VERTEX NORMALS
+        # Vertex Normals
         if psk.has_vertex_normals and options.should_import_vertex_normals:
             mesh_data.polygons.foreach_set('use_smooth', [True] * len(mesh_data.polygons))
             normals = []
@@ -248,7 +248,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
         bm.normal_update()
         bm.free()
 
-        # WEIGHTS
+        # Weights
         # Get a list of all bones that have weights associated with them.
         vertex_group_bone_indices = set(map(lambda weight: weight.bone_index, psk.weights))
         vertex_groups: List[Optional[VertexGroup]] = [None] * len(psk.bones)
@@ -258,7 +258,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
         for weight in psk.weights:
             vertex_groups[weight.bone_index].add((weight.point_index,), weight.weight, 'ADD')
 
-        # MORPHS (SHAPE KEYS)
+        # Morphs (Shape Keys)
         if options.should_import_shape_keys:
             morph_data_iterator = iter(psk.morph_data)
 

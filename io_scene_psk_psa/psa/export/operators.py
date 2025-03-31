@@ -43,11 +43,10 @@ def is_action_for_object(obj: Object, action: Action):
     version = SemanticVersion(bpy.app.version)
 
     def is_action_for_object_legacy(action: Action,  obj: Object):
-        '''
+        """
         This is the legacy behavior before slotted actions were introduced in Blender 4.4.
         It would simply check if it had any f-curves that corresponded to any bones in the armature.
-        @return:
-        '''
+        """
         import re
         armature_data = obj.data
         bone_names = set([x.name for x in armature_data.bones])
