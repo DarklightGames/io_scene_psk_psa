@@ -1,16 +1,15 @@
-import typing
 from collections import OrderedDict
-from typing import List
+from typing import List, OrderedDict as OrderedDictType
 
 from ctypes import Structure, c_char, c_int32, c_float
 from ..shared.data import PsxBone, Quaternion, Vector3
 
 
 class Psa:
-    '''
+    """
     Note that keys are not stored within the Psa object.
-    Use the PsaReader::get_sequence_keys to get the keys for a sequence.
-    '''
+    Use the `PsaReader.get_sequence_keys` to get the keys for a sequence.
+    """
 
     class Sequence(Structure):
         _fields_ = [
@@ -50,5 +49,5 @@ class Psa:
 
     def __init__(self):
         self.bones: List[PsxBone] = []
-        self.sequences: typing.OrderedDict[str, Psa.Sequence] = OrderedDict()
+        self.sequences: OrderedDictType[str, Psa.Sequence] = OrderedDict()
         self.keys: List[Psa.Key] = []

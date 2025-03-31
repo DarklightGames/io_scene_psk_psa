@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, List, Optional, cast
+from typing import Iterable, List, Optional, cast as typing_cast
 
 import bpy
 from bpy.props import BoolProperty, StringProperty
@@ -7,8 +7,13 @@ from bpy.types import Collection, Context, Depsgraph, Material, Object, Operator
 from bpy_extras.io_utils import ExportHelper
 
 from .properties import PskExportMixin
-from ..builder import PskBuildOptions, build_psk, get_psk_input_objects_for_context, \
-    get_psk_input_objects_for_collection, get_materials_for_mesh_objects
+from ..builder import (
+    PskBuildOptions,
+    build_psk,
+    get_materials_for_mesh_objects,
+    get_psk_input_objects_for_collection,
+    get_psk_input_objects_for_context,
+)
 from ..writer import write_psk
 from ...shared.helpers import populate_bone_collection_list
 from ...shared.ui import draw_bone_filter_mode
@@ -34,10 +39,10 @@ def get_collection_from_context(context: Context) -> Optional[Collection]:
     if context.space_data.type != 'PROPERTIES':
         return None
 
-    space_data = cast(SpaceProperties, context.space_data)
+    space_data = typing_cast(SpaceProperties, context.space_data)
 
     if space_data.use_pin_id:
-        return cast(Collection, space_data.pin_id)
+        return typing_cast(Collection, space_data.pin_id)
     else:
         return context.collection
 
@@ -226,13 +231,11 @@ class PSK_OT_material_list_name_move_down(Operator):
         return {'FINISHED'}
 
 
-empty_set = set()
-
-
 def get_sorted_materials_by_names(materials: Iterable[Material], material_names: List[str]) -> List[Material]:
     """
     Sorts the materials by the order of the material names list. Any materials not in the list will be appended to the
     end of the list in the order they are found.
+
     @param materials: A list of materials to sort
     @param material_names: A list of material names to sort by
     @return: A sorted list of materials

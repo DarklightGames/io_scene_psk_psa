@@ -1,15 +1,15 @@
-from typing import Optional, List
-
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import VertexGroup, Context, Object
-from mathutils import Quaternion, Vector, Matrix
+
+from bpy.types import Context, Object, VertexGroup
+from mathutils import Matrix, Quaternion, Vector
+from typing import List, Optional
 
 from .data import Psk
 from .properties import poly_flags_to_triangle_type_and_bit_flags
 from ..shared.data import PsxBone
-from ..shared.helpers import rgb_to_srgb, is_bdk_addon_loaded
+from ..shared.helpers import is_bdk_addon_loaded, rgb_to_srgb
 
 
 class PskImportOptions:

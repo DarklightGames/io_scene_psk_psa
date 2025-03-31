@@ -2,20 +2,25 @@ import re
 from fnmatch import fnmatch
 from typing import List
 
-from bpy.props import StringProperty, BoolProperty, CollectionProperty, IntProperty, PointerProperty, EnumProperty, \
-    FloatProperty
+from bpy.props import (
+    BoolProperty,
+    CollectionProperty,
+    EnumProperty,
+    FloatProperty,
+    IntProperty,
+    PointerProperty,
+    StringProperty,
+)
 from bpy.types import PropertyGroup, Text
-
-empty_set = set()
 
 
 class PSA_PG_import_action_list_item(PropertyGroup):
-    action_name: StringProperty(options=empty_set)
-    is_selected: BoolProperty(default=True, options=empty_set)
+    action_name: StringProperty(options=set())
+    is_selected: BoolProperty(default=True, options=set())
 
 
 class PSA_PG_bone(PropertyGroup):
-    bone_name: StringProperty(options=empty_set)
+    bone_name: StringProperty(options=set())
 
 
 class PSA_PG_data(PropertyGroup):
@@ -43,31 +48,31 @@ class PsaImportMixin:
     should_use_fake_user: BoolProperty(default=True, name='Fake User',
                                        description='Assign each imported action a fake user so that the data block is '
                                                    'saved even it has no users',
-                                       options=empty_set)
+                                       options=set())
     should_use_config_file: BoolProperty(default=True, name='Use Config File',
                                          description='Use the .config file that is sometimes generated when the PSA '
                                                      'file is exported from UEViewer. This file contains '
                                                      'options that can be used to filter out certain bones tracks '
                                                      'from the imported actions',
-                                         options=empty_set)
+                                         options=set())
     should_stash: BoolProperty(default=False, name='Stash',
                                description='Stash each imported action as a strip on a new non-contributing NLA track',
-                               options=empty_set)
-    should_use_action_name_prefix: BoolProperty(default=False, name='Prefix Action Name', options=empty_set)
-    action_name_prefix: StringProperty(default='', name='Prefix', options=empty_set)
-    should_overwrite: BoolProperty(default=False, name='Overwrite', options=empty_set,
+                               options=set())
+    should_use_action_name_prefix: BoolProperty(default=False, name='Prefix Action Name', options=set())
+    action_name_prefix: StringProperty(default='', name='Prefix', options=set())
+    should_overwrite: BoolProperty(default=False, name='Overwrite', options=set(),
                                    description='If an action with a matching name already exists, the existing action '
                                                'will have it\'s data overwritten instead of a new action being created')
-    should_write_keyframes: BoolProperty(default=True, name='Keyframes', options=empty_set)
-    should_write_metadata: BoolProperty(default=True, name='Metadata', options=empty_set,
+    should_write_keyframes: BoolProperty(default=True, name='Keyframes', options=set())
+    should_write_metadata: BoolProperty(default=True, name='Metadata', options=set(),
                                         description='Additional data will be written to the custom properties of the '
                                                     'Action (e.g., frame rate)')
     sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
-    sequence_filter_is_selected: BoolProperty(default=False, options=empty_set, name='Only Show Selected',
+    sequence_filter_is_selected: BoolProperty(default=False, options=set(), name='Only Show Selected',
                                               description='Only show selected sequences')
-    sequence_use_filter_invert: BoolProperty(default=False, options=empty_set)
+    sequence_use_filter_invert: BoolProperty(default=False, options=set())
     sequence_use_filter_regex: BoolProperty(default=False, name='Regular Expression',
-                                            description='Filter using regular expressions', options=empty_set)
+                                            description='Filter using regular expressions', options=set())
 
     should_convert_to_samples: BoolProperty(
         default=False,
@@ -77,7 +82,7 @@ class PsaImportMixin:
     )
     bone_mapping_mode: EnumProperty(
         name='Bone Mapping',
-        options=empty_set,
+        options=set(),
         description='The method by which bones from the incoming PSA file are mapped to the armature',
         items=bone_mapping_items,
         default='CASE_INSENSITIVE'
@@ -87,7 +92,7 @@ class PsaImportMixin:
         default=30.0,
         name='Custom FPS',
         description='The frame rate to which the imported sequences will be resampled to',
-        options=empty_set,
+        options=set(),
         min=1.0,
         soft_min=1.0,
         soft_max=60.0,
@@ -98,7 +103,7 @@ class PsaImportMixin:
         default=1.0,
         name='Custom Compression Ratio',
         description='The compression ratio to apply to the imported sequences',
-        options=empty_set,
+        options=set(),
         min=0.0,
         soft_min=0.0,
         soft_max=1.0,
@@ -119,11 +124,11 @@ class PSA_PG_import(PropertyGroup):
     sequence_list: CollectionProperty(type=PSA_PG_import_action_list_item)
     sequence_list_index: IntProperty(name='', default=0)
     sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
-    sequence_filter_is_selected: BoolProperty(default=False, options=empty_set, name='Only Show Selected',
+    sequence_filter_is_selected: BoolProperty(default=False, options=set(), name='Only Show Selected',
                                               description='Only show selected sequences')
-    sequence_use_filter_invert: BoolProperty(default=False, options=empty_set)
+    sequence_use_filter_invert: BoolProperty(default=False, options=set())
     sequence_use_filter_regex: BoolProperty(default=False, name='Regular Expression',
-                                            description='Filter using regular expressions', options=empty_set)
+                                            description='Filter using regular expressions', options=set())
     select_text: PointerProperty(type=Text)
 
 

@@ -53,6 +53,7 @@ class PsaReader(object):
     def read_sequence_data_matrix(self, sequence_name: str) -> np.ndarray:
         """
         Reads and returns the data matrix for the given sequence.
+        
         @param sequence_name: The name of the sequence.
         @return: An FxBx7 matrix where F is the number of frames, B is the number of bones.
         """

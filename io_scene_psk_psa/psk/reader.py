@@ -4,7 +4,6 @@ import re
 import warnings
 from pathlib import Path
 from typing import List
-
 from ..shared.data import Section
 from .data import Color, Psk, PsxBone, Vector2, Vector3
 

@@ -1,4 +1,4 @@
-import typing
+from typing import cast as typing_cast
 
 from bpy.types import UIList
 
@@ -14,7 +14,7 @@ class PSA_UL_export_sequences(UIList):
         self.use_filter_show = True
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        item = typing.cast(PSA_PG_export_action_list_item, item)
+        item = typing_cast(PSA_PG_export_action_list_item, item)
 
         is_pose_marker = hasattr(item, 'is_pose_marker') and item.is_pose_marker
         layout.prop(item, 'is_selected', icon_only=True, text=item.name)

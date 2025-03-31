@@ -24,4 +24,4 @@ paths_exclude_pattern = [
 ]
 
 [permissions]
-files = "Import/export PSK and PSA files from/to disk"
+files = "Read and write PSK and PSA files from and to disk"

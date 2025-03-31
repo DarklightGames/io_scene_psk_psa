@@ -12,9 +12,9 @@ from mathutils import Matrix
 
 
 class DfsObject:
-    '''
+    """
     Represents an object in a depth-first search.
-    '''
+    """
     def __init__(self, obj: Object, instance_objects: List[Object], matrix_world: Matrix):
         self.obj = obj
         self.instance_objects = instance_objects
@@ -22,10 +22,11 @@ class DfsObject:
 
     @property
     def is_visible(self) -> bool:
-        '''
+        """
         Check if the object is visible.
+
         @return: True if the object is visible, False otherwise.
-        '''
+        """
         if self.instance_objects:
             return self.instance_objects[-1].visible_get()
         return self.obj.visible_get()
@@ -41,11 +42,11 @@ class DfsObject:
         return self.obj.select_get()
 
 
-
 def _dfs_object_children(obj: Object, collection: Collection) -> Iterable[Object]:
     '''
     Construct a list of objects in hierarchy order from `collection.objects`, only keeping those that are in the
     collection.
+
     @param obj: The object to start the search from.
     @param collection:  The collection to search in.
     @return: An iterable of objects in hierarchy order.
@@ -60,6 +61,7 @@ def dfs_objects_in_collection(collection: Collection) -> Iterable[Object]:
     '''
     Returns a depth-first iterator over all objects in a collection, only keeping those that are directly in the
     collection.
+
     @param collection: The collection to search in.
     @return: An iterable of objects in hierarchy order.
     '''
@@ -74,6 +76,7 @@ def dfs_objects_in_collection(collection: Collection) -> Iterable[Object]:
 def dfs_collection_objects(collection: Collection, visible_only: bool = False) -> Iterable[DfsObject]:
     '''
     Depth-first search of objects in a collection, including recursing into instances.
+
     @param collection: The collection to search in.
     @return: An iterable of tuples containing the object, the instance objects, and the world matrix.
     '''
@@ -89,6 +92,7 @@ def _dfs_collection_objects_recursive(
     '''
     Depth-first search of objects in a collection, including recursing into instances.
     This is a recursive function.
+
     @param collection: The collection to search in.
     @param instance_objects: The running hierarchy of instance objects.
     @param matrix_world: The world matrix of the current object.
@@ -130,6 +134,7 @@ def _dfs_collection_objects_recursive(
 def dfs_view_layer_objects(view_layer: ViewLayer) -> Iterable[DfsObject]:
     '''
     Depth-first iterator over all objects in a view layer, including recursing into instances.
+
     @param view_layer: The view layer to inspect.
     @return: An iterable of tuples containing the object, the instance objects, and the world matrix.
     '''
@@ -146,6 +151,7 @@ def dfs_view_layer_objects(view_layer: ViewLayer) -> Iterable[DfsObject]:
 def _is_dfs_object_visible(obj: Object, instance_objects: List[Object]) -> bool:
     '''
     Check if a DFS object is visible.
+
     @param obj: The object.
     @param instance_objects: The instance objects.
     @return: True if the object is visible, False otherwise.

@@ -124,9 +124,6 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
     if len(psa.bones) == 0:
         raise RuntimeError('No bones available for export')
 
-    # We invert the export space matrix so that we neutralize the transform of the armature object.
-    # export_space_matrix_inverse = get_export_space_matrix(options.export_space, armature_object)
-
     # Add prefixes and suffices to the names of the export sequences and strip whitespace.
     for export_sequence in options.sequences:
         export_sequence.name = f'{options.sequence_name_prefix}{export_sequence.name}{options.sequence_name_suffix}'

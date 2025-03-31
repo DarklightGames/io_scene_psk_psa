@@ -1,18 +1,18 @@
-import typing
-from typing import Dict, Generator, Set, Iterable, Optional, cast, Tuple, List
-
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import Collection, Context, Object, Armature, Depsgraph
+from bpy.types import Armature, Collection, Context, Depsgraph, Object
 from mathutils import Matrix
-
+from typing import Dict, Generator, Iterable, List, Optional, Set, Tuple, cast as typing_cast
 from .data import Psk
 from .properties import triangle_type_and_bit_flags_to_poly_flags
 from ..shared.data import Vector3
-from ..shared.dfs import dfs_collection_objects, dfs_view_layer_objects, DfsObject
-from ..shared.helpers import convert_string_to_cp1252_bytes, \
-    create_psx_bones, get_coordinate_system_transform
+from ..shared.dfs import DfsObject, dfs_collection_objects, dfs_view_layer_objects
+from ..shared.helpers import (
+    convert_string_to_cp1252_bytes,
+    create_psx_bones,
+    get_coordinate_system_transform,
+)
 
 
 class PskInputObjects(object):
@@ -108,11 +108,11 @@ class PskBuildResult(object):
         self.warnings: List[str] = []
 
 
-def _get_mesh_export_space_matrix(armature_object: Object, export_space: str) -> Matrix:
+def _get_mesh_export_space_matrix(armature_object: Optional[Object], export_space: str) -> Matrix:
     if armature_object is None:
         return Matrix.Identity(4)
 
-    def get_object_space_space_matrix(obj: Object) -> Matrix:
+    def get_object_space_matrix(obj: Object) -> Matrix:
         translation, rotation, _ = obj.matrix_world.decompose()
         # We neutralize the scale here because the scale is already applied to the mesh objects implicitly.
         return Matrix.Translation(translation) @ rotation.to_matrix().to_4x4()
@@ -121,10 +121,10 @@ def _get_mesh_export_space_matrix(armature_object: Object, export_space: str) ->
         case 'WORLD':
             return Matrix.Identity(4)
         case 'ARMATURE':
-            return get_object_space_space_matrix(armature_object).inverted()
+            return get_object_space_matrix(armature_object).inverted()
         case 'ROOT':
-            armature_data = cast(armature_object.data, Armature)
-            armature_space_matrix = get_object_space_space_matrix(armature_object) @ armature_data.bones[0].matrix_local
+            armature_data = typing_cast(Armature, armature_object.data)
+            armature_space_matrix = get_object_space_matrix(armature_object) @ armature_data.bones[0].matrix_local
             return armature_space_matrix.inverted()
         case _:
             assert False, f'Invalid export space: {export_space}'
@@ -200,15 +200,15 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
     coordinate_system_matrix = get_coordinate_system_transform(options.forward_axis, options.up_axis)
 
-    # TODO: we need to store this per armature
-    armature_mesh_export_space_matrices: Dict[Optional[Object], Matrix] = dict()
-
+    # Calculate the export spaces for the armature objects.
+    # This is used later to transform the mesh object geometry into the export space.
+    armature_mesh_export_space_matrices: Dict[Optional[Object], Matrix] = {None: Matrix.Identity(4)}
     for armature_object in armature_objects:
         armature_mesh_export_space_matrices[armature_object] = _get_mesh_export_space_matrix(armature_object, options.export_space)
 
     scale_matrix = Matrix.Scale(options.scale, 4)
 
-    original_armature_object_pose_positions = {armature_object: armature_object.data.pose_position for armature_object in armature_objects}
+    original_armature_object_pose_positions = {a: a.data.pose_position for a in armature_objects}
 
     # Temporarily force the armature into the rest position.
     # We will undo this later.
@@ -218,7 +218,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
     material_names = [m.name for m in materials]
 
     for object_index, input_mesh_object in enumerate(input_objects.mesh_dfs_objects):
-        obj, instance_objects, matrix_world = input_mesh_object.obj, input_mesh_object.instance_objects, input_mesh_object.matrix_world
+        obj, matrix_world = input_mesh_object.obj, input_mesh_object.matrix_world
 
         armature_object = get_armature_for_mesh_object(obj)
 
@@ -272,7 +272,8 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
                 # the normals will be correct. We can detect this by checking if the number of negative scaling axes is
                 # odd. If it is, we need to invert the normals of the mesh by swapping the order of the vertices in each
                 # face.
-                should_flip_normals = sum(1 for x in scale if x < 0) % 2 == 1
+                if not should_flip_normals:
+                    should_flip_normals = sum(1 for x in scale if x < 0) % 2 == 1
 
                 # Copy the vertex groups
                 for vertex_group in obj.vertex_groups:
@@ -285,6 +286,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         point_transform_matrix = vertex_transform_matrix @ mesh_object.matrix_world
 
         # Vertices
+        vertex_offset = len(psk.points)
         for vertex in mesh_data.vertices:
             point = Vector3()
             v = point_transform_matrix @ vertex.co
@@ -297,8 +299,6 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
         # Wedges
         mesh_data.calc_loop_triangles()
-
-        vertex_offset = len(psk.points)
 
         # Build a list of non-unique wedges.
         wedges = []
@@ -346,7 +346,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
         # Weights
         if armature_object is not None:
-            armature_data = typing.cast(Armature, armature_object.data)
+            armature_data = typing_cast(Armature, armature_object.data)
             bone_index_offset = psx_bone_create_result.armature_object_root_bone_indices[armature_object]
             # Because the vertex groups may contain entries for which there is no matching bone in the armature,
             # we must filter them out and not export any weights for these vertex groups.

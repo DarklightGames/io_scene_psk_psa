@@ -1,7 +1,5 @@
 from ctypes import Structure, c_char, c_int32, c_float, c_ubyte
 from typing import Tuple
-
-from bpy.props import EnumProperty
 from mathutils import Quaternion as BpyQuaternion
 
 
@@ -118,69 +116,3 @@ class Section(Structure):
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
         self.type_flags = 1999801
-
-
-bone_filter_mode_items = (
-    ('ALL', 'All', 'All bones will be exported'),
-    ('BONE_COLLECTIONS', 'Bone Collections', 'Only bones belonging to the selected bone collections and their ancestors will be exported')
-)
-
-axis_identifiers = ('X', 'Y', 'Z', '-X', '-Y', '-Z')
-forward_items = (
-    ('X', 'X Forward', ''),
-    ('Y', 'Y Forward', ''),
-    ('Z', 'Z Forward', ''),
-    ('-X', '-X Forward', ''),
-    ('-Y', '-Y Forward', ''),
-    ('-Z', '-Z Forward', ''),
-)
-
-up_items = (
-    ('X', 'X Up', ''),
-    ('Y', 'Y Up', ''),
-    ('Z', 'Z Up', ''),
-    ('-X', '-X Up', ''),
-    ('-Y', '-Y Up', ''),
-    ('-Z', '-Z Up', ''),
-)
-
-
-def forward_axis_update(self, _context):
-    if self.forward_axis == self.up_axis:
-        # Automatically set the up axis to the next available axis
-        self.up_axis = next((axis for axis in axis_identifiers if axis != self.forward_axis), 'Z')
-
-
-def up_axis_update(self, _context):
-    if self.up_axis == self.forward_axis:
-        # Automatically set the forward axis to the next available axis
-        self.forward_axis = next((axis for axis in axis_identifiers if axis != self.up_axis), 'X')
-
-
-class ForwardUpAxisMixin:
-    forward_axis: EnumProperty(
-        name='Forward',
-        items=forward_items,
-        default='X',
-        update=forward_axis_update
-    )
-    up_axis: EnumProperty(
-        name='Up',
-        items=up_items,
-        default='Z',
-        update=up_axis_update
-    )
-
-
-export_space_items = [
-    ('WORLD', 'World', 'Export in world space'),
-    ('ARMATURE', 'Armature', 'Export the local space of the armature object'),
-    ('ROOT', 'Root', 'Export in the space of the root bone')
-]
-
-class ExportSpaceMixin:
-    export_space: EnumProperty(
-        name='Export Space',
-        items=export_space_items,
-        default='WORLD'
-    )

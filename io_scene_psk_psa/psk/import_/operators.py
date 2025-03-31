@@ -1,15 +1,13 @@
 import os
 from pathlib import Path
 
-from bpy.props import StringProperty, CollectionProperty
-from bpy.types import Operator, FileHandler, Context, OperatorFileListElement, UILayout
+from bpy.props import CollectionProperty, StringProperty
+from bpy.types import Context, FileHandler, Operator, OperatorFileListElement, UILayout
 from bpy_extras.io_utils import ImportHelper
 
 from ..importer import PskImportOptions, import_psk
 from ..properties import PskImportMixin
 from ..reader import read_psk
-
-empty_set = set()
 
 def get_psk_import_options_from_properties(property_group: PskImportMixin):
     options = PskImportOptions()

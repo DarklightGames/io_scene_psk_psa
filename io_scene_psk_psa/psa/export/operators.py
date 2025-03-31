@@ -6,8 +6,12 @@ from bpy.props import StringProperty
 from bpy.types import Context, Action, Object, AnimData, TimelineMarker, Operator
 from bpy_extras.io_utils import ExportHelper
 
-from .properties import PSA_PG_export, PSA_PG_export_action_list_item, filter_sequences, \
-    get_sequences_from_name_and_frame_range
+from .properties import (
+    PSA_PG_export,
+    PSA_PG_export_action_list_item,
+    filter_sequences,
+    get_sequences_from_name_and_frame_range,
+)
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from ..writer import write_psa
 from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range
@@ -98,7 +102,8 @@ def update_actions_and_timeline_markers(context: Context, armature_objects: Iter
         for pose_marker_index, pose_marker in enumerate(pose_markers):
             if pose_marker.name.strip() == '' or pose_marker.name.startswith('#'):
                 continue
-            for (name, frame_start, frame_end) in get_sequences_from_action_pose_markers(action, pose_markers, pose_marker, pose_marker_index):
+            sequences = get_sequences_from_action_pose_markers(action, pose_markers, pose_marker, pose_marker_index)
+            for (name, frame_start, frame_end) in sequences:
                 item = pg.action_list.add()
                 item.action = action
                 item.name = name
@@ -154,7 +159,11 @@ def get_sequence_fps(context: Context, fps_source: str, fps_custom: float, actio
             assert False, f'Invalid FPS source: {fps_source}'
 
 
-def get_sequence_compression_ratio(compression_ratio_source: str, compression_ratio_custom: float, actions: Iterable[Action]) -> float:
+def get_sequence_compression_ratio(
+        compression_ratio_source: str, 
+        compression_ratio_custom: float, 
+        actions: Iterable[Action],
+        ) -> float:
     match compression_ratio_source:
         case 'ACTION_METADATA':
             # Get the minimum value of action metadata compression ratio values.
@@ -181,7 +190,11 @@ def get_animation_data_object(context: Context) -> Object:
     return animation_data_object
 
 
-def get_timeline_marker_sequence_frame_ranges(animation_data: AnimData, context: Context, marker_names: List[str]) -> Dict:
+def get_timeline_marker_sequence_frame_ranges(
+        animation_data: AnimData, 
+        context: Context, 
+        marker_names: List[str],
+        ) -> Dict:
     # Timeline markers need to be sorted so that we can determine the sequence start and end positions.
     sequence_frame_ranges = dict()
     sorted_timeline_markers = list(sorted(context.scene.timeline_markers, key=lambda x: x.frame))
@@ -239,7 +252,12 @@ def get_sequences_from_action(action: Action):
     yield from get_sequences_from_name_and_frame_range(action_name, frame_start, frame_end)
 
 
-def get_sequences_from_action_pose_markers(action: Action, pose_markers: List[TimelineMarker], pose_marker: TimelineMarker, pose_marker_index: int):
+def get_sequences_from_action_pose_markers(
+        action: Action, 
+        pose_markers: List[TimelineMarker], 
+        pose_marker: TimelineMarker, 
+        pose_marker_index: int,
+        ):
     frame_start = pose_marker.frame
     sequence_name = pose_marker.name
     if pose_marker.name.startswith('!'):
@@ -378,8 +396,10 @@ class PSA_OT_export(Operator, ExportHelper):
                 row.operator(PSA_OT_export_bone_collections_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
                 row.operator(PSA_OT_export_bone_collections_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
                 rows = max(3, min(len(pg.bone_collection_list), 10))
-                bones_panel.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index',
-                                     rows=rows)
+                bones_panel.template_list(
+                    'PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index',
+                    rows=rows
+                    )
 
             bones_advanced_header, bones_advanced_panel = layout.panel('Advanced', default_closed=False)
             bones_advanced_header.label(text='Advanced')
@@ -559,7 +579,7 @@ class PSA_OT_export_actions_select_all(Operator):
             case 'ACTIVE_ACTION':
                 return pg.active_action_list
             case _:
-                return None
+                assert False, f'Invalid sequence source: {pg.sequence_source}'
 
     @classmethod
     def poll(cls, context):

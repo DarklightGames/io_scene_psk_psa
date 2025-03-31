@@ -1,6 +1,6 @@
 from bpy.types import UILayout
 
-from .data import bone_filter_mode_items
+from .types import bone_filter_mode_items
 
 
 def is_bone_filter_mode_item_available(pg, identifier):

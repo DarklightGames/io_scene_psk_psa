@@ -1,6 +1,6 @@
 import sys
 
-from bpy.props import EnumProperty, BoolProperty, FloatProperty, StringProperty
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, StringProperty
 from bpy.types import PropertyGroup
 
 mesh_triangle_types_items = (
@@ -44,8 +44,6 @@ def poly_flags_to_triangle_type_and_bit_flags(poly_flags: int) -> (str, set[str]
     triangle_bit_flags = {item[0] for item in mesh_triangle_bit_flags_items if item[3] & poly_flags}
     return triangle_type, triangle_bit_flags
 
-empty_set = set()
-
 
 def should_import_mesh_get(self):
     return self.import_components in {'ALL', 'MESH'}
@@ -57,13 +55,13 @@ def should_import_skleton_get(self):
 class PskImportMixin:
     should_import_vertex_colors: BoolProperty(
         default=True,
-        options=empty_set,
+        options=set(),
         name='Import Vertex Colors',
         description='Import vertex colors, if available'
     )
     vertex_color_space: EnumProperty(
         name='Vertex Color Space',
-        options=empty_set,
+        options=set(),
         description='The source vertex color space',
         default='SRGBA',
         items=(
@@ -74,18 +72,18 @@ class PskImportMixin:
     should_import_vertex_normals: BoolProperty(
         default=True,
         name='Import Vertex Normals',
-        options=empty_set,
+        options=set(),
         description='Import vertex normals, if available'
     )
     should_import_extra_uvs: BoolProperty(
         default=True,
         name='Import Extra UVs',
-        options=empty_set,
+        options=set(),
         description='Import extra UV maps, if available'
     )
     import_components: EnumProperty(
         name='Import Components',
-        options=empty_set,
+        options=set(),
         description='Determine which components to import',
         items=(
             ('ALL', 'Mesh & Skeleton', 'Import mesh and skeleton'),
@@ -101,7 +99,7 @@ class PskImportMixin:
     should_import_materials: BoolProperty(
         default=True,
         name='Import Materials',
-        options=empty_set,
+        options=set(),
     )
     should_import_skeleton: BoolProperty(
         name='Import Skeleton',
@@ -113,14 +111,14 @@ class PskImportMixin:
         step=100,
         soft_min=1.0,
         name='Bone Length',
-        options=empty_set,
+        options=set(),
         subtype='DISTANCE',
         description='Length of the bones'
     )
     should_import_shape_keys: BoolProperty(
         default=True,
         name='Import Shape Keys',
-        options=empty_set,
+        options=set(),
         description='Import shape keys, if available'
     )
     scale: FloatProperty(
@@ -131,7 +129,7 @@ class PskImportMixin:
     bdk_repository_id: StringProperty(
         name='BDK Repository ID',
         default='',
-        options=empty_set,
+        options=set(),
         description='The ID of the BDK repository to use for loading materials'
     )
 

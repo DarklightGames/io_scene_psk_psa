@@ -1,9 +1,9 @@
 import typing
-from typing import List, Optional
+from typing import Iterable, List, Optional, cast as typing_cast
 
 import bpy
 import numpy as np
-from bpy.types import Context, FCurve, Object
+from bpy.types import Armature, Context, FCurve, Object
 from mathutils import Vector, Quaternion
 
 from .config import PsaConfig, REMOVE_TRACK_LOCATION, REMOVE_TRACK_ROTATION
@@ -56,7 +56,7 @@ class ImportBone(object):
         self.fcurves: List[FCurve] = []
 
 
-def _calculate_fcurve_data(import_bone: ImportBone, key_data: typing.Iterable[float]):
+def _calculate_fcurve_data(import_bone: ImportBone, key_data: Iterable[float]):
     # Convert world-space transforms to local-space transforms.
     key_rotation = Quaternion(key_data[0:4])
     key_location = Vector(key_data[4:])
@@ -83,7 +83,7 @@ def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_name
     """
     @param psa_bone_name: The name of the PSA bone.
     @param armature_bone_names: The names of the bones in the armature.
-    @param bone_mapping_mode: One of 'EXACT' or 'CASE_INSENSITIVE'.
+    @param bone_mapping_mode: One of `['EXACT', 'CASE_INSENSITIVE']`.
     @return: The index of the armature bone that corresponds to the given PSA bone, or None if no such bone exists.
     """
     for armature_bone_index, armature_bone_name in enumerate(armature_bone_names):
@@ -95,24 +95,27 @@ def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_name
                 return armature_bone_index
     return None
 
-def _get_sample_frame_times(source_frame_count: int, frame_step: float) -> typing.Iterable[float]:
-    # TODO: for correctness, we should also emit the target frame time as well (because the last frame can be a
-    #  fractional frame).
-    time = 0.0
-    while time < source_frame_count - 1:
-        yield time
-        time += frame_step
-    yield source_frame_count - 1
-
 
 def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, frame_step: float = 1.0) -> np.ndarray:
     """
     Resamples the sequence data matrix to the target frame count.
+
     @param sequence_data_matrix: FxBx7 matrix where F is the number of frames, B is the number of bones, and X is the
     number of data elements per bone.
     @param frame_step: The step between frames in the resampled sequence.
     @return: The resampled sequence data matrix, or sequence_data_matrix if no resampling is necessary.
     """
+
+    def _get_sample_frame_times(source_frame_count: int, frame_step: float) -> Iterable[float]:
+        # TODO: for correctness, we should also emit the target frame time as well (because the last frame can be a
+        #  fractional frame).
+        assert frame_step > 0.0, 'Frame step must be greater than 0'
+        time = 0.0
+        while time < source_frame_count - 1:
+            yield time
+            time += frame_step
+        yield source_frame_count - 1
+
     if frame_step == 1.0:
         # No resampling is necessary.
         return sequence_data_matrix
@@ -145,7 +148,7 @@ def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, frame_step:
 def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object, options: PsaImportOptions) -> PsaImportResult:
     result = PsaImportResult()
     sequences = [psa_reader.sequences[x] for x in options.sequence_names]
-    armature_data = typing.cast(bpy.types.Armature, armature_object.data)
+    armature_data = typing_cast(Armature, armature_object.data)
 
     # Create an index mapping from bones in the PSA to bones in the target armature.
     psa_to_armature_bone_indices = {}

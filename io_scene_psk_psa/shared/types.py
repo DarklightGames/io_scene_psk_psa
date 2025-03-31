@@ -1,5 +1,5 @@
 import bpy
-from bpy.props import StringProperty, IntProperty, BoolProperty, FloatProperty
+from bpy.props import CollectionProperty, EnumProperty, StringProperty, IntProperty, BoolProperty, FloatProperty
 from bpy.types import PropertyGroup, UIList, UILayout, Context, AnyType, Panel
 
 
@@ -54,6 +54,90 @@ class PSX_PT_action(Panel):
         flow.prop(action.psa_export, 'compression_ratio')
         flow.prop(action.psa_export, 'key_quota')
         flow.prop(action.psa_export, 'fps')
+
+
+bone_filter_mode_items = (
+    ('ALL', 'All', 'All bones will be exported'),
+    ('BONE_COLLECTIONS', 'Bone Collections', 'Only bones belonging to the selected bone collections and their ancestors will be exported')
+)
+
+axis_identifiers = ('X', 'Y', 'Z', '-X', '-Y', '-Z')
+forward_items = (
+    ('X', 'X Forward', ''),
+    ('Y', 'Y Forward', ''),
+    ('Z', 'Z Forward', ''),
+    ('-X', '-X Forward', ''),
+    ('-Y', '-Y Forward', ''),
+    ('-Z', '-Z Forward', ''),
+)
+
+up_items = (
+    ('X', 'X Up', ''),
+    ('Y', 'Y Up', ''),
+    ('Z', 'Z Up', ''),
+    ('-X', '-X Up', ''),
+    ('-Y', '-Y Up', ''),
+    ('-Z', '-Z Up', ''),
+)
+
+
+def forward_axis_update(self, _context):
+    if self.forward_axis == self.up_axis:
+        # Automatically set the up axis to the next available axis
+        self.up_axis = next((axis for axis in axis_identifiers if axis != self.forward_axis), 'Z')
+
+
+def up_axis_update(self, _context):
+    if self.up_axis == self.forward_axis:
+        # Automatically set the forward axis to the next available axis
+        self.forward_axis = next((axis for axis in axis_identifiers if axis != self.up_axis), 'X')
+
+
+class ForwardUpAxisMixin:
+    forward_axis: EnumProperty(
+        name='Forward',
+        items=forward_items,
+        default='X',
+        update=forward_axis_update
+    )
+    up_axis: EnumProperty(
+        name='Up',
+        items=up_items,
+        default='Z',
+        update=up_axis_update
+    )
+
+
+export_space_items = [
+    ('WORLD', 'World', 'Export in world space'),
+    ('ARMATURE', 'Armature', 'Export the local space of the armature object'),
+    ('ROOT', 'Root', 'Export in the space of the root bone')
+]
+
+
+class ExportSpaceMixin:
+    export_space: EnumProperty(
+        name='Export Space',
+        items=export_space_items,
+        default='WORLD'
+    )
+ 
+ 
+class PsxBoneExportMixin:
+    bone_filter_mode: EnumProperty(
+        name='Bone Filter',
+        options=set(),
+        description='',
+        items=bone_filter_mode_items,
+    )
+    bone_collection_list: CollectionProperty(type=PSX_PG_bone_collection_list_item)
+    bone_collection_list_index: IntProperty(default=0, name='', description='')
+    root_bone_name: StringProperty(
+        name='Root Bone Name',
+        description='The name of the generated root bone when exporting multiple armatures',
+        default='ROOT',
+    )
+
 
 
 classes = (

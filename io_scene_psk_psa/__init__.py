@@ -36,27 +36,39 @@ if 'bpy' in locals():
 else:
     from .shared import data as shared_data, types as shared_types, helpers as shared_helpers
     from .shared import dfs as shared_dfs, ui as shared_ui
-    from .psk import data as psk_data, builder as psk_builder, writer as psk_writer, \
-    importer as psk_importer, properties as psk_properties
+    from .psk import (
+        builder as psk_builder,
+        data as psk_data,
+        importer as psk_importer,
+        properties as psk_properties,
+        writer as psk_writer,
+    )
     from .psk import reader as psk_reader, ui as psk_ui
-    from .psk.export import properties as psk_export_properties, ui as psk_export_ui, \
-        operators as psk_export_operators
+    from .psk.export import (
+        operators as psk_export_operators,
+        properties as psk_export_properties,
+        ui as psk_export_ui,
+    )
     from .psk.import_ import operators as psk_import_operators
 
-    from .psa import config as psa_config, data as psa_data, writer as psa_writer, reader as psa_reader, \
-        builder as psa_builder, importer as psa_importer
-    from .psa.export import properties as psa_export_properties, ui as psa_export_ui, \
-        operators as psa_export_operators
+    from .psa import (
+        config as psa_config,
+        data as psa_data,
+        writer as psa_writer,
+        reader as psa_reader,
+        builder as psa_builder,
+        importer as psa_importer,
+    )
+    from .psa.export import (
+        properties as psa_export_properties,
+        ui as psa_export_ui,
+        operators as psa_export_operators,
+    )
     from .psa.import_ import operators as psa_import_operators
     from .psa.import_ import ui as psa_import_ui, properties as psa_import_properties
 
 import bpy
 from bpy.props import PointerProperty
-
-# TODO: just here so that it's not unreferenced and removed on save.
-if [shared_data, shared_helpers, psk_data, psk_reader, psk_writer, psk_builder, psk_importer, psa_data, psa_config,
-    psa_reader, psa_writer, psa_builder, psa_importer]:
-    pass
 
 classes = shared_types.classes +\
           psk_properties.classes +\

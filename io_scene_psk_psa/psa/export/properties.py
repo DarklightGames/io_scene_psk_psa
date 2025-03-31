@@ -2,20 +2,21 @@ import re
 import sys
 from fnmatch import fnmatch
 from typing import List, Optional
-
-from bpy.props import BoolProperty, PointerProperty, EnumProperty, FloatProperty, CollectionProperty, IntProperty, \
-    StringProperty
+from bpy.props import (
+    BoolProperty,
+    PointerProperty,
+    EnumProperty,
+    FloatProperty,
+    CollectionProperty,
+    IntProperty,
+    StringProperty,
+)
 from bpy.types import PropertyGroup, Object, Action, AnimData, Context
-
-from ...shared.data import bone_filter_mode_items, ForwardUpAxisMixin, ExportSpaceMixin
-from ...shared.types import PSX_PG_bone_collection_list_item
+from ...shared.types import ForwardUpAxisMixin, ExportSpaceMixin, PsxBoneExportMixin
 
 
 def psa_export_property_group_animation_data_override_poll(_context, obj):
     return obj.animation_data is not None
-
-
-empty_set = set()
 
 
 class PSA_PG_export_action_list_item(PropertyGroup):
@@ -102,10 +103,10 @@ def animation_data_override_update_cb(self: 'PSA_PG_export', context: Context):
     self.nla_track = ''
 
 
-class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin):
+class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin, PsxBoneExportMixin):
     should_override_animation_data: BoolProperty(
         name='Override Animation Data',
-        options=empty_set,
+        options=set(),
         default=False,
         description='Use the animation data from a different object instead of the selected object',
         update=animation_data_override_update_cb,
@@ -117,7 +118,7 @@ class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin):
     )
     sequence_source: EnumProperty(
         name='Source',
-        options=empty_set,
+        options=set(),
         description='',
         items=(
             ('ACTIONS', 'Actions', 'Sequences will be exported using actions', 'ACTION', 0),
@@ -128,7 +129,7 @@ class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin):
     )
     nla_track: StringProperty(
         name='NLA Track',
-        options=empty_set,
+        options=set(),
         description='',
         search=nla_track_search_cb,
         update=nla_track_update_cb
@@ -136,7 +137,7 @@ class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin):
     nla_track_index: IntProperty(name='NLA Track Index', default=-1)
     fps_source: EnumProperty(
         name='FPS Source',
-        options=empty_set,
+        options=set(),
         description='',
         items=(
             ('SCENE', 'Scene', '', 'SCENE_DATA', 0),
@@ -144,11 +145,11 @@ class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin):
             ('CUSTOM', 'Custom', '', 2)
         )
     )
-    fps_custom: FloatProperty(default=30.0, min=sys.float_info.epsilon, soft_min=1.0, options=empty_set, step=100,
+    fps_custom: FloatProperty(default=30.0, min=sys.float_info.epsilon, soft_min=1.0, options=set(), step=100,
                               soft_max=60.0)
     compression_ratio_source: EnumProperty(
         name='Compression Ratio Source',
-        options=empty_set,
+        options=set(),
         description='',
         items=(
             ('ACTION_METADATA', 'Action Metadata', 'The compression ratio will be determined by action\'s Compression Ratio property found in the PSA Export panel.\n\nIf the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used', 'ACTION', 1),
@@ -164,16 +165,8 @@ class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin):
     nla_strip_list_index: IntProperty(default=0)
     active_action_list: CollectionProperty(type=PSA_PG_export_active_action_list_item)
     active_action_list_index: IntProperty(default=0)
-    bone_filter_mode: EnumProperty(
-        name='Bone Filter',
-        options=empty_set,
-        description='',
-        items=bone_filter_mode_items,
-    )
-    bone_collection_list: CollectionProperty(type=PSX_PG_bone_collection_list_item)
-    bone_collection_list_index: IntProperty(default=0, name='', description='')
-    sequence_name_prefix: StringProperty(name='Prefix', options=empty_set)
-    sequence_name_suffix: StringProperty(name='Suffix', options=empty_set)
+    sequence_name_prefix: StringProperty(name='Prefix', options=set())
+    sequence_name_suffix: StringProperty(name='Suffix', options=set())
     sequence_filter_name: StringProperty(
         default='',
         name='Filter by Name',
@@ -182,21 +175,21 @@ class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin):
     sequence_use_filter_invert: BoolProperty(
         default=False,
         name='Invert',
-        options=empty_set,
+        options=set(),
         description='Invert filtering (show hidden items, and vice versa)')
     sequence_filter_asset: BoolProperty(
         default=False,
         name='Show assets',
-        options=empty_set,
+        options=set(),
         description='Show actions that belong to an asset library')
     sequence_filter_pose_marker: BoolProperty(
         default=True,
         name='Show pose markers',
-        options=empty_set)
-    sequence_use_filter_sort_reverse: BoolProperty(default=True, options=empty_set)
+        options=set())
+    sequence_use_filter_sort_reverse: BoolProperty(default=True, options=set())
     sequence_filter_reversed: BoolProperty(
         default=True,
-        options=empty_set,
+        options=set(),
         name='Show Reversed',
         description='Show reversed sequences'
     )
@@ -209,18 +202,13 @@ class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin):
     )
     sampling_mode: EnumProperty(
         name='Sampling Mode',
-        options=empty_set,
+        options=set(),
         description='The method by which frames are sampled',
         items=(
             ('INTERPOLATED', 'Interpolated', 'Sampling is performed by interpolating the evaluated bone poses from the adjacent whole frames.', 'INTERPOLATED', 0),
             ('SUBFRAME', 'Subframe', 'Sampling is performed by evaluating the bone poses at the subframe time.\n\nNot recommended unless you are also animating with subframes enabled.', 'SUBFRAME', 1),
         ),
         default='INTERPOLATED'
-    )
-    root_bone_name: StringProperty(
-        name='Root Bone Name',
-        description='The name of the generated root bone when exporting multiple armatures',
-        default='ROOT',
     )
 
 
