@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        blender-version: [ 4.2, 4.3, 4.4 ]
+        blender-version: [ 4.4 ]
     env:
       ADDON_NAME: io_scene_psk_psa
     steps:
@@ -31,7 +31,7 @@ jobs:
           sudo apt-get install libxkbcommon-x11-0 -y
           sudo apt-get install libgl1 -y
           sudo apt-get install libglx-mesa0 -y
-          sudo apt-get install python3.11 -y
+          sudo apt-get install python3 -y
       - name: Install Requirements
         run: |
           python3 -m pip install --upgrade pip
@@ -63,7 +63,7 @@ jobs:
       - name: Run tests
         run: |
           source venv/bin/activate
-          pytest -svv tests
+          pytest -svv tests --blender-addons-dirs .
       - name: Archive addon
         uses: actions/upload-artifact@v4
         with:
