@@ -17,6 +17,10 @@ jobs:
       ADDON_NAME: io_scene_psk_psa
     steps:
       - uses: actions/checkout@v3
+        with:
+          lfs: true
+      - name: Checkout LFS objects
+        run: git lfs checkout
       - uses: SebRollen/toml-action@v1.2.0
         id: read_manifest
         with:
