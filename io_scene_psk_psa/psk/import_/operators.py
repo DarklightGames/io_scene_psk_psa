@@ -91,7 +91,7 @@ class PSK_OT_import(Operator, ImportHelper, PskImportMixin):
     def execute(self, context):
         try:
             psk = read_psk(self.filepath)
-        except IOError as e:
+        except OSError as e:
             self.report({'ERROR'}, f'Failed to read "{self.filepath}". The file may be corrupted or not a valid PSK file: {e}')
             return {'CANCELLED'}
 
@@ -141,8 +141,9 @@ class PSK_OT_import_drag_and_drop(Operator, PskImportMixin):
             filepath = Path(self.directory) / file.name
             try:
                 psk = read_psk(filepath)
-            except IOError as e:
+            except OSError as e:
                 self.report({'ERROR'}, f'Failed to read "{filepath}". The file may be corrupted or not a valid PSK file: {e}')
+                return {'CANCELLED'}
 
             name = os.path.splitext(file.name)[0]
             result = import_psk(psk, context, name, options)
