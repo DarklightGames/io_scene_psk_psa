@@ -10,8 +10,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        blender-version: [ 4.2, 4.3, 4.4 ]
     env:
-      BLENDER_VERSION: blender-4.2.0-linux-x64
       ADDON_NAME: io_scene_psk_psa
     steps:
       - uses: actions/checkout@v3
@@ -20,33 +22,48 @@ jobs:
         with:
           file: '${{ env.ADDON_NAME }}/blender_manifest.toml'
           field: 'version'
-      - name: Set derived environment variables
-        run: |
-          echo "BLENDER_FILENAME=${{ env.BLENDER_VERSION }}.tar.xz" >> $GITHUB_ENV
-          echo "BLENDER_URL=https://mirrors.iu13.net/blender/release/Blender4.2/${{ env.BLENDER_VERSION }}.tar.xz" >> $GITHUB_ENV
       - name: Install Blender Dependencies
         run: |
+          sudo apt-get update -y
           sudo apt-get install libxxf86vm-dev -y
           sudo apt-get install libxfixes3 -y
           sudo apt-get install libxi-dev -y
           sudo apt-get install libxkbcommon-x11-0 -y
           sudo apt-get install libgl1 -y
           sudo apt-get install libglx-mesa0 -y
-      - name: Download & Extract Blender
+          sudo apt-get install python3.11 -y
+      - name: Install Requirements
         run: |
-          wget -q $BLENDER_URL
-          tar -xf $BLENDER_FILENAME
-          rm -rf $BLENDER_FILENAME
-      - name: Add Blender executable to path
+          python3 -m pip install --upgrade pip
+          python3 -m pip install virtualenv
+          python3 -m virtualenv venv
+          source venv/bin/activate
+          pip install pytest-blender
+          pip install blender-downloader
+      - name: Install Blender
         run: |
-          echo "${{ github.workspace }}/${{ env.BLENDER_VERSION }}/" >> $GITHUB_PATH
+          source venv/bin/activate
+          blender_executable="$(blender-downloader ${{ matrix.blender-version }} --extract --print-blender-executable)"
+          echo "BLENDER_EXECUTABLE=${blender_executable}" >> $GITHUB_ENV
+          blender_python="$(pytest-blender --blender-executable "$blender_executable")"
+          echo "BLENDER_PYTHON=${blender_python}" >> $GITHUB_ENV
+          # Write the BLENDER_PYTHON path to the console for debugging
+          # Deactivate the virtualenv to avoid conflicts with the system python
+          deactivate
+          $blender_python -m ensurepip
+          $blender_python -m pip install -r tests/requirements.txt
       - name: Build extension
         run: |
           pushd ./${{ env.ADDON_NAME }}
-          blender --command extension build
+          # Run blender using the environment variable set by the action
+          ${{ env.BLENDER_EXECUTABLE }} --command extension build
           mkdir artifact
           unzip -q ${{ env.ADDON_NAME }}-${{ steps.read_manifest.outputs.value }}.zip -d ./artifact
           popd
+      - name: Run tests
+        run: |
+          source venv/bin/activate
+          pytest -svv tests
       - name: Archive addon
         uses: actions/upload-artifact@v4
         with:

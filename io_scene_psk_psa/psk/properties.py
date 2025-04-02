@@ -46,10 +46,11 @@ def poly_flags_to_triangle_type_and_bit_flags(poly_flags: int) -> (str, set[str]
 
 
 def should_import_mesh_get(self):
-    return self.import_components in {'ALL', 'MESH'}
+    return self.components in {'ALL', 'MESH'}
+
 
 def should_import_skleton_get(self):
-    return self.import_components in {'ALL', 'SKELETON'}
+    return self.components in {'ALL', 'ARMATURE'}
 
 
 class PskImportMixin:
@@ -73,7 +74,7 @@ class PskImportMixin:
         default=True,
         name='Import Vertex Normals',
         options=set(),
-        description='Import vertex normals, if available'
+        description='Import vertex normals, if available.\n\nThis is only supported for PSKX files'
     )
     should_import_extra_uvs: BoolProperty(
         default=True,
@@ -81,14 +82,14 @@ class PskImportMixin:
         options=set(),
         description='Import extra UV maps, if available'
     )
-    import_components: EnumProperty(
-        name='Import Components',
+    components: EnumProperty(
+        name='Components',
         options=set(),
-        description='Determine which components to import',
+        description='Which components to import',
         items=(
-            ('ALL', 'Mesh & Skeleton', 'Import mesh and skeleton'),
+            ('ALL', 'Mesh & Armature', 'Import mesh and armature'),
             ('MESH', 'Mesh Only', 'Import mesh only'),
-            ('SKELETON', 'Skeleton Only', 'Import skeleton only'),
+            ('ARMATURE', 'Armature Only', 'Import armature only'),
         ),
         default='ALL'
     )
@@ -101,7 +102,7 @@ class PskImportMixin:
         name='Import Materials',
         options=set(),
     )
-    should_import_skeleton: BoolProperty(
+    should_import_armature: BoolProperty(
         name='Import Skeleton',
         get=should_import_skleton_get,
     )
@@ -119,7 +120,7 @@ class PskImportMixin:
         default=True,
         name='Import Shape Keys',
         options=set(),
-        description='Import shape keys, if available'
+        description='Import shape keys, if available.\n\nThis is only supported for PSKX files'
     )
     scale: FloatProperty(
         name='Scale',

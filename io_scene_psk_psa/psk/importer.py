@@ -20,7 +20,7 @@ class PskImportOptions:
         self.vertex_color_space = 'SRGB'
         self.should_import_vertex_normals = True
         self.should_import_extra_uvs = True
-        self.should_import_skeleton = True
+        self.should_import_armature = True
         self.should_import_shape_keys = True
         self.bone_length = 1.0
         self.should_import_materials = True
@@ -62,7 +62,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
     armature_object = None
     mesh_object = None
 
-    if options.should_import_skeleton:
+    if options.should_import_armature:
         # Armature
         armature_data = bpy.data.armatures.new(name)
         armature_object = bpy.data.objects.new(name, armature_data)
@@ -213,12 +213,9 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
             psk_vertex_colors = np.zeros((len(psk.vertex_colors), 4))
             for vertex_color_index in range(len(psk.vertex_colors)):
                 psk_vertex_colors[vertex_color_index,:] = psk.vertex_colors[vertex_color_index].normalized()
-            match options.vertex_color_space:
-                case 'SRGBA':
-                    for i in range(psk_vertex_colors.shape[0]):
-                        psk_vertex_colors[i, :3] = tuple(map(lambda x: rgb_to_srgb(x), psk_vertex_colors[i, :3]))
-                case _:
-                    pass
+            if options.vertex_color_space == 'SRGBA':
+                for i in range(psk_vertex_colors.shape[0]):
+                    psk_vertex_colors[i, :3] = tuple(map(lambda x: rgb_to_srgb(x), psk_vertex_colors[i, :3]))
 
             # Map the PSK vertex colors to the face corners.
             face_count = len(psk.faces) - len(invalid_face_indices)
@@ -276,12 +273,12 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
         context.scene.collection.objects.link(mesh_object)
 
         # Add armature modifier to our mesh object.
-        if options.should_import_skeleton:
+        if options.should_import_armature:
             armature_modifier = mesh_object.modifiers.new(name='Armature', type='ARMATURE')
             armature_modifier.object = armature_object
             mesh_object.parent = armature_object
 
-    root_object = armature_object if options.should_import_skeleton else mesh_object
+    root_object = armature_object if options.should_import_armature else mesh_object
     root_object.scale = (options.scale, options.scale, options.scale)
 
     try:

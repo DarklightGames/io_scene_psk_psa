@@ -16,7 +16,7 @@ def get_psk_import_options_from_properties(property_group: PskImportMixin):
     options.should_import_vertex_colors = property_group.should_import_vertex_colors
     options.should_import_vertex_normals = property_group.should_import_vertex_normals
     options.vertex_color_space = property_group.vertex_color_space
-    options.should_import_skeleton = property_group.should_import_skeleton
+    options.should_import_armature = property_group.should_import_armature
     options.bone_length = property_group.bone_length
     options.should_import_materials = property_group.should_import_materials
     options.should_import_shape_keys = property_group.should_import_shape_keys
@@ -34,7 +34,7 @@ def psk_import_draw(layout: UILayout, props: PskImportMixin):
     col = row.column()
     col.use_property_split = True
     col.use_property_decorate = False
-    col.prop(props, 'import_components')
+    col.prop(props, 'components')
 
     if props.should_import_mesh:
         mesh_header, mesh_panel = layout.panel('mesh_panel_id', default_closed=False)
@@ -45,20 +45,21 @@ def psk_import_draw(layout: UILayout, props: PskImportMixin):
             col = row.column()
             col.use_property_split = True
             col.use_property_decorate = False
-            col.prop(props, 'should_import_materials', text='Materials')
-            col.prop(props, 'should_import_vertex_normals', text='Vertex Normals')
             col.prop(props, 'should_import_extra_uvs', text='Extra UVs')
+            col.prop(props, 'should_import_materials', text='Materials')
             col.prop(props, 'should_import_vertex_colors', text='Vertex Colors')
             if props.should_import_vertex_colors:
                 col.prop(props, 'vertex_color_space')
+            col.separator()
+            col.prop(props, 'should_import_vertex_normals', text='Vertex Normals')
             col.prop(props, 'should_import_shape_keys', text='Shape Keys')
 
-    if props.should_import_skeleton:
-        skeleton_header, skeleton_panel = layout.panel('skeleton_panel_id', default_closed=False)
-        skeleton_header.label(text='Skeleton', icon='OUTLINER_DATA_ARMATURE')
+    if props.should_import_armature:
+        armature_header, armature_panel = layout.panel('armature_panel_id', default_closed=False)
+        armature_header.label(text='Armature', icon='OUTLINER_DATA_ARMATURE')
 
-        if skeleton_panel:
-            row = skeleton_panel.row()
+        if armature_panel:
+            row = armature_panel.row()
             col = row.column()
             col.use_property_split = True
             col.use_property_decorate = False

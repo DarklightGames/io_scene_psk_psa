@@ -49,8 +49,8 @@ def _get_pose_bone_location_and_rotation(
         coordinate_system_transform: Matrix,
         has_false_root_bone: bool,
 ) -> Tuple[Vector, Quaternion]:
-    # TODO: my kingdom for a Rust monad.
     is_false_root_bone = pose_bone is None and armature_object is None
+
     if is_false_root_bone:
         pose_bone_matrix = coordinate_system_transform
     elif pose_bone.parent is not None:
@@ -82,7 +82,6 @@ def _get_pose_bone_location_and_rotation(
     location = pose_bone_matrix.to_translation()
     rotation = pose_bone_matrix.to_quaternion().normalized()
 
-    # TODO: this has gotten way more complicated than it needs to be.
     # Don't apply scale to the root bone of armatures if we have a false root.
     if not has_false_root_bone or (pose_bone is None or pose_bone.parent is not None):
         location *= scale
@@ -112,12 +111,9 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         bone_collection_indices=options.bone_collection_indices,
     )
 
-    # TODO: technically wrong, might not necessarily be true (i.e., if the armature object has no contributing bones).
-    has_false_root_bone = len(options.armature_objects) > 1
-
     # Build list of PSA bones.
-    # Note that the PSA bones are just here to validate the hierarchy. The bind pose information is not used by the
-    # engine.
+    # Note that the PSA bones are just here to validate the hierarchy.
+    # The bind pose information is not used by the engine.
     psa.bones = [psx_bone for psx_bone, _ in psx_bone_create_result.bones]
 
     # No bones are going to be exported.
@@ -129,10 +125,9 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         export_sequence.name = f'{options.sequence_name_prefix}{export_sequence.name}{options.sequence_name_suffix}'
         export_sequence.name = export_sequence.name.strip()
 
-    # Save the current action and frame so that we can restore the state once we are done.
+    # Save each armature object's current action and frame so that we can restore the state once we are done.
+    saved_armature_object_actions = {o: o.animation_data.action for o in options.armature_objects}
     saved_frame_current = context.scene.frame_current
-
-    saved_action = options.animation_data.action
 
     # Now build the PSA sequences.
     # We actually alter the timeline frame and simply record the resultant pose bone matrices.
@@ -179,7 +174,6 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
 
         # Link the action to the animation data and update view layer.
         for armature_object in options.armature_objects:
-            # TODO: change this to assign it to each armature object's animation data.
             armature_object.animation_data.action = export_sequence.nla_state.action
 
         context.view_layer.update()
@@ -217,13 +211,10 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         export_bones: List[PsaExportBone] = []
 
         for psx_bone, armature_object in psx_bone_create_result.bones:
-            print(psx_bone, armature_object)
-            # TODO: look up the pose bone from the name in the PSX bone.
             if armature_object is None:
                 export_bones.append(PsaExportBone(None, None, Vector((1.0, 1.0, 1.0))))
                 continue
 
-            # TODO: we need to look up the pose bones using the name.
             pose_bone = armature_object.pose.bones[psx_bone.name.decode('windows-1252')]
 
             export_bones.append(PsaExportBone(pose_bone, armature_object, armature_scales[armature_object]))
@@ -260,7 +251,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
                                     options.export_space,
                                     export_bone.scale,
                                     coordinate_system_transform=coordinate_system_transform,
-                                    has_false_root_bone=has_false_root_bone,
+                                    has_false_root_bone=psx_bone_create_result.has_false_root_bone,
                                 )
                                 last_frame_bone_poses.append((location, rotation))
 
@@ -283,7 +274,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
                                     export_space=options.export_space,
                                     scale=export_bone.scale,
                                     coordinate_system_transform=coordinate_system_transform,
-                                    has_false_root_bone=has_false_root_bone,
+                                    has_false_root_bone=psx_bone_create_result.has_false_root_bone,
                                 )
                                 next_frame_bone_poses.append((location, rotation))
 
@@ -310,7 +301,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
                             export_space=options.export_space,
                             scale=export_bone.scale,
                             coordinate_system_transform=coordinate_system_transform,
-                            has_false_root_bone=has_false_root_bone,
+                            has_false_root_bone=psx_bone_create_result.has_false_root_bone,
                         )
                         add_key(location, rotation)
 
@@ -322,9 +313,9 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
 
         context.window_manager.progress_update(export_sequence_index)
 
-    # Restore the previous action & frame.
-    # TODO: store each armature object's previous action
-    options.animation_data.action = saved_action
+    # Restore the previous actions & frame.
+    for armature_object, action in saved_armature_object_actions.items():
+        armature_object.animation_data.action = action
 
     context.scene.frame_set(saved_frame_current)
 

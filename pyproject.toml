@@ -1,0 +1,6 @@
+[project]
+name = "io_scene_psk_psa"
+
+[pytest]
+blender-addons-dirs = "io_scene_psk_psa"
+testpaths = "tests"

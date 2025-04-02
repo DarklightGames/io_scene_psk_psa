@@ -70,18 +70,18 @@ else:
 import bpy
 from bpy.props import PointerProperty
 
-classes = shared_types.classes +\
-          psk_properties.classes +\
-          psk_ui.classes +\
-          psk_import_operators.classes +\
-          psk_export_properties.classes +\
-          psk_export_operators.classes +\
+classes = shared_types.classes + \
+          psk_properties.classes + \
+          psk_ui.classes + \
+          psk_import_operators.classes + \
+          psk_export_properties.classes + \
+          psk_export_operators.classes + \
           psk_export_ui.classes + \
-          psa_export_properties.classes +\
-          psa_export_operators.classes +\
+          psa_export_properties.classes + \
+          psa_export_operators.classes + \
           psa_export_ui.classes + \
-          psa_import_properties.classes +\
-          psa_import_operators.classes +\
+          psa_import_properties.classes + \
+          psa_import_operators.classes + \
           psa_import_ui.classes
 
 

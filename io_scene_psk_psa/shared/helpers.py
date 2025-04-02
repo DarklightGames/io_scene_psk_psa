@@ -271,6 +271,10 @@ class PsxBoneCreateResult:
         self.bones = bones
         self.armature_object_root_bone_indices = armature_object_root_bone_indices
         self.armature_object_bone_names = armature_object_bone_names
+    
+    @property
+    def has_false_root_bone(self) -> bool:
+        return len(self.bones) > 0 and self.bones[0][1] is None
 
 
 def create_psx_bones(
