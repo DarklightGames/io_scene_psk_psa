@@ -1,0 +1,2 @@
+*.psk filter=lfs diff=lfs merge=lfs -text
+*.psa filter=lfs diff=lfs merge=lfs -text
