@@ -1,6 +1,5 @@
 from ctypes import Structure, c_char, c_int32, c_float, c_ubyte
 from typing import Tuple
-from mathutils import Quaternion as BpyQuaternion
 
 
 class Color(Structure):
@@ -81,15 +80,6 @@ class Quaternion(Structure):
     @classmethod
     def identity(cls):
         return Quaternion(0, 0, 0, 1)
-
-    @classmethod
-    def from_bpy_quaternion(cls, other: BpyQuaternion) -> BpyQuaternion:
-        quaternion = Quaternion()
-        quaternion.x = other.x
-        quaternion.y = other.y
-        quaternion.z = other.z
-        quaternion.w = other.w
-        return quaternion
 
 
 class PsxBone(Structure):

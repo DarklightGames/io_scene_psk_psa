@@ -3,7 +3,7 @@ from collections import Counter
 from typing import List, Iterable, Optional, Dict, Tuple, cast as typing_cast
 from bpy.props import CollectionProperty
 from bpy.types import Armature, AnimData, Object
-from mathutils import Matrix, Vector
+from mathutils import Matrix, Vector, Quaternion as BpyQuaternion
 from .data import Vector3, Quaternion
 from ..shared.data import PsxBone
 
@@ -277,6 +277,15 @@ class PsxBoneCreateResult:
         return len(self.bones) > 0 and self.bones[0][1] is None
 
 
+def convert_bpy_quaternion_to_psx_quaternion(other: BpyQuaternion) -> Quaternion:
+    quaternion = Quaternion()
+    quaternion.x = other.x
+    quaternion.y = other.y
+    quaternion.z = other.z
+    quaternion.w = other.w
+    return quaternion
+
+
 def create_psx_bones(
         armature_objects: List[Object],
         export_space: str = 'WORLD',
@@ -326,7 +335,7 @@ def create_psx_bones(
         psx_bone.children_count = 0
         psx_bone.parent_index = 0
         psx_bone.location = Vector3.zero()
-        psx_bone.rotation = Quaternion.from_bpy_quaternion(coordinate_system_default_rotation)
+        psx_bone.rotation = convert_bpy_quaternion_to_psx_quaternion(coordinate_system_default_rotation)
         bones.append((psx_bone, None))
 
         armature_object_root_bone_indices[None] = 0
@@ -339,7 +348,7 @@ def create_psx_bones(
             psx_bone.children_count = total_bone_count
             psx_bone.parent_index = 0
             psx_bone.location = Vector3.zero()
-            psx_bone.rotation = Quaternion.from_bpy_quaternion(coordinate_system_default_rotation)
+            psx_bone.rotation = convert_bpy_quaternion_to_psx_quaternion(coordinate_system_default_rotation)
             bones.append((psx_bone, None))
 
             armature_object_root_bone_indices[None] = 0
