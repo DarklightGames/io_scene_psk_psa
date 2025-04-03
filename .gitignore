@@ -105,3 +105,4 @@ venv.bak/
 
 # PyCharm
 .idea
+*.blend1
