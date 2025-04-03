@@ -23,6 +23,7 @@ def test_psk_import_all():
 
     armature_object = bpy.data.objects.get('Suzanne', None)
 
+    assert armature_object is not None, "Armature object not found in the scene"
     assert armature_object.type == 'ARMATURE', "Armature object type should be ARMATURE"
     assert armature_object is not None, "Armature object not found in the scene"
     assert len(armature_object.children) == 1, "Armature object should have one child"
