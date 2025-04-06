@@ -13,16 +13,16 @@ RUN pip install blender-downloader
 # Set BLENDER_EXECUTABLE and BLENDER_PYTHON as environment variables
 RUN BLENDER_EXECUTABLE=$(blender-downloader $BLENDER_VERSION --extract --remove-compressed --print-blender-executable) && \
     BLENDER_PYTHON=$(pytest-blender --blender-executable "${BLENDER_EXECUTABLE}") && \
-    echo "Blender executable: $BLENDER_EXECUTABLE" && \
-    echo "Blender Python: $BLENDER_PYTHON" && \
     echo "export BLENDER_EXECUTABLE=${BLENDER_EXECUTABLE}" >> /etc/environment && \
     echo "export BLENDER_PYTHON=${BLENDER_PYTHON}" >> /etc/environment && \
     echo $BLENDER_EXECUTABLE > /blender_executable_path
 
+RUN pip install pytest-cov
+
 # Source the environment variables and install Python dependencies
 RUN . /etc/environment && \
     $BLENDER_PYTHON -m ensurepip && \
-    $BLENDER_PYTHON -m pip install pytest
+    $BLENDER_PYTHON -m pip install pytest pytest-cov
 
 # Persist BLENDER_EXECUTABLE as an environment variable
 RUN echo $(cat /blender_executable_path) > /tmp/blender_executable_path_env && \
@@ -30,4 +30,5 @@ RUN echo $(cat /blender_executable_path) > /tmp/blender_executable_path_env && \
 ENV BLENDER_EXECUTABLE /tmp/blender_executable_path_env
 
 ENTRYPOINT [ "/bin/bash", "-c" ]
-CMD ["export BLENDER_EXECUTABLE=$(cat /blender_executable_path) && echo $BLENDER_EXECUTABLE && pytest -svv tests --blender-executable $BLENDER_EXECUTABLE --blender-addons-dirs addons"]
+WORKDIR /io_scene_psk_psa
+CMD ["source tests/test.sh"]

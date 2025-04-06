@@ -1,4 +1,4 @@
-name: Build Extension
+name: tests
 
 on:
   workflow_dispatch:

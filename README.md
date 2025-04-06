@@ -1,6 +1,5 @@
-[![Blender](https://img.shields.io/badge/Blender->=2.9-blue?logo=blender&logoColor=white)](https://www.blender.org/download/ "Download Blender")
-[![GitHub release](https://img.shields.io/github/release/DarklightGames/io_scene_psk_psa?include_prereleases=&sort=semver&color=blue)](https://github.com/DarklightGames/io_scene_psk_psa/releases/)
-[![Build Extension](https://github.com/DarklightGames/io_scene_psk_psa/actions/workflows/main.yml/badge.svg)](https://github.com/DarklightGames/io_scene_psk_psa/actions/workflows/main.yml)
+[![Blender](https://img.shields.io/badge/Blender%20Extension-Download-blue?logo=blender&logoColor=white)](https://extensions.blender.org/add-ons/io-scene-psk-psa/ "Download Blender")
+[![tests](https://github.com/DarklightGames/io_scene_psk_psa/actions/workflows/main.yml/badge.svg)](https://github.com/DarklightGames/io_scene_psk_psa/actions/workflows/main.yml)
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/L4L3853VR)
 
@@ -20,7 +19,7 @@ This software is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0
 * Support for exporting instance collections.
 
 # Installation
-For Blender 4.2 and higher, it is recommended to download the latest version from the [Blender Extensions](https://extensions.blender.org/add-ons/io-scene-psk-psa/) platform.
+For Blender 4.2 and higher, download the latest version from the [Blender Extensions](https://extensions.blender.org/add-ons/io-scene-psk-psa/) platform.
 
 For Blender 4.1 and lower, see [Legacy Compatibility](#legacy-compatibility).
 
@@ -69,7 +68,7 @@ The PSA importer creates [Actions](https://docs.blender.org/manual/en/latest/ani
 ## Why are imported PSKs too big/too small?
 The PSK format, unlike other more modern formats, has no explicit or implicit unit system. Each game has its own convention as to what the base distance unit will represent. As such, this addon makes no assumptions as to the unit scale of the imported PSKs. If you think that your models are being imported into Blender either too big or too small, there are a couple ways to remedy this.
 
-The method I prefer is to simply change the Blender [scene properties](https://docs.blender.org/manual/en/4.4/scene_layout/scene/properties.html#units) to match the unit system and scale for the game you're using. This is non-destructive and ensures that the actual raw unit scaling of any PSK or PSA exports from Blender will match the source file from which it was derived.
+The method I prefer is to simply change the Blender [scene properties](https://docs.blender.org/manual/en/4.4/scene_layout/scene/properties.html#units) to match the unit system and scale for the game you're using. This is non-destructive and ensures that the unit scaling of any PSK or PSA exports from Blender will match the source file from which it was derived.
 
 The second option is to simply change the `Scale` value on the PSK import dialog. This will scale the armature by the factor provided. Note that this is more destructive, but may be preferable if you don't intend on exporting PSKs or PSAs to a game engine.
 
@@ -79,4 +78,4 @@ The PSK format does not support vertex normals and instead uses [smoothing group
 ## Why are the mesh normals not accurate when importing a PSK extracted from [UE Viewer](https://www.gildor.org/en/projects/umodel)?
 If preserving the mesh normals of models is important for your workflow, it is *not recommended* to export PSK files from UE Viewer. This is because UE Viewer makes no attempt to reconstruct the original [smoothing groups](https://en.wikipedia.org/wiki/Smoothing_group). As a result, the normals of imported PSK files will be incorrect when imported into Blender and will need to be manually fixed.
 
-There is a [pull request](https://github.com/gildor2/UEViewer/pull/277) to add support for exporting explicit normals from UE Viewer in the future.
+There is a [pull request](https://github.com/gildor2/UEViewer/pull/277) to add support for exporting explicit normals from UE Viewer in the future, although UEViewer's maintainer has seemingly abandoned the project.
