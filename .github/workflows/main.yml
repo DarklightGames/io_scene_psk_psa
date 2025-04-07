@@ -68,6 +68,8 @@ jobs:
         run: |
           source venv/bin/activate
           pytest -svv tests --blender-addons-dirs .
+      - name: Coveralls
+        uses: coverallsapp/github-action@v2
       - name: Archive addon
         uses: actions/upload-artifact@v4
         with:
