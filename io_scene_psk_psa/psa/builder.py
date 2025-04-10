@@ -91,7 +91,7 @@ def _get_pose_bone_location_and_rotation(
     else:
         is_child_bone = pose_bone.parent is not None
 
-    if is_child_bone is not None:
+    if is_child_bone:
         rotation.conjugate()
 
     return location, rotation
