@@ -23,18 +23,6 @@ For Blender 4.2 and higher, download the latest version from the [Blender Extens
 
 For Blender 4.1 and lower, see [Legacy Compatibility](#legacy-compatibility).
 
-# Legacy Compatibility
-Below is a table of the latest addon versions that are compatible with older versions of Blender. These versions are no longer maintained and may contain bugs that have been fixed in newer versions. It is recommended to use the latest version of the addon for the best experience.
-
-Critical bug fixes may be issued for legacy addon versions that are under [Blender's LTS maintenance period](https://www.blender.org/download/lts/). Once the LTS period has ended, legacy addon versions will no longer be supported by the maintainers of this repository, although the releases will still be available for download.
-
-| Blender Version| Addon Version                                                                  | Long Term Support |
-|-|--------------------------------------------------------------------------------|-----------------|
-| [4.1](https://www.blender.org/download/releases/4-1/)        | [7.0.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/7.0.0) | No              |
-| [4.0](https://www.blender.org/download/releases/4-0/)        | [6.2.1](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/6.2.1) | No              |
-| [3.4 - 3.6](https://www.blender.org/download/lts/3-6/)       | [5.0.6](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.6) | June 2025       |
-| [2.93 - 3.3](https://www.blender.org/download/releases/3-3/) | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) | ~~September 2024~~  |
-
 # Usage
 ## Exporting a PSK
 1. Select the mesh objects you wish to export.
@@ -78,4 +66,28 @@ The PSK format does not support vertex normals and instead uses [smoothing group
 ## Why are the mesh normals not accurate when importing a PSK extracted from [UE Viewer](https://www.gildor.org/en/projects/umodel)?
 If preserving the mesh normals of models is important for your workflow, it is *not recommended* to export PSK files from UE Viewer. This is because UE Viewer makes no attempt to reconstruct the original [smoothing groups](https://en.wikipedia.org/wiki/Smoothing_group). As a result, the normals of imported PSK files will be incorrect when imported into Blender and will need to be manually fixed.
 
-There is a [pull request](https://github.com/gildor2/UEViewer/pull/277) to add support for exporting explicit normals from UE Viewer in the future, although UEViewer's maintainer has seemingly abandoned the project.
+There is a [pull request](https://github.com/gildor2/UEViewer/pull/277) to add support for exporting explicit normals from UE Viewer, although UEViewer's maintainer has seemingly abandoned the project.
+
+# Legacy Compatibility
+Below is a table of the latest addon versions that are compatible with older versions of Blender. These versions are no longer maintained and may contain bugs that have been fixed in newer versions. It is recommended to use the latest version of the addon for the best experience.
+
+Critical bug fixes may be issued for legacy addon versions that are under [Blender's LTS maintenance period](https://www.blender.org/download/lts/). Once the LTS period has ended, legacy addon versions will no longer be supported by the maintainers of this repository, although the releases will still be available for download.
+
+| Blender Version| Addon Version                                                                  | Long Term Support |
+|-|--------------------------------------------------------------------------------|-----------------|
+| [4.1](https://www.blender.org/download/releases/4-1/)        | [7.0.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/7.0.0) | No              |
+| [4.0](https://www.blender.org/download/releases/4-0/)        | [6.2.1](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/6.2.1) | No              |
+| [3.4 - 3.6](https://www.blender.org/download/lts/3-6/)       | [5.0.6](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.6) | June 2025       |
+| [2.93 - 3.3](https://www.blender.org/download/releases/3-3/) | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) | ~~September 2024~~  |
+
+
+# Testing
+To execute the automated tests, run:
+
+```
+./test.sh
+````
+
+This will create a [Docker](https://www.docker.com/) container with and run the tests inside it. The tests are executed using [pytest](https://docs.pytest.org/en/stable/) and the results will be displayed in the terminal.
+
+For now, the tests are not exhaustive and primarily focus on sanity checking the most common use cases (PSK & PSA import). New tests will likely be made to cover new features and prevent further regressions of reported issues.
