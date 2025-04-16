@@ -179,7 +179,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
     for material in materials:
         psk_material = Psk.Material()
-        psk_material.name = convert_string_to_cp1252_bytes(material.name)
+        psk_material.name = convert_string_to_cp1252_bytes(material.name if material else 'None')
         psk_material.texture_index = len(psk.materials)
         psk_material.poly_flags = triangle_type_and_bit_flags_to_poly_flags(material.psk.mesh_triangle_type,
                                                                             material.psk.mesh_triangle_bit_flags)
