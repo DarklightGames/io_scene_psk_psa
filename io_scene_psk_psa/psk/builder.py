@@ -421,6 +421,9 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
     context.window_manager.progress_end()
 
+    # https://github.com/DarklightGames/io_scene_psk_psa/issues/129.
+    psk.sort_and_normalize_weights()
+
     result.psk = psk
 
     return result

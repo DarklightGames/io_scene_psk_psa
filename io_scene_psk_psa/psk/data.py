@@ -113,6 +113,26 @@ class Psk(object):
     def has_morph_data(self):
         return len(self.morph_infos) > 0
     
+    def sort_and_normalize_weights(self):
+        self.weights.sort(key=lambda x: x.point_index)
+        weight_index = 0
+        weight_total = len(self.weights)
+        while weight_index < weight_total:
+            point_weight_total = 1
+            point_index: int = self.weights[weight_index].point_index
+            weight_sum: float = self.weights[weight_index].weight
+            # Count the number of weights with contiguous point indices and sum the total weights.
+            for w in range(weight_index + 1, weight_total):
+                if point_index != self.weights[w].point_index:
+                    break
+                point_weight_total += 1
+                weight_sum += self.weights[w].weight
+            # Now normalize the weights against the sum of all weights.
+            for weight in self.weights[weight_index:weight_index+point_weight_total]:
+                weight.weight /= weight_sum
+            # Increment 
+            weight_index += point_weight_total
+    
     def __init__(self):
         self.points: List[Vector3] = []
         self.wedges: List[Psk.Wedge] = []
