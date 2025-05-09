@@ -38,7 +38,7 @@ Critical bug fixes may be issued for legacy addon versions that are under [Blend
 # Usage
 ## Exporting a PSK
 1. Select the mesh objects you wish to export.
-2. Navigate to `File` > `Export` > `Unreal PSK (.psk)`.
+2. Navigate to `File` > `Export` > `Unreal PSK (.psk/pskx)`.
 3. Enter the file name and click `Export`.
 
 ## Importing a PSK/PSKX

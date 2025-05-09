@@ -86,7 +86,7 @@ classes = shared_types.classes + \
 
 
 def psk_export_menu_func(self, context):
-    self.layout.operator(psk_export_operators.PSK_OT_export.bl_idname, text='Unreal PSK (.psk)')
+    self.layout.operator(psk_export_operators.PSK_OT_export.bl_idname, text='Unreal PSK (.psk/pskx)')
 
 
 def psk_import_menu_func(self, context):

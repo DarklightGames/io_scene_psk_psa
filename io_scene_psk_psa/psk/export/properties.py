@@ -55,6 +55,36 @@ class PskExportMixin(ExportSpaceMixin, ForwardUpAxisMixin, PsxBoneExportMixin):
     )
     material_name_list: CollectionProperty(type=PSK_PG_material_name_list_item)
     material_name_list_index: IntProperty(default=0)
+    export_vertex_normals: BoolProperty(
+        default=False,
+        name='Export Vertex Normals',
+        description='Export vertex normals.\n\nThis will export as a PSKX file'
+    )
+    export_shape_keys: BoolProperty(
+        default=False,
+        name='Export Shape Keys',
+        description='Export shape keys.\n\nThis will export as a PSKX file'
+    )
+    export_extra_uvs: BoolProperty(
+        default=False,
+        name='Export Extra UVs',
+        description='Export Extra UVs.\n\nThis will export as a PSKX file'
+    )
+    export_vertex_colors: BoolProperty(
+        default=False,
+        name='Export Vertex Colors',
+        description='Export vertex Colors.\n\nThis will export as a PSKX file'
+    )
+    vertex_color_space: EnumProperty(
+        name='Vertex Color Space',
+        options=set(),
+        description='The source vertex color space',
+        default='SRGBA',
+        items=(
+            ('LINEAR', 'Linear', ''),
+            ('SRGBA', 'sRGBA', ''),
+        )
+    )
 
 
 class PSK_PG_export(PropertyGroup, PskExportMixin):

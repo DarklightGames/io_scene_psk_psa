@@ -38,6 +38,12 @@ def write_psk(psk: Psk, path: str):
     # Make the directory for the file if it doesn't exist.
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
+    # if if has any of the nonstandard data, make sure it outputs with the pskx extension
+    if psk.has_vertex_normals or psk.has_extra_uvs or psk.has_vertex_colors or psk.has_morph_data:
+        # TODO deal with capitalization better
+        if path.endswith('psk'):
+            path += "x"
+
     try:
         with open(path, 'wb') as fp:
             _write_section(fp, b'ACTRHEAD')
@@ -57,5 +63,8 @@ def write_psk(psk: Psk, path: str):
             _write_section(fp, b'MATT0000', Psk.Material, psk.materials)
             _write_section(fp, b'REFSKELT', PsxBone, psk.bones)
             _write_section(fp, b'RAWWEIGHTS', Psk.Weight, psk.weights)
+            if psk.has_vertex_normals:
+                _write_section(fp, b'VTXNORMS', Vector3, psk.vertex_normals)
+            # TODO output other nonstandard sections
     except PermissionError as e:
         raise RuntimeError(f'The current user "{os.getlogin()}" does not have permission to write to "{path}"') from e

@@ -258,6 +258,11 @@ def get_psk_build_options_from_property_group(pg: PskExportMixin) -> PskBuildOpt
     options.root_bone_name = pg.root_bone_name
     options.material_order_mode = pg.material_order_mode
     options.material_name_list = pg.material_name_list
+    options.vertex_norms = pg.export_vertex_normals
+    options.vertex_colors = pg.export_vertex_colors
+    options.vertex_color_space = pg.vertex_color_space
+    options.extra_uvs = pg.export_extra_uvs
+    options.shape_keys = pg.export_shape_keys
     return options
 
 
@@ -387,7 +392,7 @@ class PSK_OT_export(Operator, ExportHelper):
     bl_options = {'INTERNAL', 'UNDO'}
     bl_description = 'Export selected meshes to PSK'
     filename_ext = '.psk'
-    filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
+    filter_glob: StringProperty(default='*.psk;*.pskx', options={'HIDDEN'})
     filepath: StringProperty(
         name='File Path',
         description='File path used for exporting the PSK file',
@@ -476,6 +481,23 @@ class PSK_OT_export(Operator, ExportHelper):
             flow.prop(pg, 'scale')
             flow.prop(pg, 'forward_axis')
             flow.prop(pg, 'up_axis')
+
+        # PSKX data
+        extensions_header, extensions_panel = layout.panel('Extensions', default_closed=True)
+        extensions_header.label(text='Extensions')
+        if extensions_panel:
+            row = extensions_panel.row()
+            col = row.column()
+            col.use_property_split = True
+            col.use_property_decorate = False
+            col.prop(pg, 'export_vertex_normals', text='Vertex Normals')
+            # TODO commented out until these can be fully implemented
+            # col.prop(pg, 'export_vertex_colors', text='Vertex Colors')
+            # if pg.export_vertex_colors:
+            #     col.prop(pg, 'vertex_color_space')
+            # col.separator()
+            # col.prop(pg, 'export_shape_keys', text='Shape Keys')
+            # col.prop(pg, 'export_extra_uvs', text='Extra UVs')
 
     def execute(self, context):
         pg = getattr(context.scene, 'psk_export')
