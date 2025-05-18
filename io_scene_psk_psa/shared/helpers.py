@@ -7,11 +7,10 @@ from .data import Vector3, Quaternion
 from ..shared.data import PsxBone
 
 
-def rgb_to_srgb(c: float):
+def rgb_to_srgb(c: float) -> float:
     if c > 0.0031308:
         return 1.055 * (pow(c, (1.0 / 2.4))) - 0.055
-    else:
-        return 12.92 * c
+    return 12.92 * c
 
 
 def get_nla_strips_in_frame_range(animation_data: AnimData, frame_min: float, frame_max: float):
