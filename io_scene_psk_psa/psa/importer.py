@@ -1,9 +1,8 @@
-import typing
-from typing import Iterable, List, Optional, cast as typing_cast
+from typing import Sequence, Iterable, List, Optional, cast as typing_cast
 
 import bpy
 import numpy as np
-from bpy.types import Armature, Context, FCurve, Object
+from bpy.types import Armature, Context, FCurve, Object, Bone, PoseBone
 from mathutils import Vector, Quaternion
 
 from .config import PsaConfig, REMOVE_TRACK_LOCATION, REMOVE_TRACK_ROTATION
@@ -18,7 +17,7 @@ class PsaImportOptions(object):
                  fps_custom: float = 30.0,
                  fps_source: str = 'SEQUENCE',
                  psa_config: PsaConfig = PsaConfig(),
-                 sequence_names: List[str] = None,
+                 sequence_names: Optional[List[str]] = None,
                  should_convert_to_samples: bool = False,
                  should_overwrite: bool = False,
                  should_stash: bool = False,
@@ -48,15 +47,15 @@ class ImportBone(object):
     def __init__(self, psa_bone: PsxBone):
         self.psa_bone: PsxBone = psa_bone
         self.parent: Optional[ImportBone] = None
-        self.armature_bone = None
-        self.pose_bone = None
+        self.armature_bone: Optional[Bone] = None
+        self.pose_bone: Optional[PoseBone] = None
         self.original_location: Vector = Vector()
         self.original_rotation: Quaternion = Quaternion()
         self.post_rotation: Quaternion = Quaternion()
         self.fcurves: List[FCurve] = []
 
 
-def _calculate_fcurve_data(import_bone: ImportBone, key_data: Iterable[float]):
+def _calculate_fcurve_data(import_bone: ImportBone, key_data: Sequence[float]):
     # Convert world-space transforms to local-space transforms.
     key_rotation = Quaternion(key_data[0:4])
     key_location = Vector(key_data[4:])
@@ -345,8 +344,9 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
     # If the user specifies, store the new animations as strips on a non-contributing NLA track.
     if options.should_stash:
-        if armature_object.animation_data is None:
-            armature_object.animation_data_create()
+        animation_data = armature_object.animation_data
+        if animation_data is None:
+            animation_data = armature_object.animation_data_create()
         for action in actions:
             nla_track = armature_object.animation_data.nla_tracks.new()
             nla_track.name = action.name

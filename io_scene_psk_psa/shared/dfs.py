@@ -146,16 +146,3 @@ def dfs_view_layer_objects(view_layer: ViewLayer) -> Iterable[DfsObject]:
         yield from _dfs_collection_objects_recursive(layer_collection.collection, visited=visited)
 
     yield from layer_collection_objects_recursive(view_layer.layer_collection)
-
-
-def _is_dfs_object_visible(obj: Object, instance_objects: List[Object]) -> bool:
-    """
-    Check if a DFS object is visible.
-
-    @param obj: The object.
-    @param instance_objects: The instance objects.
-    @return: True if the object is visible, False otherwise.
-    """
-    if instance_objects:
-        return instance_objects[-1].visible_get()
-    return obj.visible_get()

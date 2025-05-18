@@ -10,3 +10,6 @@ branch = true
 
 [tool.coverage.report]
 ignore_errors = true
+
+[tool.pyright]
+reportInvalidTypeForm = false

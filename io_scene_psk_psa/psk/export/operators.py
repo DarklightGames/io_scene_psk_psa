@@ -3,7 +3,7 @@ from typing import Iterable, List, Optional, cast as typing_cast
 
 import bpy
 from bpy.props import BoolProperty, StringProperty
-from bpy.types import Collection, Context, Depsgraph, Material, Object, Operator, SpaceProperties
+from bpy.types import Collection, Context, Depsgraph, Material, Object, Operator, SpaceProperties, Scene
 from bpy_extras.io_utils import ExportHelper
 
 from .properties import PskExportMixin
@@ -15,7 +15,7 @@ from ..builder import (
     get_psk_input_objects_for_context,
 )
 from ..writer import write_psk
-from ...shared.helpers import populate_bone_collection_list
+from ...shared.helpers import PsxBoneCollection, populate_bone_collection_list
 from ...shared.ui import draw_bone_filter_mode
 
 
@@ -77,7 +77,7 @@ class PSK_OT_bone_collection_list_populate(Operator):
         if not input_objects.armature_objects:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No armature modifiers found on mesh objects')
             return {'CANCELLED'}
-        populate_bone_collection_list(input_objects.armature_objects, export_operator.bone_collection_list)
+        populate_bone_collection_list(export_operator.bone_collection_list, input_objects.armature_objects)
         return {'FINISHED'}
 
 
@@ -246,18 +246,28 @@ def get_sorted_materials_by_names(materials: Iterable[Material], material_names:
     return materials_in_collection + materials_not_in_collection
 
 
-def get_psk_build_options_from_property_group(pg: PskExportMixin) -> PskBuildOptions:
+def get_psk_build_options_from_property_group(scene: Scene, pg: PskExportMixin) -> PskBuildOptions:
     options = PskBuildOptions()
     options.object_eval_state = pg.object_eval_state
     options.export_space = pg.export_space
     options.bone_filter_mode = pg.bone_filter_mode
-    options.bone_collection_indices = [(x.armature_object_name, x.index) for x in pg.bone_collection_list if x.is_selected]
-    options.scale = pg.scale
-    options.forward_axis = pg.forward_axis
-    options.up_axis = pg.up_axis
+    options.bone_collection_indices = [PsxBoneCollection(x.armature_object_name, x.armature_data_name, x.index) for x in pg.bone_collection_list if x.is_selected]
     options.root_bone_name = pg.root_bone_name
     options.material_order_mode = pg.material_order_mode
     options.material_name_list = pg.material_name_list
+    
+    match pg.transform_source:
+        case 'SCENE':
+            transform_source = getattr(scene, 'psx_export')
+        case 'SELF':
+            transform_source = pg
+        case _:
+            assert False, f'Invalid transform source: {pg.transform_source}'
+    
+    options.scale = transform_source.scale
+    options.forward_axis = transform_source.forward_axis
+    options.up_axis = transform_source.up_axis
+
     return options
 
 
@@ -279,12 +289,12 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
         collection = bpy.data.collections.get(self.collection)
 
         try:
-            input_objects = get_psk_input_objects_for_collection(collection, self.should_exclude_hidden_meshes)
+            input_objects = get_psk_input_objects_for_collection(collection)
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
-        options = get_psk_build_options_from_property_group(self)
+        options = get_psk_build_options_from_property_group(context.scene, self)
         filepath = str(Path(self.filepath).resolve())
 
         try:
@@ -317,7 +327,6 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
             flow.use_property_split = True
             flow.use_property_decorate = False
             flow.prop(self, 'object_eval_state', text='Data')
-            flow.prop(self, 'should_exclude_hidden_meshes')
 
         # Bones
         bones_header, bones_panel = layout.panel('Bones', default_closed=False)
@@ -375,10 +384,22 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
             flow.use_property_split = True
             flow.use_property_decorate = False
             flow.prop(self, 'export_space')
-            flow.prop(self, 'scale')
-            flow.prop(self, 'forward_axis')
-            flow.prop(self, 'up_axis')
+            flow.prop(self, 'transform_source')
 
+            flow = transform_panel.grid_flow(row_major=True)
+            flow.use_property_split = True
+            flow.use_property_decorate = False
+
+            match self.transform_source:
+                case 'SCENE':
+                    transform_source = getattr(context.scene, 'psx_export')
+                    flow.enabled = False
+                case 'CUSTOM':
+                    transform_source = self
+        
+            flow.prop(transform_source, 'scale')
+            flow.prop(transform_source, 'forward_axis')
+            flow.prop(transform_source, 'up_axis')
 
 
 class PSK_OT_export(Operator, ExportHelper):
@@ -403,7 +424,7 @@ class PSK_OT_export(Operator, ExportHelper):
 
         pg = getattr(context.scene, 'psk_export')
 
-        populate_bone_collection_list(input_objects.armature_objects, pg.bone_collection_list)
+        populate_bone_collection_list(pg.bone_collection_list, input_objects.armature_objects)
 
         depsgraph = context.evaluated_depsgraph_get()
 
@@ -476,12 +497,21 @@ class PSK_OT_export(Operator, ExportHelper):
             flow.prop(pg, 'scale')
             flow.prop(pg, 'forward_axis')
             flow.prop(pg, 'up_axis')
+        
+        # Extended Format
+        extended_format_header, extended_format_panel = layout.panel('Extended Format', default_closed=False)
+        extended_format_header.label(text='Extended Format')
+        if extended_format_panel:
+            flow = extended_format_panel.grid_flow(row_major=True)
+            flow.use_property_split = True
+            flow.use_property_decorate = False
+            flow.prop(pg, 'should_export_vertex_normals', text='Vertex Normals')
 
     def execute(self, context):
         pg = getattr(context.scene, 'psk_export')
 
         input_objects = get_psk_input_objects_for_context(context)
-        options = get_psk_build_options_from_property_group(pg)
+        options = get_psk_build_options_from_property_group(context.scene, pg)
 
         try:
             result = build_psk(context, input_objects, options)

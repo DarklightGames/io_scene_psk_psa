@@ -1,11 +1,11 @@
 from ctypes import Structure, sizeof
-from typing import Type
+from typing import Optional, Type, Collection
 
 from .data import Psa
 from ..shared.data import PsxBone, Section
 
 
-def write_section(fp, name: bytes, data_type: Type[Structure] = None, data: list = None):
+def write_section(fp, name: bytes, data_type: Optional[Type[Structure]] = None, data: Optional[Collection] = None):
     section = Section()
     section.name = name
     if data_type is not None and data is not None:
