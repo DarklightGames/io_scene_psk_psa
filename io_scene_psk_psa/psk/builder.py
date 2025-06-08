@@ -44,7 +44,7 @@ def get_materials_for_mesh_objects(depsgraph: Depsgraph, mesh_objects: Iterable[
         for i, material_slot in enumerate(evaluated_mesh_object.material_slots):
             material = material_slot.material
             if material is None:
-                raise RuntimeError('Material slot cannot be empty (index ' + str(i) + ')')
+                raise RuntimeError(f'Material slots cannot be empty. ({mesh_object.name}, index {i})')
             if material not in yielded_materials:
                 yielded_materials.add(material)
                 yield material
