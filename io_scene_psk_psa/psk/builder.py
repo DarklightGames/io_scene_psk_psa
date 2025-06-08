@@ -193,7 +193,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
     armature_mesh_export_space_matrices: Dict[Optional[Object], Matrix] = {None: Matrix.Identity(4)}
     if options.export_space == 'ARMATURE':
         # For meshes without an armature modifier, we need to set the export space to the armature object.
-        armature_mesh_export_space_matrices[None] = _get_mesh_export_space_matrix(list(input_objects.armature_objects)[0], options.export_space)
+        armature_mesh_export_space_matrices[None] = _get_mesh_export_space_matrix(next(iter(input_objects.armature_objects), None), options.export_space)
     for armature_object in armature_objects:
         armature_mesh_export_space_matrices[armature_object] = _get_mesh_export_space_matrix(armature_object, options.export_space)
 
