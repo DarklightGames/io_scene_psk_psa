@@ -400,7 +400,7 @@ class PSA_OT_export(Operator, ExportHelper):
                     rows=rows
                     )
 
-            bones_advanced_header, bones_advanced_panel = layout.panel('Bones Advanced', default_closed=False)
+            bones_advanced_header, bones_advanced_panel = layout.panel('Bones Advanced', default_closed=True)
             bones_advanced_header.label(text='Advanced')
             if bones_advanced_panel:
                 flow = bones_advanced_panel.grid_flow()
