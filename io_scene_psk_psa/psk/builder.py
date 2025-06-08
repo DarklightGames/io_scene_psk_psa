@@ -63,8 +63,9 @@ def get_mesh_objects_for_context(context: Context) -> Iterable[DfsObject]:
 def get_armature_for_mesh_object(mesh_object: Object) -> Optional[Object]:
     if mesh_object.type != 'MESH':
         return None
+    # Get the first armature modifier with a non-empty armature object.
     for modifier in mesh_object.modifiers:
-        if modifier.type == 'ARMATURE':
+        if modifier.type == 'ARMATURE' and modifier.object is not None:
             return modifier.object
     return None
 
