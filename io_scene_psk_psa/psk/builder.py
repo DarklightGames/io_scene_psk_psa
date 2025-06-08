@@ -291,19 +291,25 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             point.z = v.z
             psk.points.append(point)
 
-        uv_layer = mesh_data.uv_layers.active.data
-
-        # Wedges
+# Wedges
         mesh_data.calc_loop_triangles()
+
+        if mesh_data.uv_layers.active is None:
+            result.warnings.append(f'"{mesh_object.name}" has no active UV Map')
 
         # Build a list of non-unique wedges.
         wedges = []
-        for loop_index, loop in enumerate(mesh_data.loops):
-            wedges.append(Psk.Wedge(
-                point_index=loop.vertex_index + vertex_offset,
-                u=uv_layer[loop_index].uv[0],
-                v=1.0 - uv_layer[loop_index].uv[1]
-            ))
+        if mesh_data.uv_layers.active:
+            uv_layer = mesh_data.uv_layers.active.data
+            for loop_index, loop in enumerate(mesh_data.loops):
+                wedges.append(Psk.Wedge(
+                    point_index=loop.vertex_index + vertex_offset,
+                    u=uv_layer[loop_index].uv[0],
+                    v=1.0 - uv_layer[loop_index].uv[1]
+                ))
+        else:
+            for loop_index, loop in enumerate(mesh_data.loops):
+                wedges.append(Psk.Wedge(point_index=loop.vertex_index + vertex_offset, u=0.0, v=0.0))
 
         # Assign material indices to the wedges.
         for triangle in mesh_data.loop_triangles:
