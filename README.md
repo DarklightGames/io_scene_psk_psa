@@ -7,6 +7,11 @@ This Blender addon allows you to import and export meshes and animations to and 
 
 This software is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html) license.
 
+# Installation
+For Blender 4.2 and higher, download the latest version from the [Blender Extensions](https://extensions.blender.org/add-ons/io-scene-psk-psa/) platform.
+
+For Blender 4.1 and lower, see [Legacy Compatibility](#legacy-compatibility).
+
 # Features
 * Full PSK/PSA import and export capabilities.
 * Non-standard file section data (.pskx) is supported for import only (vertex normals, extra UV channels, vertex colors, shape keys).
@@ -17,11 +22,6 @@ This software is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0
 * Manual re-ordering of material slots.
 * Multiple armature objects can be exported to a single PSK or PSA file, allowing seamless use of [action slots](https://docs.blender.org/manual/en/latest/animation/actions.html#action-slots).
 * Support for exporting instance collections.
-
-# Installation
-For Blender 4.2 and higher, download the latest version from the [Blender Extensions](https://extensions.blender.org/add-ons/io-scene-psk-psa/) platform.
-
-For Blender 4.1 and lower, see [Legacy Compatibility](#legacy-compatibility).
 
 # Usage
 ## Exporting a PSK
