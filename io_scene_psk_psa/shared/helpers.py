@@ -307,7 +307,8 @@ def create_psx_bones(
     bones: List[Tuple[PsxBone, Optional[Object]]] = []
 
     if export_space != 'WORLD' and len(armature_objects) > 1:
-        raise RuntimeError('When exporting multiple armatures, the Export Space must be World')
+        armature_object_names = [armature_object.name for armature_object in armature_objects]
+        raise RuntimeError(f'When exporting multiple armatures, the Export Space must be World. The following armatures are attempting to be exported: {armature_object_names}')
 
     coordinate_system_matrix = get_coordinate_system_transform(forward_axis, up_axis)
     coordinate_system_default_rotation = coordinate_system_matrix.to_quaternion()
