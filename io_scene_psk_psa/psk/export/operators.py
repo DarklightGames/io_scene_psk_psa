@@ -34,7 +34,6 @@ def populate_material_name_list(depsgraph: Depsgraph, mesh_objects: Iterable[Obj
         m.index = index
 
 
-
 def get_collection_from_context(context: Context) -> Optional[Collection]:
     if context.space_data.type != 'PROPERTIES':
         return None
