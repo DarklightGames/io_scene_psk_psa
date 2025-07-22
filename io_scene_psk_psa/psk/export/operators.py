@@ -410,12 +410,12 @@ class PSK_OT_export(Operator, ExportHelper):
     bl_idname = 'psk.export'
     bl_label = 'Export'
     bl_options = {'INTERNAL', 'UNDO'}
-    bl_description = 'Export selected meshes to PSK'
+    bl_description = 'Export selected meshes to PSK/PSKX'
     filename_ext = '.psk'
     filter_glob: StringProperty(default='*.psk;*.pskx', options={'HIDDEN'})
     filepath: StringProperty(
         name='File Path',
-        description='File path used for exporting the PSK file',
+        description='File path used for exporting the PSK/PSKX file',
         maxlen=1024,
         default='')
 
@@ -446,6 +446,9 @@ class PSK_OT_export(Operator, ExportHelper):
         layout = self.layout
 
         pg = getattr(context.scene, 'psk_export')
+
+        # Ensure that the initial state of the file extension matches the selected options.
+        pg.update_extended_data_property(context)
 
         # Mesh
         mesh_header, mesh_panel = layout.panel('Mesh', default_closed=False)
@@ -510,7 +513,7 @@ class PSK_OT_export(Operator, ExportHelper):
             flow.use_property_split = True
             flow.use_property_decorate = False
             flow.prop(pg, 'should_export_vertex_normals', text='Vertex Normals')
-            # TODO commented out until these can be fully implemented
+            # TODO Uncomment these once these functions are implemented
             # flow.prop(pg, 'export_vertex_colors', text='Vertex Colors')
             # if pg.export_vertex_colors:
             #     flow.prop(pg, 'vertex_color_space')
@@ -520,6 +523,9 @@ class PSK_OT_export(Operator, ExportHelper):
 
     def execute(self, context):
         pg = getattr(context.scene, 'psk_export')
+
+        # Ensure that the final state of the file extension matches the selected options even if this is invoked programmatically.
+        pg.update_extended_data_property(context)
 
         input_objects = get_psk_input_objects_for_context(context)
         options = get_psk_build_options_from_property_group(context.scene, pg)

@@ -38,11 +38,6 @@ def write_psk(psk: Psk, path: str):
     # Make the directory for the file if it doesn't exist.
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
-    # if if has any of the nonstandard data, make sure it outputs with the pskx extension
-    if psk.has_extended_data:
-        if path.lower().endswith('psk'):
-            path += "x"
-
     try:
         with open(path, 'wb') as fp:
             _write_section(fp, b'ACTRHEAD')
