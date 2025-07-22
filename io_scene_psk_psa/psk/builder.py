@@ -35,10 +35,10 @@ class PskBuildOptions(object):
         self.forward_axis = 'X'
         self.up_axis = 'Z'
         self.root_bone_name = 'ROOT'
-        self.vertex_norms = False
-        self.shape_keys = False
-        self.extra_uvs = False
-        self.vertex_colors = False
+        self.should_export_vertex_normals = False
+        self.should_export_shape_keys = False
+        self.should_export_extra_uvs = False
+        self.should_export_vertex_colors = False
         self.vertex_color_space = 'SRGBA'
 
 
@@ -300,8 +300,8 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 # Wedges
         mesh_data.calc_loop_triangles()
 
-        # create a list the size of the points list to store all the split normals for each point
-        split_norms_by_vert: List[List[Vector3]] = [[] for i in range(len(psk.points))]
+        # Create a list the size of the points list to store all the split normals for each point.
+        split_normals_by_vertex: List[List[Vector3]] = [[] for i in range(len(psk.points))]
 
         if mesh_data.uv_layers.active is None:
             result.warnings.append(f'"{mesh_object.name}" has no active UV Map')
@@ -311,8 +311,8 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         if mesh_data.uv_layers.active:
             uv_layer = mesh_data.uv_layers.active.data
             for loop_index, loop in enumerate(mesh_data.loops):
-                if options.vertex_norms:
-                    split_norms_by_vert[loop.vertex_index].append(loop.normal)
+                if options.should_export_vertex_normals:
+                    split_normals_by_vertex[loop.vertex_index].append(loop.normal)
                 wedges.append(Psk.Wedge(
                     point_index=loop.vertex_index + vertex_offset,
                     u=uv_layer[loop_index].uv[0],
@@ -322,15 +322,15 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             for loop_index, loop in enumerate(mesh_data.loops):
                 wedges.append(Psk.Wedge(point_index=loop.vertex_index + vertex_offset, u=0.0, v=0.0))
 
-        # add the vertex normals, if enabled
-        if options.vertex_norms:
-            for split_norms in split_norms_by_vert:
-                avg_normal = Vector([0,0,0])
-                for split in split_norms:
-                    avg_normal += split.xyz
-                avg_normal.normalize()
-                new_norm = Vector3(avg_normal.x, avg_normal.y, avg_normal.z)
-                psk.vertex_normals.append(new_norm)
+        # Add the vertex normals, if enabled.
+        if options.should_export_vertex_normals:
+            for split_normals in split_normals_by_vertex:
+                average_normal = Vector([0,0,0])
+                for split_normal in split_normals:
+                    average_normal += split_normal.xyz
+                average_normal.normalize()
+                vertex_normal = Vector3(average_normal.x, average_normal.y, average_normal.z)
+                psk.vertex_normals.append(vertex_normal)
 
         # Assign material indices to the wedges.
         for triangle in mesh_data.loop_triangles:

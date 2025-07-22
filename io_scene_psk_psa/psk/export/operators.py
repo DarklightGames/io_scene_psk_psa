@@ -267,11 +267,11 @@ def get_psk_build_options_from_property_group(scene: Scene, pg: PskExportMixin) 
     options.forward_axis = transform_source.forward_axis
     options.up_axis = transform_source.up_axis
 
-    options.vertex_norms = pg.export_vertex_normals
-    options.vertex_colors = pg.export_vertex_colors
+    options.should_export_vertex_normals = pg.should_export_vertex_normals
+    options.should_export_vertex_colors = pg.should_export_vertex_colors
     options.vertex_color_space = pg.vertex_color_space
-    options.extra_uvs = pg.export_extra_uvs
-    options.shape_keys = pg.export_shape_keys
+    options.should_export_extra_uvs = pg.should_export_extra_uvs
+    options.should_export_shape_keys = pg.should_export_shape_keys
     return options
 
 

@@ -39,7 +39,7 @@ def write_psk(psk: Psk, path: str):
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     # if if has any of the nonstandard data, make sure it outputs with the pskx extension
-    if psk.has_vertex_normals or psk.has_extra_uvs or psk.has_vertex_colors or psk.has_morph_data:
+    if psk.has_extended_data:
         if path.lower().endswith('psk'):
             path += "x"
 
@@ -64,6 +64,6 @@ def write_psk(psk: Psk, path: str):
             _write_section(fp, b'RAWWEIGHTS', Psk.Weight, psk.weights)
             if psk.has_vertex_normals:
                 _write_section(fp, b'VTXNORMS', Vector3, psk.vertex_normals)
-            # output other non standard sections here when they are implemented
+            # TODO Output other non standard sections here when they are implemented.
     except PermissionError as e:
         raise RuntimeError(f'The current user "{os.getlogin()}" does not have permission to write to "{path}"') from e
