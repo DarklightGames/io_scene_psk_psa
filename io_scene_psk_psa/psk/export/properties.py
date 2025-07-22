@@ -45,7 +45,6 @@ class PskExportMixin(ExportSpaceMixin, TransformMixin, PsxBoneExportMixin):
                 context.active_operator.filename_ext = '.pskx'
             else:
                 context.active_operator.filename_ext = '.psk'
-        pass
     object_eval_state: EnumProperty(
         items=object_eval_state_items,
         name='Object Evaluation State',
@@ -91,7 +90,7 @@ class PskExportMixin(ExportSpaceMixin, TransformMixin, PsxBoneExportMixin):
     vertex_color_space: EnumProperty(
         name='Vertex Color Space',
         options=set(),
-        description='The source vertex color space',
+        description='The vertex color space',
         default='SRGBA',
         items=vertex_color_space_items
     )

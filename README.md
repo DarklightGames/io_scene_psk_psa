@@ -7,11 +7,6 @@ This Blender addon allows you to import and export meshes and animations to and 
 
 This software is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html) license.
 
-# Installation
-For Blender 4.2 and higher, download the latest version from the [Blender Extensions](https://extensions.blender.org/add-ons/io-scene-psk-psa/) platform.
-
-For Blender 4.1 and lower, see [Legacy Compatibility](#legacy-compatibility).
-
 # Features
 * Full PSK/PSA import and export capabilities.
 * Non-standard file section data (.pskx) is supported for import (vertex normals, extra UV channels, vertex colors, shape keys) and partially supported for export (vertex normals).
@@ -22,6 +17,11 @@ For Blender 4.1 and lower, see [Legacy Compatibility](#legacy-compatibility).
 * Manual re-ordering of material slots.
 * Multiple armature objects can be exported to a single PSK or PSA file, allowing seamless use of [action slots](https://docs.blender.org/manual/en/latest/animation/actions.html#action-slots).
 * Support for exporting instance collections.
+
+# Installation
+For Blender 4.2 and higher, download the latest version from the [Blender Extensions](https://extensions.blender.org/add-ons/io-scene-psk-psa/) platform.
+
+For Blender 4.1 and lower, see [Legacy Compatibility](#legacy-compatibility).
 
 # Usage
 ## Exporting a PSK/PSKX
@@ -71,12 +71,15 @@ There is a [pull request](https://github.com/gildor2/UEViewer/pull/277) to add s
 # Legacy Compatibility
 Below is a table of the latest addon versions that are compatible with older versions of Blender. These versions are no longer maintained and may contain bugs that have been fixed in newer versions. It is recommended to use the latest version of the addon for the best experience.
 
-| Blender Version| Addon Version |
-|-|-|
-| [4.1](https://www.blender.org/download/releases/4-1/)        | [7.0.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/7.0.0) |
-| [4.0](https://www.blender.org/download/releases/4-0/)        | [6.2.1](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/6.2.1) |
-| [3.4 - 3.6](https://www.blender.org/download/lts/3-6/)       | [5.0.6](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.6) |
-| [2.93 - 3.3](https://www.blender.org/download/releases/3-3/) | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) |
+Critical bug fixes may be issued for legacy addon versions that are under [Blender's LTS maintenance period](https://www.blender.org/download/lts/). Once the LTS period has ended, legacy addon versions will no longer be supported by the maintainers of this repository, although the releases will still be available for download.
+
+| Blender Version| Addon Version                                                                  | Long Term Support |
+|-|--------------------------------------------------------------------------------|-----------------|
+| [4.1](https://www.blender.org/download/releases/4-1/)        | [7.0.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/7.0.0) | No              |
+| [4.0](https://www.blender.org/download/releases/4-0/)        | [6.2.1](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/6.2.1) | No              |
+| [3.4 - 3.6](https://www.blender.org/download/lts/3-6/)       | [5.0.6](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.6) | June 2025       |
+| [2.93 - 3.3](https://www.blender.org/download/releases/3-3/) | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) | ~~September 2024~~  |
+
 
 # Testing
 To execute the automated tests, run:

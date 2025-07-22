@@ -513,7 +513,7 @@ class PSK_OT_export(Operator, ExportHelper):
             flow.use_property_split = True
             flow.use_property_decorate = False
             flow.prop(pg, 'should_export_vertex_normals', text='Vertex Normals')
-            # TODO Uncomment these once these functions are implemented
+            # TODO Uncomment these once these functions are implemented.
             # flow.prop(pg, 'export_vertex_colors', text='Vertex Colors')
             # if pg.export_vertex_colors:
             #     flow.prop(pg, 'vertex_color_space')
