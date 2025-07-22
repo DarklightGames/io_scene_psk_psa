@@ -14,7 +14,7 @@ from .properties import (
 )
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from ..writer import write_psa
-from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range
+from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range, PsxBoneCollection
 from ...shared.semver import SemanticVersion
 from ...shared.ui import draw_bone_filter_mode
 
@@ -400,7 +400,7 @@ class PSA_OT_export(Operator, ExportHelper):
                     rows=rows
                     )
 
-            bones_advanced_header, bones_advanced_panel = layout.panel('Advanced', default_closed=False)
+            bones_advanced_header, bones_advanced_panel = layout.panel('Bones Advanced', default_closed=True)
             bones_advanced_header.label(text='Advanced')
             if bones_advanced_panel:
                 flow = bones_advanced_panel.grid_flow()
@@ -450,7 +450,11 @@ class PSA_OT_export(Operator, ExportHelper):
                 armature_object.animation_data_create()
 
         update_actions_and_timeline_markers(context, self.armature_objects)
-        populate_bone_collection_list(self.armature_objects, pg.bone_collection_list)
+        populate_bone_collection_list(
+            pg.bone_collection_list,
+            self.armature_objects,
+            primary_key='DATA' if pg.sequence_source == 'ACTIVE_ACTION' else 'OBJECT',
+            )
 
         context.window_manager.fileselect_add(self)
 
@@ -458,16 +462,6 @@ class PSA_OT_export(Operator, ExportHelper):
 
     def execute(self, context):
         pg = getattr(context.scene, 'psa_export')
-
-        # Ensure that we actually have items that we are going to be exporting.
-        if pg.sequence_source == 'ACTIONS' and len(pg.action_list) == 0:
-            raise RuntimeError('No actions were selected for export')
-
-        if pg.sequence_source == 'TIMELINE_MARKERS' and len(pg.marker_list) == 0:
-            raise RuntimeError('No timeline markers were selected for export')
-
-        if pg.sequence_source == 'NLA_TRACK_STRIPS' and len(pg.nla_strip_list) == 0:
-            raise RuntimeError('No NLA track strips were selected for export')
 
         # Populate the export sequence list.
         animation_data_object = get_animation_data_object(context)
@@ -537,15 +531,16 @@ class PSA_OT_export(Operator, ExportHelper):
         options.animation_data = animation_data
         options.sequences = export_sequences
         options.bone_filter_mode = pg.bone_filter_mode
-        options.bone_collection_indices = [(x.armature_object_name, x.index) for x in pg.bone_collection_list if x.is_selected]
+        options.bone_collection_indices = [PsxBoneCollection(x.armature_object_name, x.armature_data_name, x.index) for x in pg.bone_collection_list if x.is_selected]
         options.sequence_name_prefix = pg.sequence_name_prefix
         options.sequence_name_suffix = pg.sequence_name_suffix
-        options.scale = pg.scale
         options.sampling_mode = pg.sampling_mode
         options.export_space = pg.export_space
+        options.scale = pg.scale
         options.forward_axis = pg.forward_axis
         options.up_axis = pg.up_axis
         options.root_bone_name = pg.root_bone_name
+        options.sequence_source = pg.sequence_source
 
         try:
             psa = build_psa(context, options)

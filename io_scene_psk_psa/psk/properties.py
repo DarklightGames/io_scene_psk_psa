@@ -20,9 +20,15 @@ mesh_triangle_bit_flags_items = (
 )
 
 class PSX_PG_material(PropertyGroup):
-    mesh_triangle_type: EnumProperty(items=mesh_triangle_types_items, name='Triangle Type')
-    mesh_triangle_bit_flags: EnumProperty(items=mesh_triangle_bit_flags_items, name='Triangle Bit Flags',
-                                          options={'ENUM_FLAG'})
+    mesh_triangle_type: EnumProperty(
+        name='Triangle Type',
+        items=mesh_triangle_types_items
+        )
+    mesh_triangle_bit_flags: EnumProperty(
+        name='Triangle Bit Flags',
+        items=mesh_triangle_bit_flags_items,
+        options={'ENUM_FLAG'}
+        )
 
 mesh_triangle_types_items_dict = {item[0]: item[3] for item in mesh_triangle_types_items}
 mesh_triangle_bit_flags_items_dict = {item[0]: item[3] for item in mesh_triangle_bit_flags_items}
@@ -36,7 +42,7 @@ def triangle_type_and_bit_flags_to_poly_flags(mesh_triangle_type: str, mesh_tria
     return poly_flags
 
 
-def poly_flags_to_triangle_type_and_bit_flags(poly_flags: int) -> (str, set[str]):
+def poly_flags_to_triangle_type_and_bit_flags(poly_flags: int) -> tuple[str, set[str]]:
     try:
         triangle_type = next(item[0] for item in mesh_triangle_types_items if item[3] == (poly_flags & 15))
     except StopIteration:
@@ -53,6 +59,17 @@ def should_import_skleton_get(self):
     return self.components in {'ALL', 'ARMATURE'}
 
 
+vertex_color_space_items = (
+    ('LINEAR', 'Linear', ''),
+    ('SRGBA', 'sRGBA', ''),
+)
+
+psk_import_components_items = (
+    ('ALL', 'Mesh & Armature', 'Import mesh and armature'),
+    ('MESH', 'Mesh Only', 'Import mesh only'),
+    ('ARMATURE', 'Armature Only', 'Import armature only'),
+)
+
 class PskImportMixin:
     should_import_vertex_colors: BoolProperty(
         default=True,
@@ -65,10 +82,7 @@ class PskImportMixin:
         options=set(),
         description='The source vertex color space',
         default='SRGBA',
-        items=(
-            ('LINEAR', 'Linear', ''),
-            ('SRGBA', 'sRGBA', ''),
-        )
+        items=vertex_color_space_items
     )
     should_import_vertex_normals: BoolProperty(
         default=True,
@@ -86,11 +100,7 @@ class PskImportMixin:
         name='Components',
         options=set(),
         description='Which components to import',
-        items=(
-            ('ALL', 'Mesh & Armature', 'Import mesh and armature'),
-            ('MESH', 'Mesh Only', 'Import mesh only'),
-            ('ARMATURE', 'Armature Only', 'Import armature only'),
-        ),
+        items=psk_import_components_items,
         default='ALL'
     )
     should_import_mesh: BoolProperty(

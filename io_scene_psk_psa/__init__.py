@@ -71,6 +71,7 @@ import bpy
 from bpy.props import PointerProperty
 
 classes = shared_types.classes + \
+          shared_ui.classes + \
           psk_properties.classes + \
           psk_ui.classes + \
           psk_import_operators.classes + \
@@ -108,15 +109,17 @@ def register():
     bpy.types.TOPBAR_MT_file_import.append(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.append(psa_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.append(psa_import_menu_func)
-    bpy.types.Material.psk = PointerProperty(type=psk_properties.PSX_PG_material)
-    bpy.types.Scene.psa_import = PointerProperty(type=psa_import_properties.PSA_PG_import)
-    bpy.types.Scene.psa_export = PointerProperty(type=psa_export_properties.PSA_PG_export)
-    bpy.types.Scene.psk_export = PointerProperty(type=psk_export_properties.PSK_PG_export)
-    bpy.types.Action.psa_export = PointerProperty(type=shared_types.PSX_PG_action_export)
+    bpy.types.Material.psk = PointerProperty(type=psk_properties.PSX_PG_material, options={'HIDDEN'})
+    bpy.types.Scene.psx_export = PointerProperty(type=shared_types.PSX_PG_scene_export, options={'HIDDEN'})
+    bpy.types.Scene.psa_import = PointerProperty(type=psa_import_properties.PSA_PG_import, options={'HIDDEN'})
+    bpy.types.Scene.psa_export = PointerProperty(type=psa_export_properties.PSA_PG_export, options={'HIDDEN'})
+    bpy.types.Scene.psk_export = PointerProperty(type=psk_export_properties.PSK_PG_export, options={'HIDDEN'})
+    bpy.types.Action.psa_export = PointerProperty(type=shared_types.PSX_PG_action_export, options={'HIDDEN'})
 
 
 def unregister():
     del bpy.types.Material.psk
+    del bpy.types.Scene.psx_export
     del bpy.types.Scene.psa_import
     del bpy.types.Scene.psa_export
     del bpy.types.Scene.psk_export
