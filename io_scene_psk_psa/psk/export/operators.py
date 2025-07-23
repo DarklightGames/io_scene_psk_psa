@@ -253,7 +253,7 @@ def get_psk_build_options_from_property_group(scene: Scene, pg: PskExportMixin) 
     options.bone_collection_indices = [PsxBoneCollection(x.armature_object_name, x.armature_data_name, x.index) for x in pg.bone_collection_list if x.is_selected]
     options.root_bone_name = pg.root_bone_name
     options.material_order_mode = pg.material_order_mode
-    options.material_name_list = pg.material_name_list
+    options.material_name_list = [x.material_name for x in pg.material_name_list]
     
     match pg.transform_source:
         case 'SCENE':

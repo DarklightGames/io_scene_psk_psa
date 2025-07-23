@@ -1,9 +1,10 @@
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import Armature, Collection, Context, Depsgraph, Object
+from bpy.types import Armature, Collection, Context, Depsgraph, Object, ArmatureModifier
 from mathutils import Matrix, Vector
 from typing import Dict, Iterable, List, Optional, Set, Tuple, cast as typing_cast
+
 from .data import Psk
 from .properties import triangle_type_and_bit_flags_to_poly_flags
 from ..shared.data import Vector3
@@ -60,6 +61,8 @@ def get_mesh_objects_for_collection(collection: Collection) -> Iterable[DfsObjec
 
 
 def get_mesh_objects_for_context(context: Context) -> Iterable[DfsObject]:
+    if context.view_layer is None:
+        return
     for dfs_object in dfs_view_layer_objects(context.view_layer):
         if dfs_object.obj.type == 'MESH' and dfs_object.is_selected:
             yield dfs_object
@@ -69,9 +72,10 @@ def get_armature_for_mesh_object(mesh_object: Object) -> Optional[Object]:
     if mesh_object.type != 'MESH':
         return None
     # Get the first armature modifier with a non-empty armature object.
-    for modifier in mesh_object.modifiers:
-        if modifier.type == 'ARMATURE' and modifier.object is not None:
-            return modifier.object
+    for modifier in filter(lambda x: x.type == 'ARMATURE', mesh_object.modifiers):
+            armature_modifier = typing_cast(ArmatureModifier, modifier)
+            if armature_modifier.object is not None:
+                return armature_modifier.object
     return None
 
 
@@ -166,7 +170,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             # The material name list may contain materials that are not on the mesh objects.
             # Therefore, we can take the material_name_list as gospel and simply use it as a lookup table.
             # If a look-up fails, replace it with an empty material.
-            materials = [bpy.data.materials.get(x.material_name, None) for x in options.material_name_list]
+            materials = [bpy.data.materials.get(x, None) for x in options.material_name_list]
         case _:
             assert False, f'Invalid material order mode: {options.material_order_mode}'
 
