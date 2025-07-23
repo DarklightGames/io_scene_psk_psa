@@ -34,7 +34,6 @@ def populate_material_name_list(depsgraph: Depsgraph, mesh_objects: Iterable[Obj
         m.index = index
 
 
-
 def get_collection_from_context(context: Context) -> Optional[Collection]:
     if context.space_data.type != 'PROPERTIES':
         return None
@@ -268,6 +267,11 @@ def get_psk_build_options_from_property_group(scene: Scene, pg: PskExportMixin) 
     options.forward_axis = transform_source.forward_axis
     options.up_axis = transform_source.up_axis
 
+    options.should_export_vertex_normals = pg.should_export_vertex_normals
+    options.should_export_vertex_colors = pg.should_export_vertex_colors
+    options.vertex_color_space = pg.vertex_color_space
+    options.should_export_extra_uvs = pg.should_export_extra_uvs
+    options.should_export_shape_keys = pg.should_export_shape_keys
     return options
 
 
@@ -406,12 +410,12 @@ class PSK_OT_export(Operator, ExportHelper):
     bl_idname = 'psk.export'
     bl_label = 'Export'
     bl_options = {'INTERNAL', 'UNDO'}
-    bl_description = 'Export selected meshes to PSK'
+    bl_description = 'Export selected meshes to PSK/PSKX'
     filename_ext = '.psk'
-    filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
+    filter_glob: StringProperty(default='*.psk;*.pskx', options={'HIDDEN'})
     filepath: StringProperty(
         name='File Path',
-        description='File path used for exporting the PSK file',
+        description='File path used for exporting the PSK/PSKX file',
         maxlen=1024,
         default='')
 
@@ -442,6 +446,9 @@ class PSK_OT_export(Operator, ExportHelper):
         layout = self.layout
 
         pg = getattr(context.scene, 'psk_export')
+
+        # Ensure that the initial state of the file extension matches the selected options.
+        pg.update_extended_data_property(context)
 
         # Mesh
         mesh_header, mesh_panel = layout.panel('Mesh', default_closed=False)
@@ -506,9 +513,19 @@ class PSK_OT_export(Operator, ExportHelper):
             flow.use_property_split = True
             flow.use_property_decorate = False
             flow.prop(pg, 'should_export_vertex_normals', text='Vertex Normals')
+            # TODO Uncomment these once these functions are implemented.
+            # flow.prop(pg, 'export_vertex_colors', text='Vertex Colors')
+            # if pg.export_vertex_colors:
+            #     flow.prop(pg, 'vertex_color_space')
+            # flow.separator()
+            # flow.prop(pg, 'export_shape_keys', text='Shape Keys')
+            # flow.prop(pg, 'export_extra_uvs', text='Extra UVs')
 
     def execute(self, context):
         pg = getattr(context.scene, 'psk_export')
+
+        # Ensure that the final state of the file extension matches the selected options even if this is invoked programmatically.
+        pg.update_extended_data_property(context)
 
         input_objects = get_psk_input_objects_for_context(context)
         options = get_psk_build_options_from_property_group(context.scene, pg)

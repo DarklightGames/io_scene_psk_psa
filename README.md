@@ -9,7 +9,7 @@ This software is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0
 
 # Features
 * Full PSK/PSA import and export capabilities.
-* Non-standard file section data (.pskx) is supported for import only (vertex normals, extra UV channels, vertex colors, shape keys).
+* Non-standard file section data (.pskx) is supported for import (vertex normals, extra UV channels, vertex colors, shape keys) and partially supported for export (vertex normals).
 * Fine-grained PSA sequence importing for efficient workflow when working with large PSA files.
 * PSA sequence metadata (e.g., frame rate) is preserved on import, allowing this data to be reused on export.
 * [Bone collections](https://docs.blender.org/manual/en/latest/animation/armatures/bones/bone_collections.html#bone-collections) can be excluded from PSK/PSA export (useful for excluding non-contributing bones such as IK controllers).
@@ -24,9 +24,9 @@ For Blender 4.2 and higher, download the latest version from the [Blender Extens
 For Blender 4.1 and lower, see [Legacy Compatibility](#legacy-compatibility).
 
 # Usage
-## Exporting a PSK
+## Exporting a PSK/PSKX
 1. Select the mesh objects you wish to export.
-2. Navigate to `File` > `Export` > `Unreal PSK (.psk)`.
+2. Navigate to `File` > `Export` > `Unreal PSK (.psk/pskx)`.
 3. Enter the file name and click `Export`.
 
 ## Importing a PSK/PSKX
@@ -61,7 +61,7 @@ The method I prefer is to simply change the Blender [scene properties](https://d
 The second option is to simply change the `Scale` value on the PSK import dialog. This will scale the armature by the factor provided. Note that this is more destructive, but may be preferable if you don't intend on exporting PSKs or PSAs to a game engine.
 
 ## How do I control shading for PSK exports?
-The PSK format does not support vertex normals and instead uses [smoothing groups](https://en.wikipedia.org/wiki/Smoothing_group) to control shading. Note that a mesh's Custom Split Normals Data will be ignored when exporting to PSK. Therefore, the best way to control shading is to use sharp edges and the Edge Split modifier.
+The standard PSK format does not support vertex normals and instead uses [smoothing groups](https://en.wikipedia.org/wiki/Smoothing_group) to control shading. If you enable the optional feature on export to include vertex normals, it will export as a PSKX file with the vertex normals included. These normals are made by averaging the split vertex normals at each vertex, if present, or the default calculated vertex normals if not. If this feature is not enabled, the mesh's Split Custom Normals will be ignored. In either case, you can use sharp edges and the Edge Split modifier to control when vertices are combined for the purpose of calculating normals. 
 
 ## Why are the mesh normals not accurate when importing a PSK extracted from [UE Viewer](https://www.gildor.org/en/projects/umodel)?
 If preserving the mesh normals of models is important for your workflow, it is *not recommended* to export PSK files from UE Viewer. This is because UE Viewer makes no attempt to reconstruct the original [smoothing groups](https://en.wikipedia.org/wiki/Smoothing_group). As a result, the normals of imported PSK files will be incorrect when imported into Blender and will need to be manually fixed.

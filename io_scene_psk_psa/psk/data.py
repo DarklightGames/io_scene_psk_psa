@@ -104,6 +104,10 @@ class Psk(object):
     @property
     def has_vertex_normals(self):
         return len(self.vertex_normals) > 0
+    
+    @property
+    def has_extended_data(self):
+        return self.has_vertex_normals or self.has_extra_uvs or self.has_vertex_colors or self.has_morph_data
 
     @property
     def has_material_references(self):

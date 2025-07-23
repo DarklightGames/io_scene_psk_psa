@@ -2,8 +2,9 @@ import bmesh
 import bpy
 import numpy as np
 from bpy.types import Armature, Collection, Context, Depsgraph, Object, ArmatureModifier
-from mathutils import Matrix
-from typing import Dict, Iterable, List, Optional, Set, cast as typing_cast
+from mathutils import Matrix, Vector
+from typing import Dict, Iterable, List, Optional, Set, Tuple, cast as typing_cast
+
 from .data import Psk
 from .properties import triangle_type_and_bit_flags_to_poly_flags
 from ..shared.data import Vector3
@@ -35,6 +36,11 @@ class PskBuildOptions(object):
         self.forward_axis = 'X'
         self.up_axis = 'Z'
         self.root_bone_name = 'ROOT'
+        self.should_export_vertex_normals = False
+        self.should_export_shape_keys = False
+        self.should_export_extra_uvs = False
+        self.should_export_vertex_colors = False
+        self.vertex_color_space = 'SRGBA'
 
 
 def get_materials_for_mesh_objects(depsgraph: Depsgraph, mesh_objects: Iterable[Object]):
@@ -298,6 +304,9 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 # Wedges
         mesh_data.calc_loop_triangles()
 
+        # Create a list the size of the points list to store all the split normals for each point.
+        split_normals_by_vertex: List[List[Vector3]] = [[] for i in range(len(psk.points))]
+
         if mesh_data.uv_layers.active is None:
             result.warnings.append(f'"{mesh_object.name}" has no active UV Map')
 
@@ -306,6 +315,8 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         if mesh_data.uv_layers.active:
             uv_layer = mesh_data.uv_layers.active.data
             for loop_index, loop in enumerate(mesh_data.loops):
+                if options.should_export_vertex_normals:
+                    split_normals_by_vertex[loop.vertex_index].append(loop.normal)
                 wedges.append(Psk.Wedge(
                     point_index=loop.vertex_index + vertex_offset,
                     u=uv_layer[loop_index].uv[0],
@@ -314,6 +325,16 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         else:
             for loop_index, loop in enumerate(mesh_data.loops):
                 wedges.append(Psk.Wedge(point_index=loop.vertex_index + vertex_offset, u=0.0, v=0.0))
+
+        # Add the vertex normals, if enabled.
+        if options.should_export_vertex_normals:
+            for split_normals in split_normals_by_vertex:
+                average_normal = Vector([0,0,0])
+                for split_normal in split_normals:
+                    average_normal += split_normal.xyz
+                average_normal.normalize()
+                vertex_normal = Vector3(average_normal.x, average_normal.y, average_normal.z)
+                psk.vertex_normals.append(vertex_normal)
 
         # Assign material indices to the wedges.
         for triangle in mesh_data.loop_triangles:

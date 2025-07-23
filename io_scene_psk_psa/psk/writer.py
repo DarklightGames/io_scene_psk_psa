@@ -57,5 +57,8 @@ def write_psk(psk: Psk, path: str):
             _write_section(fp, b'MATT0000', Psk.Material, psk.materials)
             _write_section(fp, b'REFSKELT', PsxBone, psk.bones)
             _write_section(fp, b'RAWWEIGHTS', Psk.Weight, psk.weights)
+            if psk.has_vertex_normals:
+                _write_section(fp, b'VTXNORMS', Vector3, psk.vertex_normals)
+            # TODO Output other non standard sections here when they are implemented.
     except PermissionError as e:
         raise RuntimeError(f'The current user "{os.getlogin()}" does not have permission to write to "{path}"') from e
