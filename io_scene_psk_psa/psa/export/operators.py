@@ -1,9 +1,9 @@
 from collections import Counter
-from typing import List, Iterable, Dict, Tuple, Optional
+from typing import List, Iterable, Dict, Tuple, cast as typing_cast
 
 import bpy
 from bpy.props import StringProperty
-from bpy.types import Context, Action, Object, AnimData, TimelineMarker, Operator
+from bpy.types import Context, Action, Object, AnimData, TimelineMarker, Operator, Armature
 from bpy_extras.io_utils import ExportHelper
 
 from .properties import (
@@ -12,6 +12,7 @@ from .properties import (
     filter_sequences,
     get_sequences_from_name_and_frame_range,
 )
+from .ui import PSA_UL_export_sequences
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from ..writer import write_psa
 from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range, PsxBoneCollection
@@ -19,7 +20,7 @@ from ...shared.semver import SemanticVersion
 from ...shared.ui import draw_bone_filter_mode
 
 
-def get_sequences_propnames_from_source(sequence_source: str) -> Optional[Tuple[str, str]]:
+def get_sequences_propnames_from_source(sequence_source: str) -> Tuple[str, str]:
     match sequence_source:
         case 'ACTIONS':
             return 'action_list', 'action_list_index'
@@ -48,7 +49,7 @@ def is_action_for_object(obj: Object, action: Action):
         It would simply check if it had any f-curves that corresponded to any bones in the armature.
         """
         import re
-        armature_data = obj.data
+        armature_data = typing_cast(Armature, obj.data)
         bone_names = set([x.name for x in armature_data.bones])
         for fcurve in action.fcurves:
             match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
@@ -57,6 +58,7 @@ def is_action_for_object(obj: Object, action: Action):
             bone_name = match.group(1)
             if bone_name in bone_names:
                 return True
+        return False
 
     if version < SemanticVersion((4, 4, 0)):
         return is_action_for_object_legacy(action, obj)
@@ -178,7 +180,7 @@ def get_animation_data_object(context: Context) -> Object:
 
     active_object = context.view_layer.objects.active
 
-    if active_object.type != 'ARMATURE':
+    if active_object is None or active_object.type != 'ARMATURE':
         raise RuntimeError('Active object must be an Armature')
 
     if pg.sequence_source != 'ACTIONS' and pg.should_override_animation_data:
@@ -334,8 +336,6 @@ class PSA_OT_export(Operator, ExportHelper):
             row.label(text='Select')
             row.operator(PSA_OT_export_actions_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
             row.operator(PSA_OT_export_actions_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
-
-            from .ui import PSA_UL_export_sequences
 
             propname, active_propname = get_sequences_propnames_from_source(pg.sequence_source)
             sequences_panel.template_list(PSA_UL_export_sequences.bl_idname, '', pg, propname, pg, active_propname,
