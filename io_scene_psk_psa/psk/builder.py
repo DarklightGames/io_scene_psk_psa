@@ -295,7 +295,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             point.z = v.z
             psk.points.append(point)
 
-# Wedges
+        # Wedges
         mesh_data.calc_loop_triangles()
 
         if mesh_data.uv_layers.active is None:
