@@ -12,7 +12,10 @@ from bpy.props import (
     StringProperty,
 )
 from bpy.types import PropertyGroup, Object, Action, AnimData, Context
-from ...shared.types import ForwardUpAxisMixin, ExportSpaceMixin, PsxBoneExportMixin
+
+from ...shared.dfs import dfs_view_layer_objects
+from ...shared.helpers import populate_bone_collection_list
+from ...shared.types import TransformMixin, ExportSpaceMixin, PsxBoneExportMixin
 
 
 def psa_export_property_group_animation_data_override_poll(_context, obj):
@@ -103,7 +106,43 @@ def animation_data_override_update_cb(self: 'PSA_PG_export', context: Context):
     self.nla_track = ''
 
 
-class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin, PsxBoneExportMixin):
+sequence_source_items = (
+    ('ACTIONS', 'Actions', 'Sequences will be exported using actions', 'ACTION', 0),
+    ('TIMELINE_MARKERS', 'Timeline Markers', 'Sequences are delineated by scene timeline markers', 'MARKER_HLT', 1),
+    ('NLA_TRACK_STRIPS', 'NLA Track Strips', 'Sequences are delineated by the start & end times of strips on the selected NLA track', 'NLA', 2),
+    ('ACTIVE_ACTION', 'Active Action', 'The active action will be exported for each selected armature', 'ACTION', 3),
+)
+
+fps_source_items = (
+    ('SCENE', 'Scene', '', 'SCENE_DATA', 0),
+    ('ACTION_METADATA', 'Action Metadata', 'The frame rate will be determined by action\'s FPS property found in the PSA Export panel.\n\nIf the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used', 'ACTION', 1),
+    ('CUSTOM', 'Custom', '', 2)
+)
+
+compression_ratio_source_items = (
+    ('ACTION_METADATA', 'Action Metadata', 'The compression ratio will be determined by action\'s Compression Ratio property found in the PSA Export panel.\n\nIf the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used', 'ACTION', 1),
+    ('CUSTOM', 'Custom', '', 2)
+)
+
+sampling_mode_items = (
+    ('INTERPOLATED', 'Interpolated', 'Sampling is performed by interpolating the evaluated bone poses from the adjacent whole frames.', 'INTERPOLATED', 0),
+    ('SUBFRAME', 'Subframe', 'Sampling is performed by evaluating the bone poses at the subframe time.\n\nNot recommended unless you are also animating with subframes enabled.', 'SUBFRAME', 1),
+)
+
+
+def sequence_source_update_cb(self: 'PSA_PG_export', context: Context) -> None:
+    armature_objects = []
+    for dfs_object in dfs_view_layer_objects(context.view_layer):
+        if dfs_object.obj.type == 'ARMATURE' and dfs_object.is_selected:
+            armature_objects.append(dfs_object.obj)
+
+    populate_bone_collection_list(
+        self.bone_collection_list,
+        armature_objects,
+        primary_key='DATA' if self.sequence_source == 'ACTIVE_ACTION' else 'OBJECT')
+
+
+class PSA_PG_export(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExportMixin):
     should_override_animation_data: BoolProperty(
         name='Override Animation Data',
         options=set(),
@@ -120,12 +159,8 @@ class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin, PsxBone
         name='Source',
         options=set(),
         description='',
-        items=(
-            ('ACTIONS', 'Actions', 'Sequences will be exported using actions', 'ACTION', 0),
-            ('TIMELINE_MARKERS', 'Timeline Markers', 'Sequences are delineated by scene timeline markers', 'MARKER_HLT', 1),
-            ('NLA_TRACK_STRIPS', 'NLA Track Strips', 'Sequences are delineated by the start & end times of strips on the selected NLA track', 'NLA', 2),
-            ('ACTIVE_ACTION', 'Active Action', 'The active action will be exported for each selected armature', 'ACTION', 3),
-        )
+        items=sequence_source_items,
+        update=sequence_source_update_cb,
     )
     nla_track: StringProperty(
         name='NLA Track',
@@ -139,22 +174,14 @@ class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin, PsxBone
         name='FPS Source',
         options=set(),
         description='',
-        items=(
-            ('SCENE', 'Scene', '', 'SCENE_DATA', 0),
-            ('ACTION_METADATA', 'Action Metadata', 'The frame rate will be determined by action\'s FPS property found in the PSA Export panel.\n\nIf the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used', 'ACTION', 1),
-            ('CUSTOM', 'Custom', '', 2)
-        )
+        items=fps_source_items,
     )
-    fps_custom: FloatProperty(default=30.0, min=sys.float_info.epsilon, soft_min=1.0, options=set(), step=100,
-                              soft_max=60.0)
+    fps_custom: FloatProperty(default=30.0, min=sys.float_info.epsilon, soft_min=1.0, options=set(), step=100, soft_max=60.0)
     compression_ratio_source: EnumProperty(
         name='Compression Ratio Source',
         options=set(),
         description='',
-        items=(
-            ('ACTION_METADATA', 'Action Metadata', 'The compression ratio will be determined by action\'s Compression Ratio property found in the PSA Export panel.\n\nIf the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used', 'ACTION', 1),
-            ('CUSTOM', 'Custom', '', 2)
-        )
+        items=compression_ratio_source_items,
     )
     compression_ratio_custom: FloatProperty(default=1.0, min=0.0, max=1.0, subtype='FACTOR', description='The key sampling ratio of the exported sequence.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames')
     action_list: CollectionProperty(type=PSA_PG_export_action_list_item)
@@ -193,21 +220,11 @@ class PSA_PG_export(PropertyGroup, ForwardUpAxisMixin, ExportSpaceMixin, PsxBone
         name='Show Reversed',
         description='Show reversed sequences'
     )
-    scale: FloatProperty(
-        name='Scale',
-        default=1.0,
-        description='Scale factor to apply to the bone translations. Use this if you are exporting animations for a scaled PSK mesh',
-        min=0.0,
-        soft_max=100.0
-    )
     sampling_mode: EnumProperty(
         name='Sampling Mode',
         options=set(),
         description='The method by which frames are sampled',
-        items=(
-            ('INTERPOLATED', 'Interpolated', 'Sampling is performed by interpolating the evaluated bone poses from the adjacent whole frames.', 'INTERPOLATED', 0),
-            ('SUBFRAME', 'Subframe', 'Sampling is performed by evaluating the bone poses at the subframe time.\n\nNot recommended unless you are also animating with subframes enabled.', 'SUBFRAME', 1),
-        ),
+        items=sampling_mode_items,
         default='INTERPOLATED'
     )
 

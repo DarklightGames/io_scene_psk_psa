@@ -1,18 +1,16 @@
 import bpy
 from collections import Counter
 from typing import List, Iterable, Optional, Dict, Tuple, cast as typing_cast
-from bpy.props import CollectionProperty
-from bpy.types import Armature, AnimData, Object
+from bpy.types import Armature, AnimData, Collection, Context, Object, ArmatureModifier, SpaceProperties
 from mathutils import Matrix, Vector, Quaternion as BpyQuaternion
 from .data import Vector3, Quaternion
 from ..shared.data import PsxBone
 
 
-def rgb_to_srgb(c: float):
+def rgb_to_srgb(c: float) -> float:
     if c > 0.0031308:
         return 1.055 * (pow(c, (1.0 / 2.4))) - 0.055
-    else:
-        return 12.92 * c
+    return 12.92 * c
 
 
 def get_nla_strips_in_frame_range(animation_data: AnimData, frame_min: float, frame_max: float):
@@ -28,15 +26,26 @@ def get_nla_strips_in_frame_range(animation_data: AnimData, frame_min: float, fr
                 yield strip
 
 
-def populate_bone_collection_list(armature_objects: Iterable[Object], bone_collection_list: CollectionProperty) -> None:
+def populate_bone_collection_list(bone_collection_list, armature_objects: Iterable[Object], primary_key: str = 'OBJECT'):
     """
-    Updates the bone collections collection.
+    Updates the bone collection list.
 
-    Bone collection selections are preserved between updates unless none of the groups were previously selected;
-    otherwise, all collections are selected by default.
+    Selection is preserved between updates unless none of the groups were previously selected.
+    Otherwise, all collections are selected by default.
+
+    The primary key is used to determine how to group the armature objects. For example, if the primary key is
+    'DATA', then all bone collections with the same armature data-block will be under one entry.
+
+    :param bone_collection_list: The list to update.
+    :param armature_objects: The armature objects to populate the collection with.
+    :param primary_key: The primary key to use for the collection (one of 'OBJECT' or 'DATA').
+    :return: None
     """
     has_selected_collections = any([g.is_selected for g in bone_collection_list])
     unassigned_collection_is_selected, selected_assigned_collection_names = True, []
+
+    if primary_key not in ('OBJECT', 'DATA'):
+        assert False, f'Invalid primary key: {primary_key}'
 
     if not armature_objects:
         return
@@ -51,16 +60,26 @@ def populate_bone_collection_list(armature_objects: Iterable[Object], bone_colle
         selected_assigned_collection_names = [
             g.name for i, g in enumerate(bone_collection_list) if i != unassigned_collection_idx and g.is_selected]
 
+
     bone_collection_list.clear()
+
+    unique_armature_data = set()
 
     for armature_object in armature_objects:
         armature = typing_cast(Armature, armature_object.data)
 
         if armature is None:
-            return
+            continue
+
+        if primary_key == 'DATA' and armature_object.data in unique_armature_data:
+            # Skip this armature since we have already added an entry for it and we are using the data as the key.
+            continue
+    
+        unique_armature_data.add(armature_object.data)
 
         item = bone_collection_list.add()
         item.armature_object_name = armature_object.name
+        item.armature_data_name = armature_object.data.name if armature_object.data else ''
         item.name = 'Unassigned' # TODO: localize
         item.index = -1
         # Count the number of bones without an assigned bone collection
@@ -70,6 +89,7 @@ def populate_bone_collection_list(armature_objects: Iterable[Object], bone_colle
         for bone_collection_index, bone_collection in enumerate(armature.collections_all):
             item = bone_collection_list.add()
             item.armature_object_name = armature_object.name
+            item.armature_data_name = armature_object.data.name if armature_object.data else ''
             item.name = bone_collection.name
             item.index = bone_collection_index
             item.count = len(bone_collection.bones)
@@ -286,6 +306,16 @@ def convert_bpy_quaternion_to_psx_quaternion(other: BpyQuaternion) -> Quaternion
     return quaternion
 
 
+class PsxBoneCollection:
+    """
+    Stores the armature's object name, data-block name and bone collection index.
+    """
+    def __init__(self, armature_object_name: str, armature_data_name: str, index: int):
+        self.armature_object_name = armature_object_name
+        self.armature_data_name = armature_data_name
+        self.index = index
+
+
 def create_psx_bones(
         armature_objects: List[Object],
         export_space: str = 'WORLD',
@@ -294,7 +324,8 @@ def create_psx_bones(
         up_axis: str = 'Z',
         scale: float = 1.0,
         bone_filter_mode: str = 'ALL',
-        bone_collection_indices: Optional[List[Tuple[str, int]]] = None,
+        bone_collection_indices: Optional[List[PsxBoneCollection]] = None,
+        bone_collection_primary_key: str = 'OBJECT',
 ) -> PsxBoneCreateResult:
     """
     Creates a list of PSX bones from the given armature objects and options.
@@ -306,20 +337,27 @@ def create_psx_bones(
 
     bones: List[Tuple[PsxBone, Optional[Object]]] = []
 
-    if export_space != 'WORLD' and len(armature_objects) > 1:
+    if export_space != 'WORLD' and len(armature_objects) >= 2:
         armature_object_names = [armature_object.name for armature_object in armature_objects]
-        raise RuntimeError(f'When exporting multiple armatures, the Export Space must be World. The following armatures are attempting to be exported: {armature_object_names}')
+        raise RuntimeError(f'When exporting multiple armatures, the Export Space must be World.\n' \
+            f'The following armatures are attempting to be exported: {armature_object_names}')
 
     coordinate_system_matrix = get_coordinate_system_transform(forward_axis, up_axis)
     coordinate_system_default_rotation = coordinate_system_matrix.to_quaternion()
 
     total_bone_count = sum(len(armature_object.data.bones) for armature_object in armature_objects)
 
-
     # Store the bone names to be exported for each armature object.
     armature_object_bone_names: Dict[Object, List[str]] = dict()
     for armature_object in  armature_objects:
-        armature_bone_collection_indices = [x[1] for x in bone_collection_indices if x[0] == armature_object.name]
+        armature_bone_collection_indices: List[int] = []
+        match bone_collection_primary_key:
+            case 'OBJECT':
+                armature_bone_collection_indices.extend([x.index for x in bone_collection_indices if x.armature_object_name == armature_object.name])
+            case 'DATA':
+                armature_bone_collection_indices.extend([x.index for x in bone_collection_indices if armature_object.data and x.armature_data_name == armature_object.data.name])
+            case _:
+                assert False, f'Invalid primary key: {bone_collection_primary_key}'
         bone_names = get_export_bone_names(armature_object, bone_filter_mode, armature_bone_collection_indices)
         armature_object_bone_names[armature_object] = bone_names
 
@@ -429,3 +467,36 @@ def get_coordinate_system_transform(forward_axis: str = 'X', up_axis: str = 'Z')
         (up.x, up.y, up.z, 0.0),
         (0.0, 0.0, 0.0, 1.0)
     ))
+
+
+def get_armatures_for_mesh_objects(mesh_objects: Iterable[Object]):
+    """
+    Returns a generator of unique armature objects that are used by the given mesh objects.
+    """
+    armature_objects: set[Object] = set()
+    for mesh_object in mesh_objects:
+        armature_modifiers = [typing_cast(ArmatureModifier, x) for x in mesh_object.modifiers if x.type == 'ARMATURE']
+        for armature_object in map(lambda x: x.object, armature_modifiers):
+            if armature_object is not None:
+                armature_objects.add(armature_object)
+    yield from armature_objects
+
+
+def get_collection_from_context(context: Context) -> Optional[Collection]:
+    if context.space_data is None or context.space_data.type != 'PROPERTIES':
+        return None
+    space_data = typing_cast(SpaceProperties, context.space_data)
+    if space_data.use_pin_id:
+        return typing_cast(Collection, space_data.pin_id)
+    else:
+        return context.collection
+
+
+def get_collection_export_operator_from_context(context: Context) -> Optional[object]:
+    collection = get_collection_from_context(context)
+    if collection is None or collection.active_exporter_index is None:
+        return None
+    if 0 > collection.active_exporter_index >= len(collection.exporters):
+        return None
+    exporter = collection.exporters[collection.active_exporter_index]
+    return exporter.export_properties

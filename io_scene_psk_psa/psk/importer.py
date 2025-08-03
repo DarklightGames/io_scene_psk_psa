@@ -163,8 +163,11 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
         # Faces
         invalid_face_indices = set()
         for face_index, face in enumerate(psk.faces):
-            point_indices = map(lambda i: psk.wedges[i].point_index, reversed(face.wedge_indices))
-            points = [bm.verts[i] for i in point_indices]
+            points = (
+                bm.verts[psk.wedges[face.wedge_indices[2]].point_index],
+                bm.verts[psk.wedges[face.wedge_indices[1]].point_index],
+                bm.verts[psk.wedges[face.wedge_indices[0]].point_index],
+            )
             try:
                 bm_face = bm.faces.new(points)
                 bm_face.material_index = face.material_index
@@ -178,44 +181,49 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
         if len(invalid_face_indices) > 0:
             result.warnings.append(f'Discarded {len(invalid_face_indices)} invalid face(s).')
 
+        face_count = len(bm.faces)
+
         bm.to_mesh(mesh_data)
 
         # Texture Coordinates
         uv_layer_data_index = 0
-        uv_layer = mesh_data.uv_layers.new(name='UVMap')
+        uv_layer_data = np.zeros((face_count * 3, 2), dtype=np.float32)
         for face_index, face in enumerate(psk.faces):
             if face_index in invalid_face_indices:
                 continue
-            face_wedges = [psk.wedges[i] for i in reversed(face.wedge_indices)]
-            for wedge in face_wedges:
-                uv_layer.data[uv_layer_data_index].uv = wedge.u, 1.0 - wedge.v
+            for wedge in map(lambda i: psk.wedges[i], reversed(face.wedge_indices)):
+                uv_layer_data[uv_layer_data_index] = wedge.u, 1.0 - wedge.v
                 uv_layer_data_index += 1
+        uv_layer = mesh_data.uv_layers.new(name='UVMap')
+        uv_layer.uv.foreach_set('vector', uv_layer_data.ravel())
 
         # Extra UVs
         if psk.has_extra_uvs and options.should_import_extra_uvs:
             extra_uv_channel_count = int(len(psk.extra_uvs) / len(psk.wedges))
             wedge_index_offset = 0
+            uv_layer_data = np.zeros((len(psk.faces) * 3, 2), dtype=np.float32)
             for extra_uv_index in range(extra_uv_channel_count):
                 uv_layer_data_index = 0
-                uv_layer = mesh_data.uv_layers.new(name=f'EXTRAUV{extra_uv_index}')
                 for face_index, face in enumerate(psk.faces):
                     if face_index in invalid_face_indices:
                         continue
-                    for wedge_index in reversed(face.wedge_indices):
-                        u, v = psk.extra_uvs[wedge_index_offset + wedge_index]
-                        uv_layer.data[uv_layer_data_index].uv = u, 1.0 - v
+                    for wedge in map(lambda i: psk.wedges[i], reversed(face.wedge_indices)):
+                        uv_layer_data[uv_layer_data_index] = wedge.u, 1.0 - wedge.v
                         uv_layer_data_index += 1
                 wedge_index_offset += len(psk.wedges)
+                uv_layer = mesh_data.uv_layers.new(name=f'EXTRAUV{extra_uv_index}')
+                uv_layer.uv.foreach_set('vector', uv_layer_data.ravel())
 
         # Vertex Colors
         if psk.has_vertex_colors and options.should_import_vertex_colors:
-            # Convert vertex colors to sRGB if necessary.
             psk_vertex_colors = np.zeros((len(psk.vertex_colors), 4))
             for vertex_color_index in range(len(psk.vertex_colors)):
-                psk_vertex_colors[vertex_color_index,:] = psk.vertex_colors[vertex_color_index].normalized()
+                psk_vertex_colors[vertex_color_index] = tuple(psk.vertex_colors[vertex_color_index])
+            psk_vertex_colors /= 255.0
+
+            # Convert vertex colors to sRGB if necessary.
             if options.vertex_color_space == 'SRGBA':
-                for i in range(psk_vertex_colors.shape[0]):
-                    psk_vertex_colors[i, :3] = tuple(map(lambda x: rgb_to_srgb(x), psk_vertex_colors[i, :3]))
+                psk_vertex_colors[:, :3] = np.vectorize(rgb_to_srgb)(psk_vertex_colors[:, :3])
 
             # Map the PSK vertex colors to the face corners.
             face_count = len(psk.faces) - len(invalid_face_indices)
@@ -230,7 +238,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
 
             # Create the vertex color attribute.
             face_corner_color_attribute = mesh_data.attributes.new(name='VERTEXCOLOR', type='FLOAT_COLOR', domain='CORNER')
-            face_corner_color_attribute.data.foreach_set('color', face_corner_colors.flatten())
+            face_corner_color_attribute.data.foreach_set('color', face_corner_colors.ravel())
 
         # Vertex Normals
         if psk.has_vertex_normals and options.should_import_vertex_normals:

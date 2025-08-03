@@ -21,6 +21,7 @@ class PSX_UL_bone_collection_list(UIList):
 
 class PSX_PG_bone_collection_list_item(PropertyGroup):
     armature_object_name: StringProperty()
+    armature_data_name: StringProperty()
     name: StringProperty()
     index: IntProperty()
     count: IntProperty()
@@ -93,7 +94,14 @@ def up_axis_update(self, __context):
         self.forward_axis = next((axis for axis in axis_identifiers if axis != self.up_axis), 'X')
 
 
-class ForwardUpAxisMixin:
+class TransformMixin:
+    scale: FloatProperty(
+        name='Scale',
+        default=1.0,
+        description='Scale factor to apply to all location data',
+        soft_min=0.0,
+        soft_max=100.0
+    )
     forward_axis: EnumProperty(
         name='Forward',
         items=forward_items,
@@ -139,7 +147,12 @@ class PsxBoneExportMixin:
     )
 
 
+class PSX_PG_scene_export(PropertyGroup, TransformMixin):
+    pass
+
+
 classes = (
+    PSX_PG_scene_export,
     PSX_PG_action_export,
     PSX_PG_bone_collection_list_item,
     PSX_UL_bone_collection_list,

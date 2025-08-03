@@ -1,9 +1,10 @@
 from collections import Counter
-from typing import List, Iterable, Dict, Tuple, Optional
+from typing import List, Iterable, Dict, Tuple, cast as typing_cast
 
 import bpy
+import re
 from bpy.props import StringProperty
-from bpy.types import Context, Action, Object, AnimData, TimelineMarker, Operator
+from bpy.types import Context, Action, Object, AnimData, TimelineMarker, Operator, Armature
 from bpy_extras.io_utils import ExportHelper
 
 from .properties import (
@@ -12,14 +13,14 @@ from .properties import (
     filter_sequences,
     get_sequences_from_name_and_frame_range,
 )
+from .ui import PSA_UL_export_sequences
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from ..writer import write_psa
-from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range
-from ...shared.semver import SemanticVersion
+from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range, PsxBoneCollection
 from ...shared.ui import draw_bone_filter_mode
 
 
-def get_sequences_propnames_from_source(sequence_source: str) -> Optional[Tuple[str, str]]:
+def get_sequences_propnames_from_source(sequence_source: str) -> Tuple[str, str]:
     match sequence_source:
         case 'ACTIONS':
             return 'action_list', 'action_list_index'
@@ -40,29 +41,18 @@ def is_action_for_object(obj: Object, action: Action):
     if obj is None or obj.animation_data is None or obj.type != 'ARMATURE':
         return False
 
-    version = SemanticVersion(bpy.app.version)
-
-    def is_action_for_object_legacy(action: Action,  obj: Object):
-        """
-        This is the legacy behavior before slotted actions were introduced in Blender 4.4.
-        It would simply check if it had any f-curves that corresponded to any bones in the armature.
-        """
-        import re
-        armature_data = obj.data
-        bone_names = set([x.name for x in armature_data.bones])
-        for fcurve in action.fcurves:
-            match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
-            if not match:
-                continue
-            bone_name = match.group(1)
-            if bone_name in bone_names:
-                return True
-
-    if version < SemanticVersion((4, 4, 0)):
-        return is_action_for_object_legacy(action, obj)
-
-    # If the object is a part of the slot's user list, then it is a valid action for the object.
-    return any(obj in slot.users() for slot in action.slots)
+    armature_data = typing_cast(Armature, obj.data)
+    bone_names = set([x.name for x in armature_data.bones])
+    
+    for fcurve in action.fcurves:
+        match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
+        if not match:
+            continue
+        bone_name = match.group(1)
+        if bone_name in bone_names:
+            return True
+    
+    return False
 
 
 def update_actions_and_timeline_markers(context: Context, armature_objects: Iterable[Object]):
@@ -178,7 +168,7 @@ def get_animation_data_object(context: Context) -> Object:
 
     active_object = context.view_layer.objects.active
 
-    if active_object.type != 'ARMATURE':
+    if active_object is None or active_object.type != 'ARMATURE':
         raise RuntimeError('Active object must be an Armature')
 
     if pg.sequence_source != 'ACTIONS' and pg.should_override_animation_data:
@@ -335,8 +325,6 @@ class PSA_OT_export(Operator, ExportHelper):
             row.operator(PSA_OT_export_actions_select_all.bl_idname, text='All', icon='CHECKBOX_HLT')
             row.operator(PSA_OT_export_actions_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
 
-            from .ui import PSA_UL_export_sequences
-
             propname, active_propname = get_sequences_propnames_from_source(pg.sequence_source)
             sequences_panel.template_list(PSA_UL_export_sequences.bl_idname, '', pg, propname, pg, active_propname,
                                           rows=max(3, min(len(getattr(pg, propname)), 10)))
@@ -400,7 +388,7 @@ class PSA_OT_export(Operator, ExportHelper):
                     rows=rows
                     )
 
-            bones_advanced_header, bones_advanced_panel = layout.panel('Advanced', default_closed=False)
+            bones_advanced_header, bones_advanced_panel = layout.panel('Bones Advanced', default_closed=True)
             bones_advanced_header.label(text='Advanced')
             if bones_advanced_panel:
                 flow = bones_advanced_panel.grid_flow()
@@ -450,7 +438,11 @@ class PSA_OT_export(Operator, ExportHelper):
                 armature_object.animation_data_create()
 
         update_actions_and_timeline_markers(context, self.armature_objects)
-        populate_bone_collection_list(self.armature_objects, pg.bone_collection_list)
+        populate_bone_collection_list(
+            pg.bone_collection_list,
+            self.armature_objects,
+            primary_key='DATA' if pg.sequence_source == 'ACTIVE_ACTION' else 'OBJECT',
+            )
 
         context.window_manager.fileselect_add(self)
 
@@ -458,16 +450,6 @@ class PSA_OT_export(Operator, ExportHelper):
 
     def execute(self, context):
         pg = getattr(context.scene, 'psa_export')
-
-        # Ensure that we actually have items that we are going to be exporting.
-        if pg.sequence_source == 'ACTIONS' and len(pg.action_list) == 0:
-            raise RuntimeError('No actions were selected for export')
-
-        if pg.sequence_source == 'TIMELINE_MARKERS' and len(pg.marker_list) == 0:
-            raise RuntimeError('No timeline markers were selected for export')
-
-        if pg.sequence_source == 'NLA_TRACK_STRIPS' and len(pg.nla_strip_list) == 0:
-            raise RuntimeError('No NLA track strips were selected for export')
 
         # Populate the export sequence list.
         animation_data_object = get_animation_data_object(context)
@@ -537,15 +519,16 @@ class PSA_OT_export(Operator, ExportHelper):
         options.animation_data = animation_data
         options.sequences = export_sequences
         options.bone_filter_mode = pg.bone_filter_mode
-        options.bone_collection_indices = [(x.armature_object_name, x.index) for x in pg.bone_collection_list if x.is_selected]
+        options.bone_collection_indices = [PsxBoneCollection(x.armature_object_name, x.armature_data_name, x.index) for x in pg.bone_collection_list if x.is_selected]
         options.sequence_name_prefix = pg.sequence_name_prefix
         options.sequence_name_suffix = pg.sequence_name_suffix
-        options.scale = pg.scale
         options.sampling_mode = pg.sampling_mode
         options.export_space = pg.export_space
+        options.scale = pg.scale
         options.forward_axis = pg.forward_axis
         options.up_axis = pg.up_axis
         options.root_bone_name = pg.root_bone_name
+        options.sequence_source = pg.sequence_source
 
         try:
             psa = build_psa(context, options)

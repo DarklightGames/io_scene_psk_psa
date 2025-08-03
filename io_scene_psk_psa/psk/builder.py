@@ -1,16 +1,18 @@
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import Armature, Collection, Context, Depsgraph, Object
+from bpy.types import Armature, Collection, Context, Depsgraph, Object, ArmatureModifier
 from mathutils import Matrix
-from typing import Dict, Generator, Iterable, List, Optional, Set, Tuple, cast as typing_cast
+from typing import Dict, Iterable, List, Optional, Set, cast as typing_cast
 from .data import Psk
 from .properties import triangle_type_and_bit_flags_to_poly_flags
 from ..shared.data import Vector3
 from ..shared.dfs import DfsObject, dfs_collection_objects, dfs_view_layer_objects
 from ..shared.helpers import (
+    PsxBoneCollection,
     convert_string_to_cp1252_bytes,
     create_psx_bones,
+    get_armatures_for_mesh_objects,
     get_coordinate_system_transform,
 )
 
@@ -24,7 +26,7 @@ class PskInputObjects(object):
 class PskBuildOptions(object):
     def __init__(self):
         self.bone_filter_mode = 'ALL'
-        self.bone_collection_indices: List[Tuple[str, int]] = []
+        self.bone_collection_indices: List[PsxBoneCollection] = []
         self.object_eval_state = 'EVALUATED'
         self.material_order_mode = 'AUTOMATIC'
         self.material_name_list: List[str] = []
@@ -42,7 +44,7 @@ def get_materials_for_mesh_objects(depsgraph: Depsgraph, mesh_objects: Iterable[
         for i, material_slot in enumerate(evaluated_mesh_object.material_slots):
             material = material_slot.material
             if material is None:
-                raise RuntimeError('Material slot cannot be empty (index ' + str(i) + ')')
+                raise RuntimeError(f'Material slots cannot be empty. ({mesh_object.name}, index {i})')
             if material not in yielded_materials:
                 yielded_materials.add(material)
                 yield material
@@ -53,40 +55,31 @@ def get_mesh_objects_for_collection(collection: Collection) -> Iterable[DfsObjec
 
 
 def get_mesh_objects_for_context(context: Context) -> Iterable[DfsObject]:
+    if context.view_layer is None:
+        return
     for dfs_object in dfs_view_layer_objects(context.view_layer):
         if dfs_object.obj.type == 'MESH' and dfs_object.is_selected:
             yield dfs_object
 
 
 def get_armature_for_mesh_object(mesh_object: Object) -> Optional[Object]:
-    for modifier in mesh_object.modifiers:
-        if modifier.type == 'ARMATURE':
-            return modifier.object
+    if mesh_object.type != 'MESH':
+        return None
+    # Get the first armature modifier with a non-empty armature object.
+    for modifier in filter(lambda x: x.type == 'ARMATURE', mesh_object.modifiers):
+            armature_modifier = typing_cast(ArmatureModifier, modifier)
+            if armature_modifier.object is not None:
+                return armature_modifier.object
     return None
-
-
-def get_armatures_for_mesh_objects(mesh_objects: Iterable[Object]) -> Generator[Object, None, None]:
-    # Ensure that there are either no armature modifiers (static mesh) or that there is exactly one armature modifier
-    # object shared between all meshes.
-    armature_objects = set()
-    for mesh_object in mesh_objects:
-        modifiers = [x for x in mesh_object.modifiers if x.type == 'ARMATURE']
-        if len(modifiers) == 0:
-            continue
-        if modifiers[0].object in armature_objects:
-            continue
-        yield modifiers[0].object
 
 
 def _get_psk_input_objects(mesh_dfs_objects: Iterable[DfsObject]) -> PskInputObjects:
     mesh_dfs_objects = list(mesh_dfs_objects)
     if len(mesh_dfs_objects) == 0:
         raise RuntimeError('At least one mesh must be selected')
-
     input_objects = PskInputObjects()
     input_objects.mesh_dfs_objects = mesh_dfs_objects
     input_objects.armature_objects |= set(get_armatures_for_mesh_objects(map(lambda x: x.obj, mesh_dfs_objects)))
-
     return input_objects
 
 
@@ -95,10 +88,8 @@ def get_psk_input_objects_for_context(context: Context) -> PskInputObjects:
     return _get_psk_input_objects(mesh_objects)
 
 
-def get_psk_input_objects_for_collection(collection: Collection, should_exclude_hidden_meshes: bool = True) -> PskInputObjects:
+def get_psk_input_objects_for_collection(collection: Collection) -> PskInputObjects:
     mesh_objects = get_mesh_objects_for_collection(collection)
-    if should_exclude_hidden_meshes:
-        mesh_objects = filter(lambda x: x.is_visible, mesh_objects)
     return _get_psk_input_objects(mesh_objects)
 
 
@@ -173,7 +164,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             # The material name list may contain materials that are not on the mesh objects.
             # Therefore, we can take the material_name_list as gospel and simply use it as a lookup table.
             # If a look-up fails, replace it with an empty material.
-            materials = [bpy.data.materials.get(x.material_name, None) for x in options.material_name_list]
+            materials = [bpy.data.materials.get(x, None) for x in options.material_name_list]
         case _:
             assert False, f'Invalid material order mode: {options.material_order_mode}'
 
@@ -181,8 +172,9 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         psk_material = Psk.Material()
         psk_material.name = convert_string_to_cp1252_bytes(material.name if material else 'None')
         psk_material.texture_index = len(psk.materials)
-        psk_material.poly_flags = triangle_type_and_bit_flags_to_poly_flags(material.psk.mesh_triangle_type,
-                                                                            material.psk.mesh_triangle_bit_flags)
+        if material is not None:
+            psk_material.poly_flags = triangle_type_and_bit_flags_to_poly_flags(material.psk.mesh_triangle_type,
+                                                                                material.psk.mesh_triangle_bit_flags)
         psk.materials.append(psk_material)
 
     # TODO: This wasn't left in a good state. We should detect if we need to add a "default" material.
@@ -203,6 +195,9 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
     # Calculate the export spaces for the armature objects.
     # This is used later to transform the mesh object geometry into the export space.
     armature_mesh_export_space_matrices: Dict[Optional[Object], Matrix] = {None: Matrix.Identity(4)}
+    if options.export_space == 'ARMATURE':
+        # For meshes without an armature modifier, we need to set the export space to the armature object.
+        armature_mesh_export_space_matrices[None] = _get_mesh_export_space_matrix(next(iter(input_objects.armature_objects), None), options.export_space)
     for armature_object in armature_objects:
         armature_mesh_export_space_matrices[armature_object] = _get_mesh_export_space_matrix(armature_object, options.export_space)
 
@@ -215,13 +210,11 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
     for armature_object in armature_objects:
         armature_object.data.pose_position = 'REST'
 
-    material_names = [m.name for m in materials]
+    material_names = [m.name if m is not None else 'None' for m in materials]
 
     for object_index, input_mesh_object in enumerate(input_objects.mesh_dfs_objects):
         obj, matrix_world = input_mesh_object.obj, input_mesh_object.matrix_world
-
         armature_object = get_armature_for_mesh_object(obj)
-
         should_flip_normals = False
 
         # Material indices
@@ -281,7 +274,14 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             case _:
                 assert False, f'Invalid object evaluation state: {options.object_eval_state}'
 
-        mesh_export_space_matrix = armature_mesh_export_space_matrices[armature_object]
+        match options.export_space:
+            case 'ARMATURE' | 'ROOT':
+                mesh_export_space_matrix = armature_mesh_export_space_matrices[armature_object]
+            case 'WORLD':
+                mesh_export_space_matrix = armature_mesh_export_space_matrices[armature_object]
+            case _:
+                assert False, f'Invalid export space: {options.export_space}'
+
         vertex_transform_matrix = scale_matrix @ coordinate_system_matrix @ mesh_export_space_matrix
         point_transform_matrix = vertex_transform_matrix @ mesh_object.matrix_world
 
@@ -295,19 +295,25 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             point.z = v.z
             psk.points.append(point)
 
-        uv_layer = mesh_data.uv_layers.active.data
-
         # Wedges
         mesh_data.calc_loop_triangles()
 
+        if mesh_data.uv_layers.active is None:
+            result.warnings.append(f'"{mesh_object.name}" has no active UV Map')
+
         # Build a list of non-unique wedges.
         wedges = []
-        for loop_index, loop in enumerate(mesh_data.loops):
-            wedges.append(Psk.Wedge(
-                point_index=loop.vertex_index + vertex_offset,
-                u=uv_layer[loop_index].uv[0],
-                v=1.0 - uv_layer[loop_index].uv[1]
-            ))
+        if mesh_data.uv_layers.active:
+            uv_layer = mesh_data.uv_layers.active.data
+            for loop_index, loop in enumerate(mesh_data.loops):
+                wedges.append(Psk.Wedge(
+                    point_index=loop.vertex_index + vertex_offset,
+                    u=uv_layer[loop_index].uv[0],
+                    v=1.0 - uv_layer[loop_index].uv[1]
+                ))
+        else:
+            for loop_index, loop in enumerate(mesh_data.loops):
+                wedges.append(Psk.Wedge(point_index=loop.vertex_index + vertex_offset, u=0.0, v=0.0))
 
         # Assign material indices to the wedges.
         for triangle in mesh_data.loop_triangles:
@@ -419,10 +425,10 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
     for armature_object, pose_position in original_armature_object_pose_positions.items():
         armature_object.data.pose_position = pose_position
 
-    context.window_manager.progress_end()
-
     # https://github.com/DarklightGames/io_scene_psk_psa/issues/129.
     psk.sort_and_normalize_weights()
+
+    context.window_manager.progress_end()
 
     result.psk = psk
 

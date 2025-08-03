@@ -17,13 +17,18 @@ class Color(Structure):
         yield self.a
 
     def __eq__(self, other):
-        return all(map(lambda x: x[0] == x[1], zip(self, other)))
+        return self.r == other.r and self.g == other.g and self.b == other.b and self.a == other.a
 
     def __repr__(self):
         return repr(tuple(self))
 
     def normalized(self) -> Tuple:
-        return tuple(map(lambda x: x / 255.0, iter(self)))
+        return (
+            self.r / 255.0,
+            self.g / 255.0,
+            self.b / 255.0,
+            self.a / 255.0
+        )
 
 
 class Vector2(Structure):

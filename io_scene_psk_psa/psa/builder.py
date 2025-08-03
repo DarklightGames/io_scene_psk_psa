@@ -30,7 +30,7 @@ class PsaBuildOptions:
         self.animation_data: Optional[AnimData] = None
         self.sequences: List[PsaBuildSequence] = []
         self.bone_filter_mode: str = 'ALL'
-        self.bone_collection_indices: List[Tuple[str, int]] = []
+        self.bone_collection_indices: List[PsaBoneCollectionIndex] = []
         self.sequence_name_prefix: str = ''
         self.sequence_name_suffix: str = ''
         self.scale = 1.0
@@ -39,6 +39,11 @@ class PsaBuildOptions:
         self.forward_axis = 'X'
         self.up_axis = 'Z'
         self.root_bone_name = 'ROOT'
+        self.sequence_source = 'ACTIONS'  # One of ('ACTIONS', 'TIMELINE_MARKERS', 'NLA_STRIPS')
+    
+    @property
+    def bone_collection_primary_key(self) -> str:
+        return 'DATA' if self.sequence_source == 'ACTIVE_ACTION' else 'OBJECT'
 
 
 def _get_pose_bone_location_and_rotation(
@@ -100,8 +105,15 @@ def _get_pose_bone_location_and_rotation(
 def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
     psa = Psa()
 
+    armature_objects_for_bones = options.armature_objects
+    if options.sequence_source == 'ACTIVE_ACTION' and len(options.armature_objects) >= 2:
+        # Make sure that the data-block for all the selected armature objects is the same.
+        if any(map(lambda o: o.data != options.armature_objects[0].data, options.armature_objects[1:])):
+            raise RuntimeError('All armature objects must share the same data-block when exporting from the active action')
+        armature_objects_for_bones = [options.armature_objects[0]]
+
     psx_bone_create_result = create_psx_bones(
-        armature_objects=options.armature_objects,
+        armature_objects=armature_objects_for_bones,
         export_space=options.export_space,
         root_bone_name=options.root_bone_name,
         forward_axis=options.forward_axis,
@@ -109,6 +121,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         scale=options.scale,
         bone_filter_mode=options.bone_filter_mode,
         bone_collection_indices=options.bone_collection_indices,
+        bone_collection_primary_key=options.bone_collection_primary_key,
     )
 
     # Build list of PSA bones.
@@ -145,11 +158,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         frame_extents = abs(frame_end - frame_start)
         frame_count_raw = frame_extents + 1
         frame_count = max(1, max(export_sequence.key_quota, int(frame_count_raw * export_sequence.compression_ratio)))
-
-        try:
-            frame_step = frame_extents / (frame_count - 1)
-        except ZeroDivisionError:
-            frame_step = 0.0
+        frame_step = frame_extents / (frame_count - 1) if frame_count > 1 else 0.0
 
         # If this is a reverse sequence, we need to reverse the frame step.
         if frame_start > frame_end:
@@ -218,9 +227,6 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
             pose_bone = armature_object.pose.bones[psx_bone.name.decode('windows-1252')]
 
             export_bones.append(PsaExportBone(pose_bone, armature_object, armature_scales[armature_object]))
-
-        for export_bone in export_bones:
-            print(export_bone.pose_bone, export_bone.armature_object, export_bone.scale)
 
         match options.sampling_mode:
             case 'INTERPOLATED':
