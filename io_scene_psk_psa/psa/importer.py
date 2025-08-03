@@ -252,6 +252,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             action = bpy.data.actions[action_name]
         else:
             action = bpy.data.actions.new(name=action_name)
+            action.slots.new('OBJECT', armature_object.name)
 
         # Calculate the target FPS.
         match options.fps_source:

@@ -2,6 +2,7 @@ from collections import Counter
 from typing import List, Iterable, Dict, Tuple, cast as typing_cast
 
 import bpy
+import re
 from bpy.props import StringProperty
 from bpy.types import Context, Action, Object, AnimData, TimelineMarker, Operator, Armature
 from bpy_extras.io_utils import ExportHelper
@@ -16,7 +17,6 @@ from .ui import PSA_UL_export_sequences
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from ..writer import write_psa
 from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range, PsxBoneCollection
-from ...shared.semver import SemanticVersion
 from ...shared.ui import draw_bone_filter_mode
 
 
@@ -41,30 +41,18 @@ def is_action_for_object(obj: Object, action: Action):
     if obj is None or obj.animation_data is None or obj.type != 'ARMATURE':
         return False
 
-    version = SemanticVersion(bpy.app.version)
-
-    def is_action_for_object_legacy(action: Action,  obj: Object):
-        """
-        This is the legacy behavior before slotted actions were introduced in Blender 4.4.
-        It would simply check if it had any f-curves that corresponded to any bones in the armature.
-        """
-        import re
-        armature_data = typing_cast(Armature, obj.data)
-        bone_names = set([x.name for x in armature_data.bones])
-        for fcurve in action.fcurves:
-            match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
-            if not match:
-                continue
-            bone_name = match.group(1)
-            if bone_name in bone_names:
-                return True
-        return False
-
-    if version < SemanticVersion((4, 4, 0)):
-        return is_action_for_object_legacy(action, obj)
-
-    # If the object is a part of the slot's user list, then it is a valid action for the object.
-    return any(obj in slot.users() for slot in action.slots)
+    armature_data = typing_cast(Armature, obj.data)
+    bone_names = set([x.name for x in armature_data.bones])
+    
+    for fcurve in action.fcurves:
+        match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
+        if not match:
+            continue
+        bone_name = match.group(1)
+        if bone_name in bone_names:
+            return True
+    
+    return False
 
 
 def update_actions_and_timeline_markers(context: Context, armature_objects: Iterable[Object]):
