@@ -181,11 +181,13 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
         if len(invalid_face_indices) > 0:
             result.warnings.append(f'Discarded {len(invalid_face_indices)} invalid face(s).')
 
+        face_count = len(bm.faces)
+
         bm.to_mesh(mesh_data)
 
         # Texture Coordinates
         uv_layer_data_index = 0
-        uv_layer_data = np.zeros((len(psk.faces) * 3, 2), dtype=np.float32)
+        uv_layer_data = np.zeros((face_count * 3, 2), dtype=np.float32)
         for face_index, face in enumerate(psk.faces):
             if face_index in invalid_face_indices:
                 continue
