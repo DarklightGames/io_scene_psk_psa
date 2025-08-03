@@ -4,6 +4,7 @@ import pytest
 SUZANNE_FILEPATH = 'tests/data/Suzanne.psk'
 SARGE_FILEPATH = 'tests/data/CS_Sarge_S0_Skelmesh.pskx'
 SLURP_MONSTER_AXE_FILEPATH = 'tests/data/Slurp_Monster_Axe_LOD0.psk'
+BAT_FILEPATH = 'tests/data/Bat.psk'
 
 
 @pytest.fixture(autouse=True)
@@ -279,4 +280,10 @@ def test_psk_import_without_shape_keys():
     assert mesh_object is not None, "Mesh object not found in the scene"
     assert mesh_object.type == 'MESH', "Mesh object type should be MESH"
     assert mesh_object.data.shape_keys is None, "Mesh object should not have shape keys"
-    
+
+
+def test_psk_import_with_invalid_faces():
+    assert bpy.ops.psk.import_file(
+        filepath=BAT_FILEPATH,
+        components='MESH'
+        ) == {'FINISHED'}
