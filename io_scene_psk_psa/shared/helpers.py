@@ -1,7 +1,7 @@
 import bpy
 from collections import Counter
 from typing import List, Iterable, Optional, Dict, Tuple, cast as typing_cast
-from bpy.types import Armature, AnimData, Object, ArmatureModifier
+from bpy.types import Armature, AnimData, Collection, Context, Object, ArmatureModifier, SpaceProperties
 from mathutils import Matrix, Vector, Quaternion as BpyQuaternion
 from .data import Vector3, Quaternion
 from ..shared.data import PsxBone
@@ -480,3 +480,23 @@ def get_armatures_for_mesh_objects(mesh_objects: Iterable[Object]):
             if armature_object is not None:
                 armature_objects.add(armature_object)
     yield from armature_objects
+
+
+def get_collection_from_context(context: Context) -> Optional[Collection]:
+    if context.space_data is None or context.space_data.type != 'PROPERTIES':
+        return None
+    space_data = typing_cast(SpaceProperties, context.space_data)
+    if space_data.use_pin_id:
+        return typing_cast(Collection, space_data.pin_id)
+    else:
+        return context.collection
+
+
+def get_collection_export_operator_from_context(context: Context) -> Optional[object]:
+    collection = get_collection_from_context(context)
+    if collection is None or collection.active_exporter_index is None:
+        return None
+    if 0 > collection.active_exporter_index >= len(collection.exporters):
+        return None
+    exporter = collection.exporters[collection.active_exporter_index]
+    return exporter.export_properties

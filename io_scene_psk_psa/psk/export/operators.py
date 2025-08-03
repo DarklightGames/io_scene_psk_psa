@@ -15,7 +15,7 @@ from ..builder import (
     get_psk_input_objects_for_context,
 )
 from ..writer import write_psk
-from ...shared.helpers import PsxBoneCollection, populate_bone_collection_list
+from ...shared.helpers import PsxBoneCollection, get_collection_export_operator_from_context, populate_bone_collection_list
 from ...shared.ui import draw_bone_filter_mode
 
 
@@ -35,29 +35,6 @@ def populate_material_name_list(depsgraph: Depsgraph, mesh_objects: Iterable[Obj
 
 
 
-def get_collection_from_context(context: Context) -> Optional[Collection]:
-    if context.space_data.type != 'PROPERTIES':
-        return None
-
-    space_data = typing_cast(SpaceProperties, context.space_data)
-
-    if space_data.use_pin_id:
-        return typing_cast(Collection, space_data.pin_id)
-    else:
-        return context.collection
-
-
-def get_collection_export_operator_from_context(context: Context) -> Optional[object]:
-    collection = get_collection_from_context(context)
-    if collection is None:
-        return None
-    if 0 > collection.active_exporter_index >= len(collection.exporters):
-        return None
-    exporter = collection.exporters[collection.active_exporter_index]
-    # TODO: make sure this is actually an ASE exporter.
-    return exporter.export_properties
-
-
 class PSK_OT_bone_collection_list_populate(Operator):
     bl_idname = 'psk.bone_collection_list_populate'
     bl_label = 'Populate Bone Collection List'
@@ -68,6 +45,9 @@ class PSK_OT_bone_collection_list_populate(Operator):
         export_operator = get_collection_export_operator_from_context(context)
         if export_operator is None:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
+            return {'CANCELLED'}
+        if context.collection is None:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'No active collection')
             return {'CANCELLED'}
         try:
             input_objects = get_psk_input_objects_for_collection(context.collection)
