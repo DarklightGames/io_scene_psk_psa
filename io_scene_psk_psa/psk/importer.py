@@ -201,7 +201,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
         if psk.has_extra_uvs and options.should_import_extra_uvs:
             extra_uv_channel_count = int(len(psk.extra_uvs) / len(psk.wedges))
             wedge_index_offset = 0
-            uv_layer_data = np.zeros((len(psk.faces) * 3, 2), dtype=np.float32)
+            uv_layer_data = np.zeros((face_count * 3, 2), dtype=np.float32)
             for extra_uv_index in range(extra_uv_channel_count):
                 uv_layer_data_index = 0
                 for face_index, face in enumerate(psk.faces):
