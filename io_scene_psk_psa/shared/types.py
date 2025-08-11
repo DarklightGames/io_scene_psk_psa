@@ -94,14 +94,7 @@ def up_axis_update(self, __context):
         self.forward_axis = next((axis for axis in axis_identifiers if axis != self.up_axis), 'X')
 
 
-class TransformMixin:
-    scale: FloatProperty(
-        name='Scale',
-        default=1.0,
-        description='Scale factor to apply to all location data',
-        soft_min=0.0,
-        soft_max=100.0
-    )
+class AxisMixin:
     forward_axis: EnumProperty(
         name='Forward',
         items=forward_items,
@@ -113,6 +106,16 @@ class TransformMixin:
         items=up_items,
         default='Z',
         update=up_axis_update
+    )
+
+
+class TransformMixin(AxisMixin):
+    scale: FloatProperty(
+        name='Scale',
+        default=1.0,
+        description='Scale factor to apply to all location data',
+        soft_min=0.0,
+        soft_max=100.0
     )
 
 
