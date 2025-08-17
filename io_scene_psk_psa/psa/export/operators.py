@@ -35,7 +35,7 @@ def get_sequences_propnames_from_source(sequence_source: str) -> Tuple[str, str]
 
 
 def is_action_for_object(obj: Object, action: Action):
-    if action is None or len(action.fcurves) == 0:
+    if len(action.fcurves) == 0:
         return False
 
     if obj is None or obj.animation_data is None or obj.type != 'ARMATURE':
@@ -43,14 +43,18 @@ def is_action_for_object(obj: Object, action: Action):
 
     armature_data = typing_cast(Armature, obj.data)
     bone_names = set([x.name for x in armature_data.bones])
-    
-    for fcurve in action.fcurves:
-        match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
-        if not match:
-            continue
-        bone_name = match.group(1)
-        if bone_name in bone_names:
-            return True
+
+    # The nesting here is absolutely bonkers.
+    for layer in action.layers:
+        for strip in layer.strips:
+            for channelbag in strip.channelbags:
+                for fcurve in channelbag.fcurves:
+                    match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
+                    if not match:
+                        continue
+                    bone_name = match.group(1)
+                    if bone_name in bone_names:
+                        return True
     
     return False
 
