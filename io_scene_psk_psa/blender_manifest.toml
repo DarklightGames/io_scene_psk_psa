@@ -7,7 +7,7 @@ maintainer = "Colin Basnett <cmbasnett@gmail.com>"
 type = "add-on"
 website = "https://github.com/DarklightGames/io_scene_psk_psa/"
 tags = ["Game Engine", "Import-Export"]
-blender_version_min = "4.2.0"
+blender_version_min = "4.4.0"
 # Optional: maximum supported Blender version
 # blender_version_max = "5.1.0"
 license = [
