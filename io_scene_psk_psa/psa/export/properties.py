@@ -262,10 +262,14 @@ def filter_sequences(pg: PSA_PG_export, sequences) -> List[int]:
     return flt_flags
 
 
-classes = (
+_classes = (
     PSA_PG_export_action_list_item,
     PSA_PG_export_timeline_markers,
     PSA_PG_export_nla_strip_list_item,
     PSA_PG_export_active_action_list_item,
     PSA_PG_export,
 )
+
+from bpy.utils import register_classes_factory
+register, unregister = register_classes_factory(_classes)
+

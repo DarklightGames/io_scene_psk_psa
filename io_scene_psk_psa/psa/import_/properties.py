@@ -175,9 +175,12 @@ def get_visible_sequences(pg: PSA_PG_import, sequences) -> List[PSA_PG_import_ac
     return visible_sequences
 
 
-classes = (
+_classes = (
     PSA_PG_import_action_list_item,
     PSA_PG_bone,
     PSA_PG_data,
     PSA_PG_import,
 )
+
+from bpy.utils import register_classes_factory
+register, unregister = register_classes_factory(_classes)

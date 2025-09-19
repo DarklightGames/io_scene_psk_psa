@@ -52,6 +52,10 @@ class PSA_UL_export_sequences(UIList):
         return flt_flags, flt_neworder
 
 
-classes = (
+_classes = (
     PSA_UL_export_sequences,
 )
+
+from bpy.utils import register_classes_factory
+register, unregister = register_classes_factory(_classes)
+

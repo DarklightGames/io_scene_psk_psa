@@ -658,10 +658,14 @@ class PSA_OT_export_bone_collections_deselect_all(Operator):
         return {'FINISHED'}
 
 
-classes = (
+_classes = (
     PSA_OT_export,
     PSA_OT_export_actions_select_all,
     PSA_OT_export_actions_deselect_all,
     PSA_OT_export_bone_collections_select_all,
     PSA_OT_export_bone_collections_deselect_all,
 )
+
+from bpy.utils import register_classes_factory
+register, unregister = register_classes_factory(_classes)
+

@@ -438,7 +438,7 @@ class PSA_FH_import(FileHandler):  # TODO: rename and add handling for PSA expor
         return context.area and context.area.type == 'VIEW_3D'
 
 
-classes = (
+_classes = (
     PSA_OT_import_sequences_select_all,
     PSA_OT_import_sequences_deselect_all,
     PSA_OT_import_sequences_select_from_text,
@@ -447,3 +447,6 @@ classes = (
     PSA_OT_import_drag_and_drop,
     PSA_FH_import,
 )
+
+from bpy.utils import register_classes_factory
+register, unregister = register_classes_factory(_classes)

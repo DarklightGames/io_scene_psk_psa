@@ -509,7 +509,7 @@ class PSK_OT_export(Operator, ExportHelper):
         return {'FINISHED'}
 
 
-classes = (
+_classes = (
     PSK_OT_material_list_move_up,
     PSK_OT_material_list_move_down,
     PSK_OT_export,
@@ -521,3 +521,6 @@ classes = (
     PSK_OT_material_list_name_move_down,
     PSK_OT_material_list_name_add,
 )
+
+from bpy.utils import register_classes_factory
+register, unregister = register_classes_factory(_classes)

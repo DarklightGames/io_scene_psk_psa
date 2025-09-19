@@ -145,6 +145,10 @@ class PskImportMixin:
     )
 
 
-classes = (
+_classes = (
     PSX_PG_material,
 )
+
+from bpy.utils import register_classes_factory
+register, unregister = register_classes_factory(_classes)
+

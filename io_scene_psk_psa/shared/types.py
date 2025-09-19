@@ -154,10 +154,13 @@ class PSX_PG_scene_export(PropertyGroup, TransformMixin):
     pass
 
 
-classes = (
+_classes = (
     PSX_PG_scene_export,
     PSX_PG_action_export,
     PSX_PG_bone_collection_list_item,
     PSX_UL_bone_collection_list,
     PSX_PT_action,
 )
+
+from bpy.utils import register_classes_factory
+register, unregister = register_classes_factory(_classes)

@@ -67,8 +67,12 @@ class PSK_PG_export(PropertyGroup, PskExportMixin):
     pass
 
 
-classes = (
+_classes = (
     PSK_PG_material_list_item,
     PSK_PG_material_name_list_item,
     PSK_PG_export,
 )
+
+from bpy.utils import register_classes_factory
+register, unregister = register_classes_factory(_classes)
+

@@ -42,8 +42,11 @@ class PSA_UL_import_actions(PSA_UL_sequences_mixin):
     pass
 
 
-classes = (
+_classes = (
     PSA_UL_sequences,
     PSA_UL_import_sequences,
     PSA_UL_import_actions,
 )
+
+from bpy.utils import register_classes_factory
+register, unregister = register_classes_factory(_classes)

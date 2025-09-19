@@ -50,6 +50,10 @@ class PSX_PT_scene(Panel):
             flow.prop(psx_export, 'up_axis')
 
 
-classes = (
+_classes = (
     PSX_PT_scene,
 )
+
+from bpy.utils import register_classes_factory
+register, unregister = register_classes_factory(_classes)
+

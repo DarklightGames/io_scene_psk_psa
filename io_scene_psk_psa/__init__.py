@@ -1,6 +1,41 @@
 from bpy.app.handlers import persistent
 
-if 'bpy' in locals():
+from .shared import data as shared_data, types as shared_types, helpers as shared_helpers
+from .shared import dfs as shared_dfs, ui as shared_ui
+from .psk import (
+    builder as psk_builder,
+    data as psk_data,
+    importer as psk_importer,
+    properties as psk_properties,
+    writer as psk_writer,
+)
+from .psk import reader as psk_reader, ui as psk_ui
+from .psk.export import (
+    operators as psk_export_operators,
+    properties as psk_export_properties,
+    ui as psk_export_ui,
+)
+from .psk.import_ import operators as psk_import_operators
+
+from .psa import (
+    config as psa_config,
+    data as psa_data,
+    writer as psa_writer,
+    reader as psa_reader,
+    builder as psa_builder,
+    importer as psa_importer,
+)
+from .psa.export import (
+    properties as psa_export_properties,
+    ui as psa_export_ui,
+    operators as psa_export_operators,
+)
+from .psa.import_ import operators as psa_import_operators
+from .psa.import_ import ui as psa_import_ui, properties as psa_import_properties
+
+_needs_reload = 'bpy' in locals()
+
+if _needs_reload:
     import importlib
 
     importlib.reload(shared_data)
@@ -33,57 +68,9 @@ if 'bpy' in locals():
     importlib.reload(psa_import_properties)
     importlib.reload(psa_import_operators)
     importlib.reload(psa_import_ui)
-else:
-    from .shared import data as shared_data, types as shared_types, helpers as shared_helpers
-    from .shared import dfs as shared_dfs, ui as shared_ui
-    from .psk import (
-        builder as psk_builder,
-        data as psk_data,
-        importer as psk_importer,
-        properties as psk_properties,
-        writer as psk_writer,
-    )
-    from .psk import reader as psk_reader, ui as psk_ui
-    from .psk.export import (
-        operators as psk_export_operators,
-        properties as psk_export_properties,
-        ui as psk_export_ui,
-    )
-    from .psk.import_ import operators as psk_import_operators
-
-    from .psa import (
-        config as psa_config,
-        data as psa_data,
-        writer as psa_writer,
-        reader as psa_reader,
-        builder as psa_builder,
-        importer as psa_importer,
-    )
-    from .psa.export import (
-        properties as psa_export_properties,
-        ui as psa_export_ui,
-        operators as psa_export_operators,
-    )
-    from .psa.import_ import operators as psa_import_operators
-    from .psa.import_ import ui as psa_import_ui, properties as psa_import_properties
 
 import bpy
 from bpy.props import PointerProperty
-
-classes = shared_types.classes + \
-          shared_ui.classes + \
-          psk_properties.classes + \
-          psk_ui.classes + \
-          psk_import_operators.classes + \
-          psk_export_properties.classes + \
-          psk_export_operators.classes + \
-          psk_export_ui.classes + \
-          psa_export_properties.classes + \
-          psa_export_operators.classes + \
-          psa_export_ui.classes + \
-          psa_import_properties.classes + \
-          psa_import_operators.classes + \
-          psa_import_ui.classes
 
 
 def psk_export_menu_func(self, context):
@@ -102,9 +89,26 @@ def psa_import_menu_func(self, context):
     self.layout.operator(psa_import_operators.PSA_OT_import.bl_idname, text='Unreal PSA (.psa)')
 
 
+_modules = (
+    shared_types,
+    shared_ui,
+    psk_properties,
+    psk_ui,
+    psk_import_operators,
+    psk_export_properties,
+    psk_export_operators,
+    psk_export_ui,
+    psa_export_properties,
+    psa_export_operators,
+    psa_export_ui,
+    psa_import_properties,
+    psa_import_operators,
+    psa_import_ui
+)
+
 def register():
-    for cls in classes:
-        bpy.utils.register_class(cls)
+    for module in _modules:
+        module.register()
     bpy.types.TOPBAR_MT_file_export.append(psk_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.append(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.append(psa_export_menu_func)
@@ -128,8 +132,8 @@ def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.remove(psa_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.remove(psa_import_menu_func)
-    for cls in reversed(classes):
-        bpy.utils.unregister_class(cls)
+    for module in reversed(_modules):
+        module.unregister()
 
 
 if __name__ == '__main__':

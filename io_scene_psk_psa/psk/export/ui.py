@@ -10,6 +10,9 @@ class PSK_UL_material_names(UIList):
         row.prop(item, 'material_name', text='', emboss=False, icon_value=icon_value, icon='BLANK1' if icon_value == 0 else 'NONE')
 
 
-classes = (
+_classes = (
     PSK_UL_material_names,
 )
+
+from bpy.utils import register_classes_factory
+register, unregister = register_classes_factory(_classes)
