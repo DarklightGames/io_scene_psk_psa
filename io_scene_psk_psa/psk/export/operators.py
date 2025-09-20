@@ -3,7 +3,7 @@ from typing import Iterable, List, Optional, cast as typing_cast
 
 import bpy
 from bpy.props import BoolProperty, StringProperty
-from bpy.types import Collection, Context, Depsgraph, Material, Object, Operator, SpaceProperties, Scene
+from bpy.types import Context, Depsgraph, Material, Object, Operator, Scene
 from bpy_extras.io_utils import ExportHelper
 
 from .properties import PskExportMixin
@@ -91,6 +91,7 @@ class PSK_OT_populate_material_name_list(Operator):
             self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
             return {'CANCELLED'}
         depsgraph = context.evaluated_depsgraph_get()
+        assert context.collection
         input_objects = get_psk_input_objects_for_collection(context.collection)
         try:
             populate_material_name_list(depsgraph, [x.obj for x in input_objects.mesh_dfs_objects], export_operator.material_name_list)
@@ -115,6 +116,7 @@ class PSK_OT_material_list_name_add(Operator):
     name: StringProperty(search=material_list_names_search_cb, name='Material Name', default='None')
 
     def invoke(self, context, event):
+        assert context.window_manager
         return context.window_manager.invoke_props_dialog(self)
 
     def execute(self, context):
@@ -266,7 +268,10 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
     collection: StringProperty(options={'HIDDEN'})
 
     def execute(self, context):
-        collection = bpy.data.collections.get(self.collection)
+        collection = bpy.data.collections.get(self.collection, None)
+
+        if collection is not None:
+            return {'CANCELLED'}
 
         try:
             input_objects = get_psk_input_objects_for_collection(collection)
@@ -294,6 +299,8 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
 
     def draw(self, context: Context):
         layout = self.layout
+
+        assert layout is not None
 
         flow = layout.grid_flow(row_major=True)
         flow.use_property_split = True
@@ -376,6 +383,8 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
                     flow.enabled = False
                 case 'CUSTOM':
                     transform_source = self
+                case _:
+                    assert False, f'Invalid transform source: {self.transform_source}'
         
             flow.prop(transform_source, 'scale')
             flow.prop(transform_source, 'forward_axis')
@@ -414,12 +423,15 @@ class PSK_OT_export(Operator, ExportHelper):
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
+        assert context.window_manager
         context.window_manager.fileselect_add(self)
 
         return {'RUNNING_MODAL'}
 
     def draw(self, context):
         layout = self.layout
+
+        assert layout
 
         pg = getattr(context.scene, 'psk_export')
 
@@ -489,6 +501,8 @@ class PSK_OT_export(Operator, ExportHelper):
 
     def execute(self, context):
         pg = getattr(context.scene, 'psk_export')
+
+        assert context.scene
 
         input_objects = get_psk_input_objects_for_context(context)
         options = get_psk_build_options_from_property_group(context.scene, pg)

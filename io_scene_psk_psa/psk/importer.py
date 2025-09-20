@@ -62,6 +62,9 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
     armature_object = None
     mesh_object = None
 
+    assert context.scene
+    assert bpy.context.view_layer
+
     if options.should_import_armature:
         # Armature
         armature_data = bpy.data.armatures.new(name)

@@ -13,6 +13,7 @@ from ..reader import PsaReader
 
 
 def psa_import_poll(cls, context: Context):
+    assert context.view_layer and context.view_layer.objects.active
     active_object = context.view_layer.objects.active
     if active_object is None or active_object.type != 'ARMATURE':
         cls.poll_message_set('The active object must be an armature')
@@ -32,10 +33,12 @@ class PSA_OT_import_sequences_select_from_text(Operator):
         return len(pg.sequence_list) > 0
 
     def invoke(self, context, event):
+        assert context.window_manager
         return context.window_manager.invoke_props_dialog(self, width=256)
 
     def draw(self, context):
         layout = self.layout
+        assert layout
         pg = getattr(context.scene, 'psa_import')
         layout.label(icon='INFO', text='Each sequence name should be on a new line.')
         layout.prop(pg, 'select_text', text='')
@@ -134,6 +137,8 @@ class PSA_OT_import_drag_and_drop(Operator, PsaImportMixin):
         warnings = []
         sequences_count = 0
 
+        assert context.view_layer and context.view_layer.objects.active
+
         for file in self.files:
             psa_path = str(os.path.join(self.directory, file.name))
             psa_reader = PsaReader(psa_path)
@@ -157,12 +162,14 @@ class PSA_OT_import_drag_and_drop(Operator, PsaImportMixin):
 
     def invoke(self, context: Context, event):
         # Make sure the selected object is an obj.
+        assert context.view_layer and context.view_layer.objects.active
         active_object = context.view_layer.objects.active
         if active_object is None or active_object.type != 'ARMATURE':
             self.report({'ERROR_INVALID_CONTEXT'}, 'The active object must be an armature')
             return {'CANCELLED'}
 
         # Show the import operator properties in a pop-up dialog (do not use the file selector).
+        assert context.window_manager
         context.window_manager.invoke_props_dialog(self)
         return {'RUNNING_MODAL'}
 
@@ -250,6 +257,8 @@ class PSA_OT_import_all(Operator, PsaImportMixin):
             translation_scale=self.translation_scale
         )
 
+        assert context.view_layer
+        assert context.view_layer.objects.active
         result = _import_psa(context, options, self.filepath, context.view_layer.objects.active)
 
         if len(result.warnings) > 0:
@@ -308,12 +317,13 @@ class PSA_OT_import(Operator, ImportHelper, PsaImportMixin):
     def invoke(self, context: Context, event: Event):
         # Attempt to load the PSA file for the pre-selected file.
         load_psa_file(context, self.filepath)
-
+        assert context.window_manager
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
     def draw(self, context: Context):
         layout = self.layout
+        assert layout
         pg = getattr(context.scene, 'psa_import')
 
         sequences_header, sequences_panel = layout.panel('sequences_panel_id', default_closed=False)
@@ -434,8 +444,8 @@ class PSA_FH_import(FileHandler):  # TODO: rename and add handling for PSA expor
     bl_file_extensions = '.psa'
 
     @classmethod
-    def poll_drop(cls, context: Context):
-        return context.area and context.area.type == 'VIEW_3D'
+    def poll_drop(cls, context: Context) -> bool:
+        return context.area is not None and context.area.type == 'VIEW_3D'
 
 
 _classes = (

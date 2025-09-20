@@ -1,7 +1,7 @@
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import Armature, Collection, Context, Depsgraph, Object, ArmatureModifier
+from bpy.types import Armature, Collection, Context, Depsgraph, Object, ArmatureModifier, Mesh
 from mathutils import Matrix
 from typing import Dict, Iterable, List, Optional, Set, cast as typing_cast
 from .data import Psk
@@ -94,9 +94,9 @@ def get_psk_input_objects_for_collection(collection: Collection) -> PskInputObje
 
 
 class PskBuildResult(object):
-    def __init__(self):
-        self.psk = None
-        self.warnings: List[str] = []
+    def __init__(self, psk: Psk, warnings: list[str]):
+        self.psk: Psk = psk
+        self.warnings: List[str] = warnings
 
 
 def _get_mesh_export_space_matrix(armature_object: Optional[Object], export_space: str) -> Matrix:
@@ -137,9 +137,12 @@ def _get_material_name_indices(obj: Object, material_names: List[str]) -> Iterab
 
 
 def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuildOptions) -> PskBuildResult:
+
+    assert context.window_manager
+
     armature_objects = list(input_objects.armature_objects)
 
-    result = PskBuildResult()
+    warnings: list[str] = []
     psk = Psk()
 
     psx_bone_create_result = create_psx_bones(
@@ -208,7 +211,8 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
     # Temporarily force the armature into the rest position.
     # We will undo this later.
     for armature_object in armature_objects:
-        armature_object.data.pose_position = 'REST'
+        armature_data = typing_cast(Armature, armature_object.data)
+        armature_data.pose_position = 'REST'
 
     material_names = [m.name if m is not None else 'None' for m in materials]
 
@@ -232,7 +236,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         match options.object_eval_state:
             case 'ORIGINAL':
                 mesh_object = obj
-                mesh_data = obj.data
+                mesh_data = typing_cast(Mesh, obj.data)
             case 'EVALUATED':
                 # Create a copy of the mesh object after non-armature modifiers are applied.
                 depsgraph = context.evaluated_depsgraph_get()
@@ -299,7 +303,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         mesh_data.calc_loop_triangles()
 
         if mesh_data.uv_layers.active is None:
-            result.warnings.append(f'"{mesh_object.name}" has no active UV Map')
+            warnings.append(f'"{mesh_object.name}" has no active UV Map')
 
         # Build a list of non-unique wedges.
         wedges = []
@@ -423,13 +427,12 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
     # Restore the original pose position of the armature objects.
     for armature_object, pose_position in original_armature_object_pose_positions.items():
-        armature_object.data.pose_position = pose_position
+        armature_data = typing_cast(Armature, armature_object.data)
+        armature_data.pose_position = pose_position
 
     # https://github.com/DarklightGames/io_scene_psk_psa/issues/129.
     psk.sort_and_normalize_weights()
 
     context.window_manager.progress_end()
 
-    result.psk = psk
-
-    return result
+    return PskBuildResult(psk, warnings)

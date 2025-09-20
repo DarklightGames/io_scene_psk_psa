@@ -145,6 +145,9 @@ def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, frame_step:
 
 
 def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object, options: PsaImportOptions) -> PsaImportResult:
+
+    assert context.window_manager
+
     result = PsaImportResult()
     sequences = [psa_reader.sequences[x] for x in options.sequence_names]
     armature_data = typing_cast(Armature, armature_object.data)
@@ -259,6 +262,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             case 'CUSTOM':
                 target_fps = options.fps_custom
             case 'SCENE':
+                assert context.scene
                 target_fps = context.scene.render.fps
             case 'SEQUENCE':
                 target_fps = sequence.fps

@@ -103,6 +103,10 @@ def _get_pose_bone_location_and_rotation(
 
 
 def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
+
+    assert context.scene
+    assert context.window_manager
+
     psa = Psa()
 
     armature_objects_for_bones = options.armature_objects
@@ -224,6 +228,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
                 export_bones.append(PsaExportBone(None, None, Vector((1.0, 1.0, 1.0))))
                 continue
 
+            assert armature_object.pose
             pose_bone = armature_object.pose.bones[psx_bone.name.decode('windows-1252')]
 
             export_bones.append(PsaExportBone(pose_bone, armature_object, armature_scales[armature_object]))
@@ -321,6 +326,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
 
     # Restore the previous actions & frame.
     for armature_object, action in saved_armature_object_actions.items():
+        assert armature_object.animation_data
         armature_object.animation_data.action = action
 
     context.scene.frame_set(saved_frame_current)

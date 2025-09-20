@@ -9,6 +9,7 @@ from ..importer import PskImportOptions, import_psk
 from ..properties import PskImportMixin
 from ..reader import read_psk
 
+
 def get_psk_import_options_from_properties(property_group: PskImportMixin):
     options = PskImportOptions()
     options.should_import_mesh = property_group.should_import_mesh
@@ -109,6 +110,7 @@ class PSK_OT_import(Operator, ImportHelper, PskImportMixin):
         return {'FINISHED'}
 
     def draw(self, context):
+        assert self.layout
         psk_import_draw(self.layout, self)
 
 
@@ -122,13 +124,15 @@ class PSK_OT_import_drag_and_drop(Operator, PskImportMixin):
     files: CollectionProperty(type=OperatorFileListElement, options={'SKIP_SAVE', 'HIDDEN'})
 
     @classmethod
-    def poll(cls, context):
-        return context.area and context.area.type == 'VIEW_3D'
+    def poll(cls, context) -> bool:
+        return context.area is not None and context.area.type == 'VIEW_3D'
 
     def draw(self, context):
+        assert self.layout
         psk_import_draw(self.layout, self)
 
     def invoke(self, context, event):
+        assert context.window_manager
         context.window_manager.invoke_props_dialog(self)
         return {'RUNNING_MODAL'}
 
@@ -167,8 +171,8 @@ class PSK_FH_import(FileHandler):
     bl_file_extensions = '.psk;.pskx'
 
     @classmethod
-    def poll_drop(cls, context: Context):
-        return context.area and context.area.type == 'VIEW_3D'
+    def poll_drop(cls, context: Context) -> bool:
+        return context.area is not None and context.area.type == 'VIEW_3D'
 
 
 _classes = (

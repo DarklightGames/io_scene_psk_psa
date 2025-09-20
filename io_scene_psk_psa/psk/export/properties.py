@@ -52,7 +52,7 @@ class PskExportMixin(ExportSpaceMixin, TransformMixin, PsxBoneExportMixin):
     material_name_list: CollectionProperty(type=PSK_PG_material_name_list_item)
     material_name_list_index: IntProperty(default=0)
     should_export_vertex_normals: BoolProperty(
-        'Export Vertex Normals',
+        name='Export Vertex Normals',
         default=False,
         description='Export VTXNORMS section.'
     )

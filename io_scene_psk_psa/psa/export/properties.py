@@ -132,6 +132,7 @@ sampling_mode_items = (
 
 def sequence_source_update_cb(self: 'PSA_PG_export', context: Context) -> None:
     armature_objects = []
+    assert context.view_layer
     for dfs_object in dfs_view_layer_objects(context.view_layer):
         if dfs_object.obj.type == 'ARMATURE' and dfs_object.is_selected:
             armature_objects.append(dfs_object.obj)

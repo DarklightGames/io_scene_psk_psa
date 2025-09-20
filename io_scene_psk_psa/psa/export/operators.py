@@ -461,6 +461,9 @@ class PSA_OT_export(Operator, ExportHelper):
 
         if animation_data is None:
             raise RuntimeError(f'No animation data for object \'{animation_data_object.name}\'')
+        
+        if context.active_object is None:
+            raise RuntimeError('No active object')
 
         export_sequences: List[PsaBuildSequence] = []
 

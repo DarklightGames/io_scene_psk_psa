@@ -15,6 +15,7 @@ class PSK_PT_material(Panel):
 
     def draw(self, context):
         layout = self.layout
+        assert layout is not None
         layout.use_property_split = True
         layout.use_property_decorate = False
         material = context.material
