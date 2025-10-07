@@ -8,7 +8,7 @@ from bpy_extras.io_utils import ImportHelper
 
 from .properties import PsaImportMixin, get_visible_sequences
 from ..config import read_psa_config
-from ..importer import PsaImportOptions, import_psa
+from ..importer import BoneMapping, PsaImportOptions, import_psa
 from ..reader import PsaReader
 
 
@@ -188,7 +188,10 @@ def psa_import_options_from_property_group(pg: PsaImportMixin, sequence_names: I
     options.should_write_metadata = pg.should_write_metadata
     options.should_write_keyframes = pg.should_write_keyframes
     options.should_convert_to_samples = pg.should_convert_to_samples
-    options.bone_mapping_mode = pg.bone_mapping_mode
+    options.bone_mapping = BoneMapping(
+        is_case_sensitive=pg.bone_mapping_is_case_sensitive,
+        should_ignore_trailing_whitespace=pg.bone_mapping_should_ignore_trailing_whitespace
+    )
     options.fps_source = pg.fps_source
     options.fps_custom = pg.fps_custom
     options.translation_scale = pg.translation_scale
@@ -243,7 +246,10 @@ class PSA_OT_import_all(Operator, PsaImportMixin):
 
         options = PsaImportOptions(
             action_name_prefix=self.action_name_prefix,
-            bone_mapping_mode=self.bone_mapping_mode,
+            bone_mapping=BoneMapping(
+                is_case_sensitive=self.bone_mapping_is_case_sensitive,
+                should_ignore_trailing_whitespace=self.bone_mapping_should_ignore_trailing_whitespace
+            ),
             fps_custom=self.fps_custom,
             fps_source=self.fps_source,
             sequence_names=sequence_names,
@@ -380,10 +386,14 @@ class PSA_OT_import(Operator, ImportHelper, PsaImportMixin):
         advanced_header.label(text='Advanced')
 
         if advanced_panel:
-            col = advanced_panel.column()
-            col.use_property_split = True
-            col.use_property_decorate = False
-            col.prop(self, 'bone_mapping_mode')
+            bone_mapping_header, bone_mapping_panel = layout.panel('bone_mapping_id', default_closed=False)
+            bone_mapping_header.label(text='Bone Mapping')
+            if bone_mapping_panel:
+                col = bone_mapping_panel.column()
+                col.use_property_split = True
+                col.use_property_decorate = False
+                col.prop(self, 'bone_mapping_is_case_sensitive')
+                col.prop(self, 'bone_mapping_should_ignore_trailing_whitespace')
 
             col = advanced_panel.column()
             col.use_property_split = True
@@ -422,10 +432,15 @@ def draw_psa_import_options_no_panels(layout, pg: PsaImportMixin):
         col.use_property_decorate = False
         col.prop(pg, 'should_convert_to_samples')
 
+    col = layout.column(heading='Bone Mapping')
+    col.use_property_split = True
+    col.use_property_decorate = False
+    col.prop(pg, 'bone_mapping_is_case_sensitive')
+    col.prop(pg, 'bone_mapping_should_ignore_trailing_whitespace')
+
     col = layout.column()
     col.use_property_split = True
     col.use_property_decorate = False
-    col.prop(pg, 'bone_mapping_mode')
     col.prop(pg, 'translation_scale')
 
     col = layout.column(heading='Options')

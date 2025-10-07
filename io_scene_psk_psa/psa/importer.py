@@ -2,6 +2,7 @@ from typing import Sequence, Iterable, List, Optional, cast as typing_cast
 
 import bpy
 import numpy as np
+import re
 from bpy.types import Armature, Context, FCurve, Object, Bone, PoseBone
 from mathutils import Vector, Quaternion
 
@@ -9,11 +10,22 @@ from .config import PsaConfig, REMOVE_TRACK_LOCATION, REMOVE_TRACK_ROTATION
 from .reader import PsaReader
 from ..shared.data import PsxBone
 
+class BoneMapping:
+    def __init__(self,
+                 is_case_sensitive: bool = False,
+                 should_ignore_trailing_whitespace: bool = True
+                 ):
+        self.is_case_sensitive = is_case_sensitive
+        # Ancient PSK and PSA exporters would, for some reason, pad the bone names with spaces
+        # instead of just writing null bytes, probably because the programmers were lazy.
+        # By default, we will ignore trailing whitespace when doing comparisons.
+        self.should_ignore_trailing_whitespace = should_ignore_trailing_whitespace
+
 
 class PsaImportOptions(object):
     def __init__(self,
                  action_name_prefix: str = '',
-                 bone_mapping_mode: str = 'CASE_INSENSITIVE',
+                 bone_mapping: BoneMapping = BoneMapping(),
                  fps_custom: float = 30.0,
                  fps_source: str = 'SEQUENCE',
                  psa_config: PsaConfig = PsaConfig(),
@@ -28,7 +40,7 @@ class PsaImportOptions(object):
                  translation_scale: float = 1.0
                  ):
         self.action_name_prefix = action_name_prefix
-        self.bone_mapping_mode = bone_mapping_mode
+        self.bone_mapping = bone_mapping
         self.fps_custom = fps_custom
         self.fps_source = fps_source
         self.psa_config = psa_config
@@ -78,20 +90,30 @@ class PsaImportResult:
         self.warnings: List[str] = []
 
 
-def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_names: List[str], bone_mapping_mode: str = 'EXACT') -> Optional[int]:
+def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_names: List[str], bone_mapping: BoneMapping) -> Optional[int]:
     """
     @param psa_bone_name: The name of the PSA bone.
     @param armature_bone_names: The names of the bones in the armature.
-    @param bone_mapping_mode: One of `['EXACT', 'CASE_INSENSITIVE']`.
+    @param bone_mapping: Bone mapping information.
     @return: The index of the armature bone that corresponds to the given PSA bone, or None if no such bone exists.
     """
+    # Use regular expressions for bone name matching.
+    pattern = psa_bone_name
+    flags = 0
+
+    if bone_mapping.should_ignore_trailing_whitespace:
+        psa_bone_name = psa_bone_name.rstrip()
+        pattern += r'\s*'
+    
+    if not bone_mapping.is_case_sensitive:
+        flags = re.IGNORECASE
+    
+    pattern = re.compile(pattern, flags)
+
     for armature_bone_index, armature_bone_name in enumerate(armature_bone_names):
-        if bone_mapping_mode == 'CASE_INSENSITIVE':
-            if armature_bone_name.lower() == psa_bone_name.lower():
-                return armature_bone_index
-        else:
-            if armature_bone_name == psa_bone_name:
-                return armature_bone_index
+        if re.fullmatch(pattern, armature_bone_name):
+            return armature_bone_index
+
     return None
 
 
@@ -161,7 +183,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
     for psa_bone_index, psa_bone in enumerate(psa_reader.bones):
         psa_bone_name: str = psa_bone.name.decode('windows-1252')
-        armature_bone_index = _get_armature_bone_index_for_psa_bone(psa_bone_name, armature_bone_names, options.bone_mapping_mode)
+        armature_bone_index = _get_armature_bone_index_for_psa_bone(psa_bone_name, armature_bone_names, options.bone_mapping)
         if armature_bone_index is not None:
             # Ensure that no other PSA bone has been mapped to this armature bone yet.
             if armature_bone_index not in armature_to_psa_bone_indices:

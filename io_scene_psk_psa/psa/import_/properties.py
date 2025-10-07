@@ -80,12 +80,13 @@ class PsaImportMixin:
         description='Convert keyframes to read-only samples. '
                     'Recommended if you do not plan on editing the actions directly'
     )
-    bone_mapping_mode: EnumProperty(
-        name='Bone Mapping',
-        options=set(),
-        description='The method by which bones from the incoming PSA file are mapped to the armature',
-        items=bone_mapping_items,
-        default='CASE_INSENSITIVE'
+    bone_mapping_is_case_sensitive: BoolProperty(
+        default=False,
+        name='Case Sensitive'
+        )
+    bone_mapping_should_ignore_trailing_whitespace: BoolProperty(
+        default=True,
+        name='Ignore Trailing Whitespace'
     )
     fps_source: EnumProperty(name='FPS Source', items=fps_source_items)
     fps_custom: FloatProperty(
