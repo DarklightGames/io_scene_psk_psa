@@ -179,7 +179,6 @@ _classes = (
     PSK_OT_import,
     PSK_OT_import_drag_and_drop,
     PSK_FH_import,
-    PSK_OT_create_bones_from_selected_objects,
 )
 
 from bpy.utils import register_classes_factory
