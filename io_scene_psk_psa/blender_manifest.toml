@@ -1,6 +1,6 @@
 schema_version = "1.0.0"
 id = "io_scene_psk_psa"
-version = "8.2.1"
+version = "8.2.2"
 name = "Unreal PSK/PSA (.psk/.psa)"
 tagline = "Import and export PSK and PSA files used in Unreal Engine"
 maintainer = "Colin Basnett <cmbasnett@gmail.com>"
