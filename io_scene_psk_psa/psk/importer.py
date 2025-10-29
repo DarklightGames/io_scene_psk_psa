@@ -53,7 +53,7 @@ class PskImportResult:
         self.mesh_object: Optional[Object] = None
 
     @property
-    def root_object(self) -> Object:
+    def root_object(self) -> Optional[Object]:
         return self.armature_object if self.armature_object is not None else self.mesh_object
 
 

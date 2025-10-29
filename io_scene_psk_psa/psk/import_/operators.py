@@ -1,9 +1,13 @@
 import os
 from pathlib import Path
 
-from bpy.props import CollectionProperty, StringProperty
-from bpy.types import Context, FileHandler, Operator, OperatorFileListElement, UILayout
+from typing import cast as typing_cast
+from bpy.props import CollectionProperty, StringProperty, FloatProperty, EnumProperty
+from bpy.types import Armature, Context, FileHandler, Operator, OperatorFileListElement, UILayout
 from bpy_extras.io_utils import ImportHelper
+
+from ...shared.helpers import get_coordinate_system_transform
+from ...shared.types import AxisMixin
 
 from ..importer import PskImportOptions, import_psk
 from ..properties import PskImportMixin
@@ -158,6 +162,46 @@ class PSK_OT_import_drag_and_drop(Operator, PskImportMixin):
             self.report({'WARNING'}, f'Imported {len(self.files)} PSK file(s) with {warning_count} warning(s)')
         else:
             self.report({'INFO'}, f'Imported {len(self.files)} PSK file(s)')
+
+        return {'FINISHED'}
+
+
+class PSK_OT_create_bones_from_selected_objects(Operator, AxisMixin):
+    bl_idname = 'psk.create_bones_from_selected_objects'
+    bl_label = 'Create Bones from Selected Objects'
+    bl_options = {'UNDO'}
+
+    length: FloatProperty(name='Length', subtype='DISTANCE', default=0.01)
+    
+    @classmethod
+    def poll(cls, context: Context) -> bool:
+        return context.active_object is not None and context.active_object.type == 'ARMATURE'
+
+    def invoke(self, context, event):
+        assert context.window_manager
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context: Context):
+        armature_object = context.active_object
+        
+        assert armature_object
+
+        armature_data = typing_cast(Armature, armature_object.data)
+        axis_transform = get_coordinate_system_transform(self.forward_axis, self.up_axis)
+
+        import bpy
+        bpy.ops.object.mode_set(mode='EDIT')
+
+        for index, obj in enumerate(context.selected_objects):
+            if obj == armature_object:
+                continue
+            edit_bone_matrix = armature_object.matrix_world.inverted() @ obj.matrix_world
+            edit_bone = armature_data.edit_bones.new(f'{obj.name}_{index}')
+            # translation, rotation, _ = edit_bone_matrix.decompose()
+            edit_bone.length = self.length
+            edit_bone.matrix = edit_bone_matrix @ axis_transform
+        
+        bpy.ops.object.mode_set(mode='OBJECT')
 
         return {'FINISHED'}
 

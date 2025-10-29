@@ -1,10 +1,10 @@
 from bpy.types import Action, AnimData, Context, Object, PoseBone
 
 from .data import Psa
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Iterable
 from mathutils import Matrix, Quaternion, Vector
 
-from ..shared.helpers import create_psx_bones, get_coordinate_system_transform
+from ..shared.helpers import PsxBoneCollection, create_psx_bones, get_coordinate_system_transform
 
 
 class PsaBuildSequence:
@@ -14,8 +14,8 @@ class PsaBuildSequence:
             self.frame_start: int = 0
             self.frame_end: int = 0
 
-    def __init__(self, armature_object: Object, anim_data: AnimData):
-        self.armature_object = armature_object
+    def __init__(self, armature_objects: Iterable[Object], anim_data: AnimData):
+        self.armature_objects = list(armature_objects)
         self.anim_data = anim_data
         self.name: str = ''
         self.nla_state: PsaBuildSequence.NlaState = PsaBuildSequence.NlaState()
@@ -27,10 +27,9 @@ class PsaBuildSequence:
 class PsaBuildOptions:
     def __init__(self):
         self.armature_objects: List[Object] = []
-        self.animation_data: Optional[AnimData] = None
         self.sequences: List[PsaBuildSequence] = []
         self.bone_filter_mode: str = 'ALL'
-        self.bone_collection_indices: List[PsaBoneCollectionIndex] = []
+        self.bone_collection_indices: List[PsxBoneCollection] = []
         self.sequence_name_prefix: str = ''
         self.sequence_name_suffix: str = ''
         self.scale = 1.0
@@ -58,7 +57,7 @@ def _get_pose_bone_location_and_rotation(
 
     if is_false_root_bone:
         pose_bone_matrix = coordinate_system_transform
-    elif pose_bone.parent is not None:
+    elif pose_bone is not None and pose_bone.parent is not None:
         pose_bone_matrix = pose_bone.matrix
         pose_bone_parent_matrix = pose_bone.parent.matrix
         pose_bone_matrix = pose_bone_parent_matrix.inverted() @ pose_bone_matrix
@@ -109,6 +108,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
 
     psa = Psa()
 
+    # TODO: move this OUT!
     armature_objects_for_bones = options.armature_objects
     if options.sequence_source == 'ACTIVE_ACTION' and len(options.armature_objects) >= 2:
         # Make sure that the data-block for all the selected armature objects is the same.
@@ -143,7 +143,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         export_sequence.name = export_sequence.name.strip()
 
     # Save each armature object's current action and frame so that we can restore the state once we are done.
-    saved_armature_object_actions = {o: o.animation_data.action for o in options.armature_objects}
+    saved_armature_object_actions = {o: o.animation_data.action if o.animation_data else None for o in options.armature_objects}
     saved_frame_current = context.scene.frame_current
 
     # Now build the PSA sequences.
@@ -184,11 +184,10 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         psa_sequence.key_reduction = 1.0
 
         frame = float(frame_start)
+        
+        export_sequence.anim_data.action = export_sequence.nla_state.action
 
-        # Link the action to the animation data and update view layer.
-        for armature_object in options.armature_objects:
-            armature_object.animation_data.action = export_sequence.nla_state.action
-
+        assert context.view_layer
         context.view_layer.update()
 
         def add_key(location: Vector, rotation: Quaternion):
@@ -212,7 +211,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         armature_scales: Dict[Object, Vector] = {}
 
         # Extract the scale from the world matrix of the evaluated armature object.
-        for armature_object in options.armature_objects:
+        for armature_object in export_sequence.armature_objects:
             evaluated_armature_object = armature_object.evaluated_get(context.evaluated_depsgraph_get())
             _, _, scale = evaluated_armature_object.matrix_world.decompose()
             scale *= options.scale
@@ -223,6 +222,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         # locations.
         export_bones: List[PsaExportBone] = []
 
+        # TODO: we need different behavior here if it's ACTIVE_ACTION
         for psx_bone, armature_object in psx_bone_create_result.bones:
             if armature_object is None:
                 export_bones.append(PsaExportBone(None, None, Vector((1.0, 1.0, 1.0))))

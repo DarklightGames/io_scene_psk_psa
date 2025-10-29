@@ -375,7 +375,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
         if animation_data is None:
             animation_data = armature_object.animation_data_create()
         for action in actions:
-            nla_track = armature_object.animation_data.nla_tracks.new()
+            nla_track = animation_data.nla_tracks.new()
             nla_track.name = action.name
             nla_track.mute = True
             nla_track.strips.new(name=action.name, start=0, action=action)

@@ -472,7 +472,7 @@ class PSA_OT_export(Operator, ExportHelper):
                 for action_item in filter(lambda x: x.is_selected, pg.action_list):
                     if len(action_item.action.fcurves) == 0:
                         continue
-                    export_sequence = PsaBuildSequence(context.active_object, animation_data)
+                    export_sequence = PsaBuildSequence(self.armature_objects, animation_data)
                     export_sequence.name = action_item.name
                     export_sequence.nla_state.action = action_item.action
                     export_sequence.nla_state.frame_start = action_item.frame_start
@@ -483,7 +483,7 @@ class PSA_OT_export(Operator, ExportHelper):
                     export_sequences.append(export_sequence)
             case 'TIMELINE_MARKERS':
                 for marker_item in filter(lambda x: x.is_selected, pg.marker_list):
-                    export_sequence = PsaBuildSequence(context.active_object, animation_data)
+                    export_sequence = PsaBuildSequence(self.armature_objects, animation_data)
                     export_sequence.name = marker_item.name
                     export_sequence.nla_state.frame_start = marker_item.frame_start
                     export_sequence.nla_state.frame_end = marker_item.frame_end
@@ -494,7 +494,7 @@ class PSA_OT_export(Operator, ExportHelper):
                     export_sequences.append(export_sequence)
             case 'NLA_TRACK_STRIPS':
                 for nla_strip_item in filter(lambda x: x.is_selected, pg.nla_strip_list):
-                    export_sequence = PsaBuildSequence(context.active_object, animation_data)
+                    export_sequence = PsaBuildSequence(self.armature_objects, animation_data)
                     export_sequence.name = nla_strip_item.name
                     export_sequence.nla_state.frame_start = nla_strip_item.frame_start
                     export_sequence.nla_state.frame_end = nla_strip_item.frame_end
@@ -504,7 +504,7 @@ class PSA_OT_export(Operator, ExportHelper):
                     export_sequences.append(export_sequence)
             case 'ACTIVE_ACTION':
                 for active_action_item in filter(lambda x: x.is_selected, pg.active_action_list):
-                    export_sequence = PsaBuildSequence(active_action_item.armature_object, active_action_item.armature_object.animation_data)
+                    export_sequence = PsaBuildSequence([active_action_item.armature_object], active_action_item.armature_object.animation_data)
                     action = active_action_item.action
                     export_sequence.name = action.name
                     export_sequence.nla_state.action = action
@@ -522,8 +522,6 @@ class PSA_OT_export(Operator, ExportHelper):
             return {'CANCELLED'}
 
         options = PsaBuildOptions()
-        options.armature_objects = self.armature_objects
-        options.animation_data = animation_data
         options.sequences = export_sequences
         options.bone_filter_mode = pg.bone_filter_mode
         options.bone_collection_indices = [PsxBoneCollection(x.armature_object_name, x.armature_data_name, x.index) for x in pg.bone_collection_list if x.is_selected]

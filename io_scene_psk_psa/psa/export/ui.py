@@ -13,7 +13,7 @@ class PSA_UL_export_sequences(UIList):
         # Show the filtering options by default.
         self.use_filter_show = True
 
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_property, index, flt_flag):
         item = typing_cast(PSA_PG_export_action_list_item, item)
 
         is_pose_marker = hasattr(item, 'is_pose_marker') and item.is_pose_marker
@@ -44,7 +44,7 @@ class PSA_UL_export_sequences(UIList):
             subrow.prop(pg, 'sequence_filter_pose_marker', icon_only=True, icon='PMARKER')
             subrow.prop(pg, 'sequence_filter_reversed', text='', icon='FRAME_PREV')
 
-    def filter_items(self, context, data, prop):
+    def filter_items(self, context, data, property):
         pg = getattr(context.scene, 'psa_export')
         actions = getattr(data, prop)
         flt_flags = filter_sequences(pg, actions)

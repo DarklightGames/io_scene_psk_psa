@@ -17,7 +17,7 @@ def _try_fix_cue4parse_issue_103(sequences) -> bool:
         # Manually set the frame_start_index for each sequence. This assumes that the sequences are in order with
         # no shared frames between sequences (all exporters that I know of do this, so it's a safe assumption).
         frame_start_index = 0
-        for i, sequence in enumerate(sequences):
+        for sequence in sequences:
             sequence.frame_start_index = frame_start_index
             frame_start_index += sequence.frame_count
         return True
