@@ -492,9 +492,6 @@ class PSK_OT_export(Operator, ExportHelper):
             flow.use_property_split = True
             flow.use_property_decorate = False
 
-            print(pg.transform_source)
-            print(type(pg.transform_source))
-
             match pg.transform_source:
                 case 'SCENE':
                     transform_source = getattr(context.scene, 'psx_export')
