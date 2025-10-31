@@ -241,7 +241,7 @@ def get_psk_build_options_from_property_group(scene: Scene, pg: PskExportMixin) 
     match pg.transform_source:
         case 'SCENE':
             transform_source = getattr(scene, 'psx_export')
-        case 'SELF':
+        case 'CUSTOM':
             transform_source = pg
         case _:
             assert False, f'Invalid transform source: {pg.transform_source}'
@@ -486,9 +486,27 @@ class PSK_OT_export(Operator, ExportHelper):
             flow.use_property_split = True
             flow.use_property_decorate = False
             flow.prop(pg, 'export_space')
-            flow.prop(pg, 'scale')
-            flow.prop(pg, 'forward_axis')
-            flow.prop(pg, 'up_axis')
+            flow.prop(pg, 'transform_source')
+
+            flow = transform_panel.grid_flow(row_major=True)
+            flow.use_property_split = True
+            flow.use_property_decorate = False
+
+            print(pg.transform_source)
+            print(type(pg.transform_source))
+
+            match pg.transform_source:
+                case 'SCENE':
+                    transform_source = getattr(context.scene, 'psx_export')
+                    flow.enabled = False
+                case 'CUSTOM':
+                    transform_source = pg
+                case _:
+                    assert False, f'Invalid transform source: {pg.transform_source}'
+        
+            flow.prop(transform_source, 'scale')
+            flow.prop(transform_source, 'forward_axis')
+            flow.prop(transform_source, 'up_axis')
         
         # Extended Format
         extended_format_header, extended_format_panel = layout.panel('Extended Format', default_closed=False)
