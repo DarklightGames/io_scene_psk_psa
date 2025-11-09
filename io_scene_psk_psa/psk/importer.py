@@ -210,8 +210,9 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
                 for face_index, face in enumerate(psk.faces):
                     if face_index in invalid_face_indices:
                         continue
-                    for wedge in map(lambda i: psk.wedges[i], reversed(face.wedge_indices)):
-                        uv_layer_data[uv_layer_data_index] = wedge.u, 1.0 - wedge.v
+                    for wedge_index in reversed(face.wedge_indices):
+                        u, v = psk.extra_uvs[wedge_index_offset + wedge_index]
+                        uv_layer_data[uv_layer_data_index] = u, 1.0 - v
                         uv_layer_data_index += 1
                 wedge_index_offset += len(psk.wedges)
                 uv_layer = mesh_data.uv_layers.new(name=f'EXTRAUV{extra_uv_index}')

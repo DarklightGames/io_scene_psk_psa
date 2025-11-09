@@ -67,7 +67,7 @@ def read_psk(path: str) -> Psk:
                 case b'MRPHDATA':
                     _read_types(fp, Psk.MorphData, section, psk.morph_data)
                 case _:
-                    if section.name.startswith(b'EXTRAUVS'):
+                    if section.name.startswith(b'EXTRAUV'):
                         _read_types(fp, Vector2, section, psk.extra_uvs)
                     else:
                         # Section is not handled, skip it.

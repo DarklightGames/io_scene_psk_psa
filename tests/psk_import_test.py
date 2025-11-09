@@ -220,6 +220,12 @@ def test_psk_import_extra_uvs():
     assert mesh_data.uv_layers[0].name == 'UVMap', "First UV layer should be named 'UVMap'"
     assert mesh_data.uv_layers[1].name == 'EXTRAUV0', "Second UV layer should be named 'EXTRAUV0'"
 
+    # Verify that the data is actually different
+    assert mesh_data.uv_layers[0].uv[0].vector.x == 0.92480468750
+    assert mesh_data.uv_layers[0].uv[0].vector.y == 0.90533447265625
+    assert mesh_data.uv_layers[1].uv[0].vector.x == 3.0517578125e-05
+    assert mesh_data.uv_layers[1].uv[0].vector.y == 0.999969482421875
+
 
 def test_psk_import_materials():
     assert bpy.ops.psk.import_file(
