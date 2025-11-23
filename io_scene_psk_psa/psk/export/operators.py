@@ -270,8 +270,8 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
     def execute(self, context):
         collection = bpy.data.collections.get(self.collection, None)
 
-        if collection is not None:
-            return {'CANCELLED'}
+        assert collection is not None
+        assert context.scene is not None
 
         try:
             input_objects = get_psk_input_objects_for_collection(collection)
