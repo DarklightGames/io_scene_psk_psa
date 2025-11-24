@@ -35,7 +35,7 @@ def get_sequences_propnames_from_source(sequence_source: str) -> Tuple[str, str]
 
 
 def is_action_for_object(obj: Object, action: Action):
-    if len(action.fcurves) == 0:
+    if len(action.layers) == 0:
         return False
 
     if obj is None or obj.animation_data is None or obj.type != 'ARMATURE':
@@ -470,7 +470,7 @@ class PSA_OT_export(Operator, ExportHelper):
         match pg.sequence_source:
             case 'ACTIONS':
                 for action_item in filter(lambda x: x.is_selected, pg.action_list):
-                    if len(action_item.action.fcurves) == 0:
+                    if len(action_item.action.layers) == 0:
                         continue
                     export_sequence = PsaBuildSequence(context.active_object, animation_data)
                     export_sequence.name = action_item.name
