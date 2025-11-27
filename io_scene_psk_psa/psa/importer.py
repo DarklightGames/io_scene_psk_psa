@@ -301,7 +301,6 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
         if options.should_write_keyframes:            
             channelbag = anim_utils.action_ensure_channelbag_for_slot(action, action_slot)
-            channelbag.fcurves.clear()
 
             # Create f-curves for the rotation and location of each bone.
             for psa_bone_index, armature_bone_index in psa_to_armature_bone_indices.items():
@@ -313,13 +312,13 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
                 add_rotation_fcurves = (bone_track_flags & REMOVE_TRACK_ROTATION) == 0
                 add_location_fcurves = (bone_track_flags & REMOVE_TRACK_LOCATION) == 0
                 import_bone.fcurves = [
-                    channelbag.fcurves.new(rotation_data_path, index=0, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qw
-                    channelbag.fcurves.new(rotation_data_path, index=1, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qx
-                    channelbag.fcurves.new(rotation_data_path, index=2, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qy
-                    channelbag.fcurves.new(rotation_data_path, index=3, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qz
-                    channelbag.fcurves.new(location_data_path, index=0, group_name=pose_bone.name) if add_location_fcurves else None,  # Lx
-                    channelbag.fcurves.new(location_data_path, index=1, group_name=pose_bone.name) if add_location_fcurves else None,  # Ly
-                    channelbag.fcurves.new(location_data_path, index=2, group_name=pose_bone.name) if add_location_fcurves else None,  # Lz
+                    channelbag.fcurves.ensure(rotation_data_path, index=0, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qw
+                    channelbag.fcurves.ensure(rotation_data_path, index=1, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qx
+                    channelbag.fcurves.ensure(rotation_data_path, index=2, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qy
+                    channelbag.fcurves.ensure(rotation_data_path, index=3, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qz
+                    channelbag.fcurves.ensure(location_data_path, index=0, group_name=pose_bone.name) if add_location_fcurves else None,  # Lx
+                    channelbag.fcurves.ensure(location_data_path, index=1, group_name=pose_bone.name) if add_location_fcurves else None,  # Ly
+                    channelbag.fcurves.ensure(location_data_path, index=2, group_name=pose_bone.name) if add_location_fcurves else None,  # Lz
                 ]
 
             # Read the sequence data matrix from the PSA.
@@ -356,6 +355,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
                 for fcurve_index, fcurve in enumerate(import_bone.fcurves):
                     if fcurve is None:
                         continue
+                    fcurve.keyframe_points.clear()
                     fcurve_data[1::2] = resampled_sequence_data_matrix[:, bone_index, fcurve_index]
                     fcurve.keyframe_points.add(target_frame_count)
                     fcurve.keyframe_points.foreach_set('co', fcurve_data)
