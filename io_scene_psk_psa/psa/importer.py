@@ -214,6 +214,8 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
         )
     del armature_bone_names
 
+    assert armature_object.pose
+
     # Create intermediate bone data for import operations.
     import_bones = []
     psa_bone_names_to_import_bones = dict()
@@ -277,7 +279,12 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             action = bpy.data.actions[action_name]
         else:
             action = bpy.data.actions.new(name=action_name)
-            action.slots.new('OBJECT', armature_object.name)
+            action_slot = action.slots.new('OBJECT', armature_object.name)
+
+        # TODO: Wish there was a better way to do this.
+        action_slot = action.slots[f'OB{armature_object.name}']
+
+        assert action_slot
 
         # Calculate the target FPS.
         match options.fps_source:
@@ -293,7 +300,22 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
         if options.should_write_keyframes:
             # Remove existing f-curves.
-            action.fcurves.clear()
+            if len(action.layers) == 0:
+                layer = action.layers.new(armature_object.name)
+            else:
+                layer = action.layers[0]
+            
+            if len(layer.strips) == 0:
+                action_strip = layer.strips.new()
+            else:
+                action_strip = layer.strips[0]
+            
+            if len(action_strip.channelbags) == 0:
+                channelbag = action_strip.channelbags.new(action_slot)
+            else:
+                channelbag = action_strip.channelbags[0]
+            
+            channelbag.fcurves.clear()
 
             # Create f-curves for the rotation and location of each bone.
             for psa_bone_index, armature_bone_index in psa_to_armature_bone_indices.items():
@@ -305,13 +327,13 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
                 add_rotation_fcurves = (bone_track_flags & REMOVE_TRACK_ROTATION) == 0
                 add_location_fcurves = (bone_track_flags & REMOVE_TRACK_LOCATION) == 0
                 import_bone.fcurves = [
-                    action.fcurves.new(rotation_data_path, index=0, action_group=pose_bone.name) if add_rotation_fcurves else None,  # Qw
-                    action.fcurves.new(rotation_data_path, index=1, action_group=pose_bone.name) if add_rotation_fcurves else None,  # Qx
-                    action.fcurves.new(rotation_data_path, index=2, action_group=pose_bone.name) if add_rotation_fcurves else None,  # Qy
-                    action.fcurves.new(rotation_data_path, index=3, action_group=pose_bone.name) if add_rotation_fcurves else None,  # Qz
-                    action.fcurves.new(location_data_path, index=0, action_group=pose_bone.name) if add_location_fcurves else None,  # Lx
-                    action.fcurves.new(location_data_path, index=1, action_group=pose_bone.name) if add_location_fcurves else None,  # Ly
-                    action.fcurves.new(location_data_path, index=2, action_group=pose_bone.name) if add_location_fcurves else None,  # Lz
+                    channelbag.fcurves.new(rotation_data_path, index=0, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qw
+                    channelbag.fcurves.new(rotation_data_path, index=1, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qx
+                    channelbag.fcurves.new(rotation_data_path, index=2, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qy
+                    channelbag.fcurves.new(rotation_data_path, index=3, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qz
+                    channelbag.fcurves.new(location_data_path, index=0, group_name=pose_bone.name) if add_location_fcurves else None,  # Lx
+                    channelbag.fcurves.new(location_data_path, index=1, group_name=pose_bone.name) if add_location_fcurves else None,  # Ly
+                    channelbag.fcurves.new(location_data_path, index=2, group_name=pose_bone.name) if add_location_fcurves else None,  # Lz
                 ]
 
             # Read the sequence data matrix from the PSA.
@@ -375,7 +397,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
         if animation_data is None:
             animation_data = armature_object.animation_data_create()
         for action in actions:
-            nla_track = armature_object.animation_data.nla_tracks.new()
+            nla_track = animation_data.nla_tracks.new()
             nla_track.name = action.name
             nla_track.mute = True
             nla_track.strips.new(name=action.name, start=0, action=action)

@@ -1,7 +1,5 @@
 FROM ubuntu:22.04
 
-ARG BLENDER_VERSION=4.4
-
 RUN apt-get update -y && \
     apt-get install -y libxxf86vm-dev libxfixes3 libxi-dev libxkbcommon-x11-0 libgl1 libglx-mesa0 python3 python3-pip \
     libxrender1 libsm6
@@ -9,6 +7,8 @@ RUN apt-get update -y && \
 RUN pip install --upgrade pip
 RUN pip install pytest-blender
 RUN pip install blender-downloader
+
+ARG BLENDER_VERSION=5.0
 
 # Set BLENDER_EXECUTABLE and BLENDER_PYTHON as environment variables
 RUN BLENDER_EXECUTABLE=$(blender-downloader $BLENDER_VERSION --extract --remove-compressed --print-blender-executable) && \

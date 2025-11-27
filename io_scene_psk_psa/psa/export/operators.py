@@ -18,6 +18,7 @@ from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from ..writer import write_psa
 from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range, PsxBoneCollection
 from ...shared.ui import draw_bone_filter_mode
+from ...shared.types import PSX_PG_action_export, PSX_PG_scene_export
 
 
 def get_sequences_propnames_from_source(sequence_source: str) -> Tuple[str, str]:
@@ -453,7 +454,7 @@ class PSA_OT_export(Operator, ExportHelper):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        pg = getattr(context.scene, 'psa_export')
+        pg = typing_cast(PSA_PG_export, getattr(context.scene, 'psa_export'))
 
         # Populate the export sequence list.
         animation_data_object = get_animation_data_object(context)

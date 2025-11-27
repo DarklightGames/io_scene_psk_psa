@@ -4,7 +4,7 @@ from .data import Psa
 from typing import Dict, List, Optional, Tuple
 from mathutils import Matrix, Quaternion, Vector
 
-from ..shared.helpers import create_psx_bones, get_coordinate_system_transform
+from ..shared.helpers import PsxBoneCollection, create_psx_bones, get_coordinate_system_transform
 
 
 class PsaBuildSequence:
@@ -30,7 +30,7 @@ class PsaBuildOptions:
         self.animation_data: Optional[AnimData] = None
         self.sequences: List[PsaBuildSequence] = []
         self.bone_filter_mode: str = 'ALL'
-        self.bone_collection_indices: List[PsaBoneCollectionIndex] = []
+        self.bone_collection_indices: List[PsxBoneCollection] = []
         self.sequence_name_prefix: str = ''
         self.sequence_name_suffix: str = ''
         self.scale = 1.0

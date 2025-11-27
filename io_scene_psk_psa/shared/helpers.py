@@ -345,7 +345,10 @@ def create_psx_bones(
     coordinate_system_matrix = get_coordinate_system_transform(forward_axis, up_axis)
     coordinate_system_default_rotation = coordinate_system_matrix.to_quaternion()
 
-    total_bone_count = sum(len(armature_object.data.bones) for armature_object in armature_objects)
+    total_bone_count = 0
+    for armature_object in filter(lambda x: x.data is not None, armature_objects):
+        armature_data = typing_cast(Armature, armature_object.data)
+        total_bone_count += len(armature_data.bones)
 
     # Store the bone names to be exported for each armature object.
     armature_object_bone_names: Dict[Object, List[str]] = dict()
