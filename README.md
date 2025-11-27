@@ -56,7 +56,7 @@ The PSA importer creates [Actions](https://docs.blender.org/manual/en/latest/ani
 ## Why are imported PSKs too big/too small?
 The PSK format, unlike other more modern formats, has no explicit or implicit unit system. Each game has its own convention as to what the base distance unit will represent. As such, this addon makes no assumptions as to the unit scale of the imported PSKs. If you think that your models are being imported into Blender either too big or too small, there are a couple ways to remedy this.
 
-The method I prefer is to simply change the Blender [scene properties](https://docs.blender.org/manual/en/4.4/scene_layout/scene/properties.html#units) to match the unit system and scale for the game you're using. This is non-destructive and ensures that the unit scaling of any PSK or PSA exports from Blender will match the source file from which it was derived.
+The method I prefer is to simply change the Blender [scene properties](https://docs.blender.org/manual/en/5.0/scene_layout/scene/properties.html#units) to match the unit system and scale for the game you're using. This is non-destructive and ensures that the unit scaling of any PSK or PSA exports from Blender will match the source file from which it was derived.
 
 The second option is to simply change the `Scale` value on the PSK import dialog. This will scale the armature by the factor provided. Note that this is more destructive, but may be preferable if you don't intend on exporting PSKs or PSAs to a game engine.
 

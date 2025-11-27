@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        blender-version: [ 4.4 ]
+        blender-version: [ 5.0 ]
     env:
       ADDON_NAME: io_scene_psk_psa
     steps:
