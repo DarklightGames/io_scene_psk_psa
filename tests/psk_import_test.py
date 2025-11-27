@@ -279,8 +279,9 @@ def test_psk_import_shape_keys():
     shape_keys = mesh_data.shape_keys.key_blocks
     assert len(shape_keys) == 6, "Mesh object should have 6 shape keys"
     for i, shape_key in enumerate(shape_keys):
-        assert shape_key.value == 0.0, f"Shape key {i} should have a value of 0.0"
-        assert shape_key.name == shape_key_names[i], f"Shape key {i} name should be {shape_key_names[i]}"
+        expected_value = 1.0 if i == 0 else 0.0
+        assert shape_key.value == expected_value, f"Shape key {shape_key.name} should have a value of {expected_value} (found {shape_key.value})"
+        assert shape_key.name == shape_key_names[i], f"Shape key {i} name should be named {shape_key_names[i]}"
 
 def test_psk_import_without_shape_keys():
     assert bpy.ops.psk.import_file(
