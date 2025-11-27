@@ -5,6 +5,7 @@ import numpy as np
 import re
 from bpy.types import Armature, Context, FCurve, Object, Bone, PoseBone
 from mathutils import Vector, Quaternion
+from bpy_extras import anim_utils
 
 from .config import PsaConfig, REMOVE_TRACK_LOCATION, REMOVE_TRACK_ROTATION
 from .reader import PsaReader
@@ -298,23 +299,8 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             case _:
                 assert False, f'Invalid FPS source: {options.fps_source}'
 
-        if options.should_write_keyframes:
-            # Remove existing f-curves.
-            if len(action.layers) == 0:
-                layer = action.layers.new(armature_object.name)
-            else:
-                layer = action.layers[0]
-            
-            if len(layer.strips) == 0:
-                action_strip = layer.strips.new()
-            else:
-                action_strip = layer.strips[0]
-            
-            if len(action_strip.channelbags) == 0:
-                channelbag = action_strip.channelbags.new(action_slot)
-            else:
-                channelbag = action_strip.channelbags[0]
-            
+        if options.should_write_keyframes:            
+            channelbag = anim_utils.action_ensure_channelbag_for_slot(action, action_slot)
             channelbag.fcurves.clear()
 
             # Create f-curves for the rotation and location of each bone.
