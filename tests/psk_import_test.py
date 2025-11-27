@@ -273,6 +273,7 @@ def test_psk_import_shape_keys():
     shape_keys = mesh_object.data.shape_keys.key_blocks
     assert len(shape_keys) == 6, "Mesh object should have 6 shape keys"
     for i, shape_key in enumerate(shape_keys):
+        assert shape_key.value == 0.0, f"Shape key {i} should have a value of 0.0"
         assert shape_key.name == shape_key_names[i], f"Shape key {i} name should be {shape_key_names[i]}"
 
 def test_psk_import_without_shape_keys():

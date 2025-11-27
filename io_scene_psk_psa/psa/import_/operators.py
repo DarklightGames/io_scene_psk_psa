@@ -13,7 +13,8 @@ from ..reader import PsaReader
 
 
 def psa_import_poll(cls, context: Context):
-    assert context.view_layer and context.view_layer.objects.active
+    if context.view_layer is None or context.view_layer.objects.active is None:
+        return False
     active_object = context.view_layer.objects.active
     if active_object is None or active_object.type != 'ARMATURE':
         cls.poll_message_set('The active object must be an armature')

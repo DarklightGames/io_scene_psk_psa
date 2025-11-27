@@ -275,6 +275,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
 
             for morph_info in psk.morph_infos:
                 shape_key = mesh_object.shape_key_add(name=morph_info.name.decode('windows-1252'), from_mix=False)
+                shape_key.value = 0.0
 
                 for _ in range(morph_info.vertex_count):
                     morph_data = next(morph_data_iterator)
