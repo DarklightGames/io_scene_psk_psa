@@ -151,7 +151,6 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
                     mesh_triangle_type, mesh_triangle_bit_flags = poly_flags_to_triangle_type_and_bit_flags(psk_material.poly_flags)
                     material.psk.mesh_triangle_type = mesh_triangle_type
                     material.psk.mesh_triangle_bit_flags = mesh_triangle_bit_flags
-                    material.use_nodes = True
                 
                 mesh_data.materials.append(material)
 
