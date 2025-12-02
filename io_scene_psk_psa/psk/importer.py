@@ -2,13 +2,13 @@ import bmesh
 import bpy
 import numpy as np
 
-from bpy.types import Context, Object, VertexGroup
+from bpy.types import Context, Object, VertexGroup, ArmatureModifier, FloatColorAttribute
 from mathutils import Matrix, Quaternion, Vector
-from typing import List, Optional
+from typing import List, Optional, cast as typing_cast
 
-from .data import Psk
+from psk_psa_py.psk.data import Psk
+from psk_psa_py.shared.data import PsxBone
 from .properties import poly_flags_to_triangle_type_and_bit_flags
-from ..shared.data import PsxBone
 from ..shared.helpers import is_bdk_addon_loaded, rgb_to_srgb
 
 
@@ -201,16 +201,15 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
 
         # Extra UVs
         if psk.has_extra_uvs and options.should_import_extra_uvs:
-            extra_uv_channel_count = int(len(psk.extra_uvs) / len(psk.wedges))
             wedge_index_offset = 0
-            uv_layer_data = np.zeros((face_count * 3, 2), dtype=np.float32)
-            for extra_uv_index in range(extra_uv_channel_count):
+            for extra_uv_index, extra_uvs in enumerate(psk.extra_uvs):
+                uv_layer_data = np.zeros((face_count * 3, 2), dtype=np.float32)
                 uv_layer_data_index = 0
                 for face_index, face in enumerate(psk.faces):
                     if face_index in invalid_face_indices:
                         continue
                     for wedge_index in reversed(face.wedge_indices):
-                        u, v = psk.extra_uvs[wedge_index_offset + wedge_index]
+                        u, v = extra_uvs[wedge_index_offset + wedge_index]
                         uv_layer_data[uv_layer_data_index] = u, 1.0 - v
                         uv_layer_data_index += 1
                 wedge_index_offset += len(psk.wedges)
@@ -241,6 +240,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
 
             # Create the vertex color attribute.
             face_corner_color_attribute = mesh_data.attributes.new(name='VERTEXCOLOR', type='FLOAT_COLOR', domain='CORNER')
+            face_corner_color_attribute = typing_cast(FloatColorAttribute, face_corner_color_attribute)
             face_corner_color_attribute.data.foreach_set('color', face_corner_colors.ravel())
 
         # Vertex Normals
@@ -287,10 +287,12 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
         # Add armature modifier to our mesh object.
         if options.should_import_armature:
             armature_modifier = mesh_object.modifiers.new(name='Armature', type='ARMATURE')
+            armature_modifier = typing_cast(ArmatureModifier, armature_modifier)
             armature_modifier.object = armature_object
             mesh_object.parent = armature_object
 
     root_object = armature_object if options.should_import_armature else mesh_object
+    assert root_object
     root_object.scale = (options.scale, options.scale, options.scale)
 
     try:

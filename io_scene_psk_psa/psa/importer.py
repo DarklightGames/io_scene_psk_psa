@@ -8,8 +8,8 @@ from mathutils import Vector, Quaternion
 from bpy_extras import anim_utils
 
 from .config import PsaConfig, REMOVE_TRACK_LOCATION, REMOVE_TRACK_ROTATION
-from .reader import PsaReader
-from ..shared.data import PsxBone
+from psk_psa_py.psa.reader import PsaReader
+from psk_psa_py.shared.data import PsxBone
 
 class BoneMapping:
     def __init__(self,

@@ -283,6 +283,7 @@ def test_psk_import_shape_keys():
         assert shape_key.value == expected_value, f"Shape key {shape_key.name} should have a value of {expected_value} (found {shape_key.value})"
         assert shape_key.name == shape_key_names[i], f"Shape key {i} name should be named {shape_key_names[i]}"
 
+
 def test_psk_import_without_shape_keys():
     assert bpy.ops.psk.import_file(
         filepath=SLURP_MONSTER_AXE_FILEPATH,

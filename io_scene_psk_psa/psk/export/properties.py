@@ -1,4 +1,3 @@
-from bpy.types import Context
 from bpy.props import (
     BoolProperty,
     CollectionProperty,
@@ -9,7 +8,6 @@ from bpy.props import (
 )
 from bpy.types import Material, PropertyGroup
 
-from ...shared.helpers import get_collection_export_operator_from_context
 from ...shared.types import ExportSpaceMixin, TransformMixin, PsxBoneExportMixin
 
 object_eval_state_items = (

@@ -15,7 +15,7 @@ from .properties import (
 )
 from .ui import PSA_UL_export_sequences
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
-from ..writer import write_psa
+from psk_psa_py.psa.writer import write_psa_to_file
 from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range, PsxBoneCollection
 from ...shared.ui import draw_bone_filter_mode
 from ...shared.types import PSX_PG_action_export, PSX_PG_scene_export
@@ -475,6 +475,7 @@ class PSA_OT_export(Operator, ExportHelper):
                         continue
                     export_sequence = PsaBuildSequence(context.active_object, animation_data)
                     export_sequence.name = action_item.name
+                    export_sequence.group = action_item.group
                     export_sequence.nla_state.action = action_item.action
                     export_sequence.nla_state.frame_start = action_item.frame_start
                     export_sequence.nla_state.frame_end = action_item.frame_end
@@ -497,6 +498,7 @@ class PSA_OT_export(Operator, ExportHelper):
                 for nla_strip_item in filter(lambda x: x.is_selected, pg.nla_strip_list):
                     export_sequence = PsaBuildSequence(context.active_object, animation_data)
                     export_sequence.name = nla_strip_item.name
+                    export_sequence.group = nla_strip_item.action.psa_export.group
                     export_sequence.nla_state.frame_start = nla_strip_item.frame_start
                     export_sequence.nla_state.frame_end = nla_strip_item.frame_end
                     export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [nla_strip_item.action])
@@ -508,6 +510,7 @@ class PSA_OT_export(Operator, ExportHelper):
                     export_sequence = PsaBuildSequence(active_action_item.armature_object, active_action_item.armature_object.animation_data)
                     action = active_action_item.action
                     export_sequence.name = action.name
+                    export_sequence.group = action.psa_export.group
                     export_sequence.nla_state.action = action
                     export_sequence.nla_state.frame_start = int(action.frame_range[0])
                     export_sequence.nla_state.frame_end = int(action.frame_range[1])
@@ -545,7 +548,7 @@ class PSA_OT_export(Operator, ExportHelper):
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
-        write_psa(psa, self.filepath)
+        write_psa_to_file(psa, self.filepath)
 
         return {'FINISHED'}
 

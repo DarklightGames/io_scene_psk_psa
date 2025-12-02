@@ -1,6 +1,6 @@
 from bpy.types import Action, AnimData, Context, Object, PoseBone
 
-from .data import Psa
+from psk_psa_py.psa.data import Psa
 from typing import Dict, List, Optional, Tuple
 from mathutils import Matrix, Quaternion, Vector
 
@@ -22,6 +22,7 @@ class PsaBuildSequence:
         self.compression_ratio: float = 1.0
         self.key_quota: int = 0
         self.fps: float = 30.0
+        self.group: Optional[str] = None
 
 
 class PsaBuildOptions:
@@ -171,11 +172,20 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         sequence_duration = frame_count_raw / export_sequence.fps
 
         psa_sequence = Psa.Sequence()
+        
         try:
             psa_sequence.name = bytes(export_sequence.name, encoding='windows-1252')
         except UnicodeEncodeError:
             raise RuntimeError(
                 f'Sequence name "{export_sequence.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
+        
+        try:
+            if export_sequence.group is not None:
+                psa_sequence.group = bytes(export_sequence.group, encoding='windows-1252')
+        except UnicodeDecodeError:
+            raise RuntimeError(
+                f'Group name "{export_sequence.group} contains characters that cannot be encoded in the Windows-1252 codepage')
+        
         psa_sequence.frame_count = frame_count
         psa_sequence.frame_start_index = frame_start_index
         psa_sequence.fps = frame_count / sequence_duration

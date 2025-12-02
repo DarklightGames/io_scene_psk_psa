@@ -3,8 +3,7 @@ from collections import Counter
 from typing import List, Iterable, Optional, Dict, Tuple, cast as typing_cast
 from bpy.types import Armature, AnimData, Collection, Context, Object, ArmatureModifier, SpaceProperties
 from mathutils import Matrix, Vector, Quaternion as BpyQuaternion
-from .data import Vector3, Quaternion
-from ..shared.data import PsxBone
+from psk_psa_py.shared.data import PsxBone, Vector3, Quaternion
 
 
 def rgb_to_srgb(c: float) -> float:

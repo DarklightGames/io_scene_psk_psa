@@ -4,9 +4,9 @@ import numpy as np
 from bpy.types import Armature, Collection, Context, Depsgraph, Object, ArmatureModifier, Mesh
 from mathutils import Matrix
 from typing import Dict, Iterable, List, Optional, Set, cast as typing_cast
-from .data import Psk
+from psk_psa_py.shared.data import Vector3
+from psk_psa_py.psk.data import Psk
 from .properties import triangle_type_and_bit_flags_to_poly_flags
-from ..shared.data import Vector3
 from ..shared.dfs import DfsObject, dfs_collection_objects, dfs_view_layer_objects
 from ..shared.helpers import (
     PsxBoneCollection,

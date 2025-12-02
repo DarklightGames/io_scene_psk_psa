@@ -22,7 +22,7 @@ RUN pip install pytest-cov
 # Source the environment variables and install Python dependencies
 RUN . /etc/environment && \
     $BLENDER_PYTHON -m ensurepip && \
-    $BLENDER_PYTHON -m pip install pytest pytest-cov
+    $BLENDER_PYTHON -m pip install pytest pytest-cov psk-psa-py
 
 # Persist BLENDER_EXECUTABLE as an environment variable
 RUN echo $(cat /blender_executable_path) > /tmp/blender_executable_path_env && \

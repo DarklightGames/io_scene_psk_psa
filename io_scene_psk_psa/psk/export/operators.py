@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, List, Optional, cast as typing_cast
+from typing import Iterable, List
 
 import bpy
 from bpy.props import BoolProperty, StringProperty
@@ -14,7 +14,7 @@ from ..builder import (
     get_psk_input_objects_for_collection,
     get_psk_input_objects_for_context,
 )
-from ..writer import write_psk
+from psk_psa_py.psk.writer import write_psk_to_path
 from ...shared.helpers import PsxBoneCollection, get_collection_export_operator_from_context, populate_bone_collection_list
 from ...shared.ui import draw_bone_filter_mode
 
@@ -286,7 +286,7 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
             result = build_psk(context, input_objects, options)
             for warning in result.warnings:
                 self.report({'WARNING'}, warning)
-            write_psk(result.psk, filepath)
+            write_psk_to_path(result.psk, filepath)
             if len(result.warnings) > 0:
                 self.report({'WARNING'}, f'PSK export successful with {len(result.warnings)} warnings')
             else:
@@ -526,7 +526,7 @@ class PSK_OT_export(Operator, ExportHelper):
             result = build_psk(context, input_objects, options)
             for warning in result.warnings:
                 self.report({'WARNING'}, warning)
-            write_psk(result.psk, self.filepath)
+            write_psk_to_path(result.psk, self.filepath)
             if len(result.warnings) > 0:
                 self.report({'WARNING'}, f'PSK export successful with {len(result.warnings)} warnings')
             else:

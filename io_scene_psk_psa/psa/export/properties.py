@@ -29,6 +29,7 @@ class PSA_PG_export_action_list_item(PropertyGroup):
     frame_start: IntProperty(options={'HIDDEN'})
     frame_end: IntProperty(options={'HIDDEN'})
     is_pose_marker: BoolProperty(options={'HIDDEN'})
+    group: StringProperty()
 
 
 class PSA_PG_export_active_action_list_item(PropertyGroup):
@@ -38,6 +39,7 @@ class PSA_PG_export_active_action_list_item(PropertyGroup):
     is_selected: BoolProperty(default=True)
     frame_start: IntProperty(options={'HIDDEN'})
     frame_end: IntProperty(options={'HIDDEN'})
+    group: StringProperty()
 
 
 class PSA_PG_export_timeline_markers(PropertyGroup):  # TODO: rename this to singular
@@ -46,6 +48,7 @@ class PSA_PG_export_timeline_markers(PropertyGroup):  # TODO: rename this to sin
     is_selected: BoolProperty(default=True)
     frame_start: IntProperty(options={'HIDDEN'})
     frame_end: IntProperty(options={'HIDDEN'})
+    group: StringProperty()
 
 
 class PSA_PG_export_nla_strip_list_item(PropertyGroup):
@@ -54,6 +57,7 @@ class PSA_PG_export_nla_strip_list_item(PropertyGroup):
     frame_start: FloatProperty()
     frame_end: FloatProperty()
     is_selected: BoolProperty(default=True)
+    group: StringProperty()
 
 
 def get_sequences_from_name_and_frame_range(name: str, frame_start: int, frame_end: int):

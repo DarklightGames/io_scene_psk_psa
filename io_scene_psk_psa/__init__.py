@@ -1,15 +1,13 @@
 from bpy.app.handlers import persistent
 
-from .shared import data as shared_data, types as shared_types, helpers as shared_helpers
+from .shared import types as shared_types, helpers as shared_helpers
 from .shared import dfs as shared_dfs, ui as shared_ui
 from .psk import (
     builder as psk_builder,
-    data as psk_data,
     importer as psk_importer,
     properties as psk_properties,
-    writer as psk_writer,
 )
-from .psk import reader as psk_reader, ui as psk_ui
+from .psk import ui as psk_ui
 from .psk.export import (
     operators as psk_export_operators,
     properties as psk_export_properties,
@@ -19,9 +17,6 @@ from .psk.import_ import operators as psk_import_operators
 
 from .psa import (
     config as psa_config,
-    data as psa_data,
-    writer as psa_writer,
-    reader as psa_reader,
     builder as psa_builder,
     importer as psa_importer,
 )
@@ -38,15 +33,11 @@ _needs_reload = 'bpy' in locals()
 if _needs_reload:
     import importlib
 
-    importlib.reload(shared_data)
     importlib.reload(shared_helpers)
     importlib.reload(shared_types)
     importlib.reload(shared_dfs)
     importlib.reload(shared_ui)
 
-    importlib.reload(psk_data)
-    importlib.reload(psk_reader)
-    importlib.reload(psk_writer)
     importlib.reload(psk_builder)
     importlib.reload(psk_importer)
     importlib.reload(psk_properties)
@@ -56,10 +47,7 @@ if _needs_reload:
     importlib.reload(psk_export_ui)
     importlib.reload(psk_import_operators)
 
-    importlib.reload(psa_data)
     importlib.reload(psa_config)
-    importlib.reload(psa_reader)
-    importlib.reload(psa_writer)
     importlib.reload(psa_builder)
     importlib.reload(psa_importer)
     importlib.reload(psa_export_properties)

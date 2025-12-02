@@ -13,6 +13,9 @@ blender_version_min = "5.0.0"
 license = [
   "SPDX:GPL-3.0-or-later",
 ]
+wheels = [
+  './wheels/psk_psa_py-0.0.1-py3-none-any.whl'
+]
 
 [build]
 paths_exclude_pattern = [

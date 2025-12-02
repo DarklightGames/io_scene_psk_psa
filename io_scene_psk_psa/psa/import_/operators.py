@@ -9,7 +9,7 @@ from bpy_extras.io_utils import ImportHelper
 from .properties import PsaImportMixin, get_visible_sequences
 from ..config import read_psa_config
 from ..importer import BoneMapping, PsaImportOptions, import_psa
-from ..reader import PsaReader
+from psk_psa_py.psa.reader import PsaReader
 
 
 def psa_import_poll(cls, context: Context):

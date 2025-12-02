@@ -7,7 +7,7 @@ from bpy_extras.io_utils import ImportHelper
 
 from ..importer import PskImportOptions, import_psk
 from ..properties import PskImportMixin
-from ..reader import read_psk
+from psk_psa_py.psk.reader import read_psk_from_file
 
 
 def get_psk_import_options_from_properties(property_group: PskImportMixin):
@@ -91,7 +91,7 @@ class PSK_OT_import(Operator, ImportHelper, PskImportMixin):
 
     def execute(self, context):
         try:
-            psk = read_psk(self.filepath)
+            psk = read_psk_from_file(self.filepath)
         except OSError as e:
             self.report({'ERROR'}, f'Failed to read "{self.filepath}". The file may be corrupted or not a valid PSK file: {e}')
             return {'CANCELLED'}
@@ -144,7 +144,7 @@ class PSK_OT_import_drag_and_drop(Operator, PskImportMixin):
         for file in self.files:
             filepath = Path(self.directory) / file.name
             try:
-                psk = read_psk(filepath)
+                psk = read_psk_from_file(filepath)
             except OSError as e:
                 self.report({'ERROR'}, f'Failed to read "{filepath}". The file may be corrupted or not a valid PSK file: {e}')
                 return {'CANCELLED'}
