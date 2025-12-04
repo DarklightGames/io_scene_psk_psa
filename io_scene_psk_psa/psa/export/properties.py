@@ -133,6 +133,11 @@ sampling_mode_items = (
     ('SUBFRAME', 'Subframe', 'Sampling is performed by evaluating the bone poses at the subframe time.\n\nNot recommended unless you are also animating with subframes enabled.', 'SUBFRAME', 1),
 )
 
+group_source_items = (
+    ('ACTIONS', 'Actions', '', 0),
+    ('CUSTOM', 'Custom', '', 1),
+)
+
 
 def sequence_source_update_cb(self: 'PSA_PG_export', context: Context) -> None:
     armature_objects = []
@@ -231,6 +236,18 @@ class PSA_PG_export(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExpo
         description='The method by which frames are sampled',
         items=sampling_mode_items,
         default='INTERPOLATED'
+    )
+    group_source: EnumProperty(
+        name='Group Source',
+        options=set(),
+        description='The source of the exported sequence\'s group property',
+        items=group_source_items,
+        default='ACTIONS'
+    )
+    group_custom: StringProperty(
+        name='Group',
+        options=set(),
+        description='The group to apply to all exported sequences. Only applicable when Group Source is Custom.'
     )
 
 

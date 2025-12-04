@@ -18,7 +18,6 @@ from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from psk_psa_py.psa.writer import write_psa_to_file
 from ...shared.helpers import populate_bone_collection_list, get_nla_strips_in_frame_range, PsxBoneCollection
 from ...shared.ui import draw_bone_filter_mode
-from ...shared.types import PSX_PG_action_export, PSX_PG_scene_export
 
 
 def get_sequences_propnames_from_source(sequence_source: str) -> Tuple[str, str]:
@@ -301,6 +300,7 @@ class PSA_OT_export(Operator, ExportHelper):
 
     def draw(self, context):
         layout = self.layout
+        assert layout
         pg = getattr(context.scene, 'psa_export')
 
         sequences_header, sequences_panel = layout.panel('Sequences', default_closed=False)
@@ -334,7 +334,7 @@ class PSA_OT_export(Operator, ExportHelper):
             sequences_panel.template_list(PSA_UL_export_sequences.bl_idname, '', pg, propname, pg, active_propname,
                                           rows=max(3, min(len(getattr(pg, propname)), 10)))
 
-            name_header, name_panel = layout.panel('Name', default_closed=False)
+            name_header, name_panel = sequences_panel.panel('Name', default_closed=False)
             name_header.label(text='Name')
             if name_panel:
                 flow = name_panel.grid_flow()
@@ -351,8 +351,20 @@ class PSA_OT_export(Operator, ExportHelper):
                     if count > 1:
                         layout.label(text=f'Duplicate action: {action_name}', icon='ERROR')
                         break
+        
+            # Group
+            group_header, group_panel = sequences_panel.panel('Group', default_closed=True)
+            group_header.label(text='Group')
+            if group_panel is not None:
+                group_flow = group_panel.grid_flow()
+                group_flow.use_property_split = True
+                group_flow.use_property_decorate = False
+                group_flow.prop(pg, 'group_source')
+                if pg.group_source == 'CUSTOM':
+                    group_flow.prop(pg, 'group_custom', placeholder='Group')
 
-            sampling_header, sampling_panel = layout.panel('Data Source', default_closed=False)
+            # Sampling
+            sampling_header, sampling_panel = sequences_panel.panel('Data Source', default_closed=False)
             sampling_header.label(text='Sampling')
             if sampling_panel:
                 flow = sampling_panel.grid_flow()
@@ -431,6 +443,7 @@ class PSA_OT_export(Operator, ExportHelper):
             self._check_context(context)
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
+            return {'CANCELLED'}
 
         pg: PSA_PG_export = getattr(context.scene, 'psa_export')
 
@@ -468,6 +481,15 @@ class PSA_OT_export(Operator, ExportHelper):
 
         export_sequences: List[PsaBuildSequence] = []
 
+        def get_export_sequence_group(group_source: str, group_custom: str | None, action: Action | None) -> str | None:
+            match group_source:
+                case 'ACTIONS':
+                    return action.psa_export.group if action else None
+                case 'CUSTOM':
+                    return group_custom
+                case _:
+                    return None
+
         match pg.sequence_source:
             case 'ACTIONS':
                 for action_item in filter(lambda x: x.is_selected, pg.action_list):
@@ -475,7 +497,7 @@ class PSA_OT_export(Operator, ExportHelper):
                         continue
                     export_sequence = PsaBuildSequence(context.active_object, animation_data)
                     export_sequence.name = action_item.name
-                    export_sequence.group = action_item.group
+                    export_sequence.group = get_export_sequence_group(pg.group_source, pg.group_custom, action_item.action)
                     export_sequence.nla_state.action = action_item.action
                     export_sequence.nla_state.frame_start = action_item.frame_start
                     export_sequence.nla_state.frame_end = action_item.frame_end
@@ -485,12 +507,15 @@ class PSA_OT_export(Operator, ExportHelper):
                     export_sequences.append(export_sequence)
             case 'TIMELINE_MARKERS':
                 for marker_item in filter(lambda x: x.is_selected, pg.marker_list):
+                    nla_strips_actions: List[Action] = []
+                    for nla_strip in get_nla_strips_in_frame_range(animation_data, marker_item.frame_start, marker_item.frame_end):
+                        if nla_strip.action:
+                            nla_strips_actions.append(nla_strip.action)
                     export_sequence = PsaBuildSequence(context.active_object, animation_data)
                     export_sequence.name = marker_item.name
+                    export_sequence.group = get_export_sequence_group(pg.group_source, pg.group_custom, next(iter(nla_strips_actions), None))
                     export_sequence.nla_state.frame_start = marker_item.frame_start
                     export_sequence.nla_state.frame_end = marker_item.frame_end
-                    nla_strips_actions = set(
-                        map(lambda x: x.action, get_nla_strips_in_frame_range(animation_data, marker_item.frame_start, marker_item.frame_end)))
                     export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, nla_strips_actions)
                     export_sequence.compression_ratio = get_sequence_compression_ratio(pg.compression_ratio_source, pg.compression_ratio_custom, nla_strips_actions)
                     export_sequences.append(export_sequence)
@@ -498,7 +523,7 @@ class PSA_OT_export(Operator, ExportHelper):
                 for nla_strip_item in filter(lambda x: x.is_selected, pg.nla_strip_list):
                     export_sequence = PsaBuildSequence(context.active_object, animation_data)
                     export_sequence.name = nla_strip_item.name
-                    export_sequence.group = nla_strip_item.action.psa_export.group
+                    export_sequence.group = get_export_sequence_group(pg.group_source, pg.group_custom, nla_strip_item.action)
                     export_sequence.nla_state.frame_start = nla_strip_item.frame_start
                     export_sequence.nla_state.frame_end = nla_strip_item.frame_end
                     export_sequence.fps = get_sequence_fps(context, pg.fps_source, pg.fps_custom, [nla_strip_item.action])
@@ -510,7 +535,7 @@ class PSA_OT_export(Operator, ExportHelper):
                     export_sequence = PsaBuildSequence(active_action_item.armature_object, active_action_item.armature_object.animation_data)
                     action = active_action_item.action
                     export_sequence.name = action.name
-                    export_sequence.group = action.psa_export.group
+                    export_sequence.group = get_export_sequence_group(pg.group_source, pg.group_custom, action)
                     export_sequence.nla_state.action = action
                     export_sequence.nla_state.frame_start = int(action.frame_range[0])
                     export_sequence.nla_state.frame_end = int(action.frame_range[1])
