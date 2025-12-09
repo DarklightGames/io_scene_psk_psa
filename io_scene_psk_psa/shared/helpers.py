@@ -13,8 +13,6 @@ def rgb_to_srgb(c: float) -> float:
 
 
 def get_nla_strips_in_frame_range(animation_data: AnimData, frame_min: float, frame_max: float):
-    if animation_data is None:
-        return
     for nla_track in animation_data.nla_tracks:
         if nla_track.mute:
             continue

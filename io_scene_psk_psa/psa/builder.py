@@ -59,7 +59,7 @@ def _get_pose_bone_location_and_rotation(
 
     if is_false_root_bone:
         pose_bone_matrix = coordinate_system_transform
-    elif pose_bone.parent is not None:
+    elif pose_bone is not None and pose_bone.parent is not None:
         pose_bone_matrix = pose_bone.matrix
         pose_bone_parent_matrix = pose_bone.parent.matrix
         pose_bone_matrix = pose_bone_parent_matrix.inverted() @ pose_bone_matrix
