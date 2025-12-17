@@ -8,6 +8,7 @@ SUZANNE_FILEPATH = 'tests/data/Suzanne.psk'
 SARGE_FILEPATH = 'tests/data/CS_Sarge_S0_Skelmesh.pskx'
 SLURP_MONSTER_AXE_FILEPATH = 'tests/data/Slurp_Monster_Axe_LOD0.psk'
 BAT_FILEPATH = 'tests/data/Bat.psk'
+BLACK_WIDOW_FILEPATH = 'tests/data/SK_1033_1033001.pskx'
 
 
 @pytest.fixture(autouse=True)
@@ -228,6 +229,38 @@ def test_psk_import_extra_uvs():
     assert mesh_data.uv_layers[0].uv[0].vector.y == 0.90533447265625
     assert mesh_data.uv_layers[1].uv[0].vector.x == 3.0517578125e-05
     assert mesh_data.uv_layers[1].uv[0].vector.y == 0.999969482421875
+
+
+def test_psk_import_many_extra_uvs():
+    assert bpy.ops.psk.import_file(
+        filepath=BLACK_WIDOW_FILEPATH,
+        components='MESH',
+        should_import_vertex_colors=False,
+        should_import_vertex_normals=False,
+        should_import_shape_keys=False,
+        ) == {'FINISHED'}
+
+    mesh_object = bpy.data.objects.get('SK_1033_1033001', None)
+    assert mesh_object is not None, "Mesh object not found in the scene"
+    assert mesh_object.type == 'MESH', "Mesh object type should be MESH"
+
+    mesh_data = typing_cast(Mesh, mesh_object.data)
+    assert mesh_data is not None, "Mesh data not found in the scene"
+    assert len(mesh_data.uv_layers) == 4, "Mesh should have two UV layers"
+
+    assert mesh_data.uv_layers[0].name == 'UVMap', "First UV layer should be named 'UVMap'"
+    assert mesh_data.uv_layers[1].name == 'EXTRAUV0', "Second UV layer should be named 'EXTRAUV0'"
+    assert mesh_data.uv_layers[2].name == 'EXTRAUV1', "Third UV layer should be named 'EXTRAUV1'"
+    assert mesh_data.uv_layers[3].name == 'EXTRAUV2', "Fourth UV layer should be named 'EXTRAUV2'"
+
+
+def test_psk_import_multiple_extra_uvs():
+    assert bpy.ops.psk.import_file(
+        filepath=SARGE_FILEPATH,
+        components='MESH',
+        should_import_vertex_colors=True,
+        vertex_color_space='LINEAR',
+        ) == {'FINISHED'}
 
 
 def test_psk_import_materials():

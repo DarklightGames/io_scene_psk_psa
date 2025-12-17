@@ -201,7 +201,6 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
 
         # Extra UVs
         if psk.has_extra_uvs and options.should_import_extra_uvs:
-            wedge_index_offset = 0
             for extra_uv_index, extra_uvs in enumerate(psk.extra_uvs):
                 uv_layer_data = np.zeros((face_count * 3, 2), dtype=np.float32)
                 uv_layer_data_index = 0
@@ -209,10 +208,9 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
                     if face_index in invalid_face_indices:
                         continue
                     for wedge_index in reversed(face.wedge_indices):
-                        u, v = extra_uvs[wedge_index_offset + wedge_index]
+                        u, v = extra_uvs[wedge_index]
                         uv_layer_data[uv_layer_data_index] = u, 1.0 - v
                         uv_layer_data_index += 1
-                wedge_index_offset += len(psk.wedges)
                 uv_layer = mesh_data.uv_layers.new(name=f'EXTRAUV{extra_uv_index}')
                 uv_layer.uv.foreach_set('vector', uv_layer_data.ravel())
 
