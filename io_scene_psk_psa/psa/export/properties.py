@@ -61,15 +61,36 @@ class PSA_PG_export_nla_strip_list_item(PropertyGroup):
 
 
 def get_sequences_from_name_and_frame_range(name: str, frame_start: int, frame_end: int):
-    reversed_pattern = r'(.+)/(.+)'
-    reversed_match = re.match(reversed_pattern, name)
-    if reversed_match:
-        forward_name = reversed_match.group(1)
-        backwards_name = reversed_match.group(2)
-        yield forward_name, frame_start, frame_end
-        yield backwards_name, frame_end, frame_start
+    # Check for loop
+    anims: List[tuple[str, int, int]] = []
+    loop_pattern = r'\@(\d+)\:(.+)'
+    loop_match = re.match(loop_pattern, name)
+    if loop_match:
+        frame_count = max(1, int(loop_match.group(1)))
+        sequence_name = loop_match.group(2)
+        iteration = 0
+        frame = frame_start
+        while frame + frame_count <= frame_end:
+            output_name = sequence_name.format(index=iteration)
+            iteration_frame_start = frame
+            iteration_frame_end = frame + frame_count - 1
+            anims.append((output_name, iteration_frame_start, iteration_frame_end))
+            frame += frame_count
+            iteration += 1
     else:
-        yield name, frame_start, frame_end
+        # If not, just treat it as a single animation, but parse for the reverse pattern as well.
+        anims.append((name, frame_start, frame_end))
+
+    for (name, frame_start, frame_end) in anims:
+        reversed_pattern = r'(.+)/(.+)'
+        reversed_match = re.match(reversed_pattern, name)
+        if reversed_match:
+            forward_name = reversed_match.group(1)
+            backwards_name = reversed_match.group(2)
+            yield forward_name, frame_start, frame_end
+            yield backwards_name, frame_end, frame_start
+        else:
+            yield name, frame_start, frame_end
 
 
 def nla_track_update_cb(self: 'PSA_PG_export', context: Context) -> None:
