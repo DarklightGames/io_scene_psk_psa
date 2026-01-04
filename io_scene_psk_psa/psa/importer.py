@@ -7,6 +7,8 @@ from bpy.types import Armature, Context, FCurve, Object, Bone, PoseBone
 from mathutils import Vector, Quaternion
 from bpy_extras import anim_utils
 
+from ..shared.types import PSX_PG_action_export
+
 from .config import PsaConfig, REMOVE_TRACK_LOCATION, REMOVE_TRACK_ROTATION
 from psk_psa_py.psa.reader import PsaReader
 from psk_psa_py.shared.data import PsxBone
@@ -369,7 +371,8 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
         # Write meta-data.
         if options.should_write_metadata:
-            action.psa_export.fps = target_fps
+            pg = typing_cast(PSX_PG_action_export, getattr(action, 'psa_export'))
+            pg.fps = target_fps
 
         action.use_fake_user = options.should_use_fake_user
 

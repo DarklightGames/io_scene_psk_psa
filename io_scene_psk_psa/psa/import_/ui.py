@@ -22,9 +22,9 @@ class PSA_UL_sequences_mixin(UIList):
         sub_row.prop(pg, 'sequence_use_filter_regex', text='', icon='SORTBYEXT')
         sub_row.prop(pg, 'sequence_filter_is_selected', text='', icon='CHECKBOX_HLT')
 
-    def filter_items(self, context, data, property_):
+    def filter_items(self, context, data, property):
         pg = getattr(context.scene, 'psa_import')
-        sequences = getattr(data, property_)
+        sequences = getattr(data, property)
         flt_flags = filter_sequences(pg, sequences)
         flt_neworder = bpy.types.UI_UL_list.sort_items_by_name(sequences, 'action_name')
         return flt_flags, flt_neworder

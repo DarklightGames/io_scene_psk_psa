@@ -1,10 +1,10 @@
 import re
 import sys
 from fnmatch import fnmatch
-from typing import List, Optional
+from typing import List, Optional, Sequence
+import bpy
 from bpy.props import (
     BoolProperty,
-    PointerProperty,
     EnumProperty,
     FloatProperty,
     CollectionProperty,
@@ -15,49 +15,50 @@ from bpy.types import PropertyGroup, Object, Action, AnimData, Context
 
 from ...shared.dfs import dfs_view_layer_objects
 from ...shared.helpers import populate_bone_collection_list
-from ...shared.types import TransformMixin, ExportSpaceMixin, PsxBoneExportMixin
+from ...shared.types import TransformMixin, ExportSpaceMixin, PsxBoneExportMixin, TransformSourceMixin
 
 
 def psa_export_property_group_animation_data_override_poll(_context, obj):
     return obj.animation_data is not None
 
+class PsaExportSequenceMixin(PropertyGroup):
+    name: StringProperty(name='Name')
+    is_selected: BoolProperty(name='Selected', default=True)
+    frame_start: IntProperty(name='Start Frame', options={'HIDDEN'})
+    frame_end: IntProperty(name='End Frame', options={'HIDDEN'})
+    group: StringProperty(name='Group')
 
-class PSA_PG_export_action_list_item(PropertyGroup):
-    action: PointerProperty(type=Action)
-    name: StringProperty()
-    is_selected: BoolProperty(default=True)
-    frame_start: IntProperty(options={'HIDDEN'})
-    frame_end: IntProperty(options={'HIDDEN'})
+    def __hash__(self) -> int:
+        return hash(self.name)
+
+class PsaExportSequenceWithActionMixin(PsaExportSequenceMixin):
+    action_name: StringProperty()
+
+    @property
+    def action(self) -> Optional[Action]:
+        return bpy.data.actions.get(self.action_name)
+
+class PSA_PG_export_action_list_item(PsaExportSequenceWithActionMixin):
     is_pose_marker: BoolProperty(options={'HIDDEN'})
-    group: StringProperty()
 
 
-class PSA_PG_export_active_action_list_item(PropertyGroup):
-    action: PointerProperty(type=Action)
-    name: StringProperty()
-    armature_object: PointerProperty(type=Object)
-    is_selected: BoolProperty(default=True)
-    frame_start: IntProperty(options={'HIDDEN'})
-    frame_end: IntProperty(options={'HIDDEN'})
-    group: StringProperty()
+class PSA_PG_export_active_action_list_item(PsaExportSequenceWithActionMixin):
+    armature_object_name: StringProperty()
+
+    @property
+    def armature_object(self) -> Optional[Object]:
+        return bpy.data.objects.get(self.armature_object_name)
+    
+    def __hash__(self) -> int:
+        return super().__hash__()
 
 
-class PSA_PG_export_timeline_markers(PropertyGroup):  # TODO: rename this to singular
+class PSA_PG_export_timeline_marker(PsaExportSequenceMixin):
     marker_index: IntProperty()
-    name: StringProperty()
-    is_selected: BoolProperty(default=True)
-    frame_start: IntProperty(options={'HIDDEN'})
-    frame_end: IntProperty(options={'HIDDEN'})
-    group: StringProperty()
 
 
-class PSA_PG_export_nla_strip_list_item(PropertyGroup):
-    name: StringProperty()
-    action: PointerProperty(type=Action)
-    frame_start: FloatProperty()
-    frame_end: FloatProperty()
-    is_selected: BoolProperty(default=True)
-    group: StringProperty()
+class PSA_PG_export_nla_strip_list_item(PsaExportSequenceWithActionMixin):
+    pass
 
 
 def get_sequences_from_name_and_frame_range(name: str, frame_start: int, frame_end: int):
@@ -105,7 +106,7 @@ def nla_track_update_cb(self: 'PSA_PG_export', context: Context) -> None:
         for nla_strip in nla_track.strips:
             for sequence_name, frame_start, frame_end in get_sequences_from_name_and_frame_range(nla_strip.name, nla_strip.frame_start, nla_strip.frame_end):
                 strip: PSA_PG_export_nla_strip_list_item = self.nla_strip_list.add()
-                strip.action = nla_strip.action
+                strip.action_name = nla_strip.action
                 strip.name = sequence_name
                 strip.frame_start = frame_start
                 strip.frame_end = frame_end
@@ -113,8 +114,6 @@ def nla_track_update_cb(self: 'PSA_PG_export', context: Context) -> None:
 
 def get_animation_data(pg: 'PSA_PG_export', context: Context) -> Optional[AnimData]:
     animation_data_object = context.object
-    if pg.should_override_animation_data:
-        animation_data_object = pg.animation_data_override
     return animation_data_object.animation_data if animation_data_object else None
 
 
@@ -173,19 +172,7 @@ def sequence_source_update_cb(self: 'PSA_PG_export', context: Context) -> None:
         primary_key='DATA' if self.sequence_source == 'ACTIVE_ACTION' else 'OBJECT')
 
 
-class PSA_PG_export(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExportMixin):
-    should_override_animation_data: BoolProperty(
-        name='Override Animation Data',
-        options=set(),
-        default=False,
-        description='Use the animation data from a different object instead of the selected object',
-        update=animation_data_override_update_cb,
-    )
-    animation_data_override: PointerProperty(
-        type=Object,
-        update=animation_data_override_update_cb,
-        poll=psa_export_property_group_animation_data_override_poll
-    )
+class PsaExportMixin(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExportMixin, TransformSourceMixin):
     sequence_source: EnumProperty(
         name='Source',
         options=set(),
@@ -215,14 +202,16 @@ class PSA_PG_export(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExpo
         items=compression_ratio_source_items,
     )
     compression_ratio_custom: FloatProperty(default=1.0, min=0.0, max=1.0, subtype='FACTOR', description='The key sampling ratio of the exported sequence.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames')
+
     action_list: CollectionProperty(type=PSA_PG_export_action_list_item)
     action_list_index: IntProperty(default=0)
-    marker_list: CollectionProperty(type=PSA_PG_export_timeline_markers)
+    marker_list: CollectionProperty(type=PSA_PG_export_timeline_marker)
     marker_list_index: IntProperty(default=0)
     nla_strip_list: CollectionProperty(type=PSA_PG_export_nla_strip_list_item)
     nla_strip_list_index: IntProperty(default=0)
     active_action_list: CollectionProperty(type=PSA_PG_export_active_action_list_item)
     active_action_list_index: IntProperty(default=0)
+
     sequence_name_prefix: StringProperty(name='Prefix', options=set())
     sequence_name_suffix: StringProperty(name='Suffix', options=set())
     sequence_filter_name: StringProperty(
@@ -271,8 +260,11 @@ class PSA_PG_export(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExpo
         description='The group to apply to all exported sequences. Only applicable when Group Source is Custom.'
     )
 
+class PSA_PG_export(PsaExportMixin):
+    pass
 
-def filter_sequences(pg: PSA_PG_export, sequences) -> List[int]:
+
+def filter_sequences(pg: PsaExportMixin, sequences: Sequence[PsaExportSequenceMixin]) -> List[int]:
     bitflag_filter_item = 1 << 30
     flt_flags = [bitflag_filter_item] * len(sequences)
 
@@ -287,6 +279,8 @@ def filter_sequences(pg: PSA_PG_export, sequences) -> List[int]:
             for i, sequence in enumerate(sequences):
                 flt_flags[i] ^= bitflag_filter_item
 
+    # TODO: perhaps just make one type that has all of the possible data types? hasattr is very flakey.
+    # we could just add the "type" as a variable and switch on that for different behaviors.
     if not pg.sequence_filter_asset:
         for i, sequence in enumerate(sequences):
             if hasattr(sequence, 'action') and sequence.action is not None and sequence.action.asset_data is not None:
@@ -307,7 +301,7 @@ def filter_sequences(pg: PSA_PG_export, sequences) -> List[int]:
 
 _classes = (
     PSA_PG_export_action_list_item,
-    PSA_PG_export_timeline_markers,
+    PSA_PG_export_timeline_marker,
     PSA_PG_export_nla_strip_list_item,
     PSA_PG_export_active_action_list_item,
     PSA_PG_export,

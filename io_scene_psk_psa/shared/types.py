@@ -1,12 +1,29 @@
+from typing import Generic, Iterable, Sized, TypeVar
 import bpy
 from bpy.props import CollectionProperty, EnumProperty, StringProperty, IntProperty, BoolProperty, FloatProperty
 from bpy.types import PropertyGroup, UIList, UILayout, Context, AnyType, Panel
 
+T = TypeVar('T')
+
+# Don't actually use this, this is just for typing.
+class BpyCollectionProperty(Generic[T], Iterable[T], Sized):
+    def add(self) -> T:
+        return T() # type: ignore
+
+    def clear(self) -> None:
+        pass
+
+    def move(self, src_index: int, dst_index: int):
+        pass
+
+    def remove(self, index: int):
+        pass
+
 
 class PSX_UL_bone_collection_list(UIList):
 
-    def draw_item(self, _context: Context, layout: UILayout, _data: AnyType, item: AnyType, _icon: int,
-                  _active_data: AnyType, _active_property: str, _index: int = 0, _flt_flag: int = 0):
+    def draw_item(self, context: Context, layout: UILayout, data: AnyType, item: AnyType, icon: int,
+                  active_data: AnyType, active_property: str, index: int = 0, flt_flag: int = 0):
         row = layout.row()
 
         row.prop(item, 'is_selected', text=getattr(item, 'name'))
@@ -27,6 +44,9 @@ class PSX_PG_bone_collection_list_item(PropertyGroup):
     count: IntProperty()
     is_selected: BoolProperty(default=False)
 
+    def __hash__(self) -> int:
+        return hash(f'{self.name}/{self.armature_object_name}/{self.armature_data_name}')
+
 
 class PSX_PG_action_export(PropertyGroup):
     group: StringProperty(name='Group', description='The group of the sequence', maxlen=64)
@@ -45,7 +65,7 @@ class PSX_PT_action(Panel):
 
     @classmethod
     def poll(cls, context: 'Context'):
-        return context.active_object and context.active_object.type == 'ARMATURE' and context.active_action is not None
+        return context.active_object is not None and context.active_object.type == 'ARMATURE' and context.active_action is not None
 
     def draw(self, context: 'Context'):
         action = context.active_action
@@ -87,13 +107,13 @@ up_items = (
 )
 
 
-def forward_axis_update(self, __context):
+def forward_axis_update(self, context):
     if self.forward_axis == self.up_axis:
         # Automatically set the up axis to the next available axis
         self.up_axis = next((axis for axis in axis_identifiers if axis != self.forward_axis), 'Z')
 
 
-def up_axis_update(self, __context):
+def up_axis_update(self, context):
     if self.up_axis == self.forward_axis:
         # Automatically set the forward axis to the next available axis
         self.forward_axis = next((axis for axis in axis_identifiers if axis != self.up_axis), 'X')
@@ -138,6 +158,17 @@ class ExportSpaceMixin:
         default='WORLD'
     )
  
+transform_source_items = (
+    ('SCENE', 'Scene', 'Use the scene transform settings'),
+    ('CUSTOM', 'Custom', 'Use custom transform settings'),
+)
+
+class TransformSourceMixin:
+    transform_source: EnumProperty(
+        items=transform_source_items,
+        name='Transform Source',
+        default='SCENE'
+    )
  
 class PsxBoneExportMixin:
     bone_filter_mode: EnumProperty(

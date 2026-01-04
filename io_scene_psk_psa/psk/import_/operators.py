@@ -163,7 +163,7 @@ class PSK_OT_import_drag_and_drop(Operator, PskImportMixin):
 
 
 # TODO: move to another file
-class PSK_FH_import(FileHandler):
+class PSK_FH_file_handler(FileHandler):
     bl_idname = 'PSK_FH_import'
     bl_label = 'Unreal PSK'
     bl_import_operator = PSK_OT_import_drag_and_drop.bl_idname
@@ -178,7 +178,7 @@ class PSK_FH_import(FileHandler):
 _classes = (
     PSK_OT_import,
     PSK_OT_import_drag_and_drop,
-    PSK_FH_import,
+    PSK_FH_file_handler,
 )
 
 from bpy.utils import register_classes_factory

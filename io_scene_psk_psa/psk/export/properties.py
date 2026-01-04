@@ -8,7 +8,7 @@ from bpy.props import (
 )
 from bpy.types import Material, PropertyGroup
 
-from ...shared.types import ExportSpaceMixin, TransformMixin, PsxBoneExportMixin
+from ...shared.types import ExportSpaceMixin, TransformMixin, PsxBoneExportMixin, TransformSourceMixin
 
 object_eval_state_items = (
     ('EVALUATED', 'Evaluated', 'Use data from fully evaluated object'),
@@ -18,11 +18,6 @@ object_eval_state_items = (
 material_order_mode_items = (
     ('AUTOMATIC', 'Automatic', 'Automatically order the materials'),
     ('MANUAL', 'Manual', 'Manually arrange the materials'),
-)
-
-transform_source_items = (
-    ('SCENE', 'Scene', 'Use the scene transform settings'),
-    ('CUSTOM', 'Custom', 'Use custom transform settings'),
 )
 
 class PSK_PG_material_list_item(PropertyGroup):
@@ -35,7 +30,7 @@ class PSK_PG_material_name_list_item(PropertyGroup):
     index: IntProperty()
 
 
-class PskExportMixin(ExportSpaceMixin, TransformMixin, PsxBoneExportMixin):
+class PskExportMixin(ExportSpaceMixin, TransformMixin, PsxBoneExportMixin, TransformSourceMixin):
     object_eval_state: EnumProperty(
         items=object_eval_state_items,
         name='Object Evaluation State',
@@ -53,11 +48,6 @@ class PskExportMixin(ExportSpaceMixin, TransformMixin, PsxBoneExportMixin):
         name='Export Vertex Normals',
         default=False,
         description='Export VTXNORMS section.'
-    )
-    transform_source: EnumProperty(
-        items=transform_source_items,
-        name='Transform Source',
-        default='SCENE'
     )
 
 

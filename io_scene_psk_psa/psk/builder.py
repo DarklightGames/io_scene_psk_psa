@@ -1,26 +1,21 @@
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import Armature, Collection, Context, Depsgraph, Object, ArmatureModifier, Mesh
+from bpy.types import Armature, Context, Object, Mesh
 from mathutils import Matrix
-from typing import Dict, Iterable, List, Optional, Set, cast as typing_cast
+from typing import Dict, Iterable, List, Optional, cast as typing_cast
 from psk_psa_py.shared.data import Vector3
 from psk_psa_py.psk.data import Psk
 from .properties import triangle_type_and_bit_flags_to_poly_flags
-from ..shared.dfs import DfsObject, dfs_collection_objects, dfs_view_layer_objects
 from ..shared.helpers import (
+    PskInputObjects,
     PsxBoneCollection,
     convert_string_to_cp1252_bytes,
     create_psx_bones,
-    get_armatures_for_mesh_objects,
+    get_armature_for_mesh_object,
     get_coordinate_system_transform,
+    get_materials_for_mesh_objects,
 )
-
-
-class PskInputObjects(object):
-    def __init__(self):
-        self.mesh_dfs_objects: List[DfsObject] = []
-        self.armature_objects: Set[Object] = set()
 
 
 class PskBuildOptions(object):
@@ -35,62 +30,6 @@ class PskBuildOptions(object):
         self.forward_axis = 'X'
         self.up_axis = 'Z'
         self.root_bone_name = 'ROOT'
-
-
-def get_materials_for_mesh_objects(depsgraph: Depsgraph, mesh_objects: Iterable[Object]):
-    yielded_materials = set()
-    for mesh_object in mesh_objects:
-        evaluated_mesh_object = mesh_object.evaluated_get(depsgraph)
-        for i, material_slot in enumerate(evaluated_mesh_object.material_slots):
-            material = material_slot.material
-            if material is None:
-                raise RuntimeError(f'Material slots cannot be empty. ({mesh_object.name}, index {i})')
-            if material not in yielded_materials:
-                yielded_materials.add(material)
-                yield material
-
-
-def get_mesh_objects_for_collection(collection: Collection) -> Iterable[DfsObject]:
-    return filter(lambda x: x.obj.type == 'MESH', dfs_collection_objects(collection))
-
-
-def get_mesh_objects_for_context(context: Context) -> Iterable[DfsObject]:
-    if context.view_layer is None:
-        return
-    for dfs_object in dfs_view_layer_objects(context.view_layer):
-        if dfs_object.obj.type == 'MESH' and dfs_object.is_selected:
-            yield dfs_object
-
-
-def get_armature_for_mesh_object(mesh_object: Object) -> Optional[Object]:
-    if mesh_object.type != 'MESH':
-        return None
-    # Get the first armature modifier with a non-empty armature object.
-    for modifier in filter(lambda x: x.type == 'ARMATURE', mesh_object.modifiers):
-            armature_modifier = typing_cast(ArmatureModifier, modifier)
-            if armature_modifier.object is not None:
-                return armature_modifier.object
-    return None
-
-
-def _get_psk_input_objects(mesh_dfs_objects: Iterable[DfsObject]) -> PskInputObjects:
-    mesh_dfs_objects = list(mesh_dfs_objects)
-    if len(mesh_dfs_objects) == 0:
-        raise RuntimeError('At least one mesh must be selected')
-    input_objects = PskInputObjects()
-    input_objects.mesh_dfs_objects = mesh_dfs_objects
-    input_objects.armature_objects |= set(get_armatures_for_mesh_objects(map(lambda x: x.obj, mesh_dfs_objects)))
-    return input_objects
-
-
-def get_psk_input_objects_for_context(context: Context) -> PskInputObjects:
-    mesh_objects = list(get_mesh_objects_for_context(context))
-    return _get_psk_input_objects(mesh_objects)
-
-
-def get_psk_input_objects_for_collection(collection: Collection) -> PskInputObjects:
-    mesh_objects = get_mesh_objects_for_collection(collection)
-    return _get_psk_input_objects(mesh_objects)
 
 
 class PskBuildResult(object):
@@ -199,12 +138,14 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
     # This is used later to transform the mesh object geometry into the export space.
     armature_mesh_export_space_matrices: Dict[Optional[Object], Matrix] = {None: Matrix.Identity(4)}
     if options.export_space == 'ARMATURE':
-        # For meshes without an armature modifier, we need to set the export space to the armature object.
+        # For meshes without an armature modifier, we need to set the export space to the first armature object.
         armature_mesh_export_space_matrices[None] = _get_mesh_export_space_matrix(next(iter(input_objects.armature_objects), None), options.export_space)
+    
     for armature_object in armature_objects:
         armature_mesh_export_space_matrices[armature_object] = _get_mesh_export_space_matrix(armature_object, options.export_space)
 
-    scale_matrix = Matrix.Scale(options.scale, 4)
+    # TODO: we need to handle armature hierarchies here. if an object is parented to another armature,
+    #  we need to take that into account when calculating the export space matrix.
 
     original_armature_object_pose_positions = {a: a.data.pose_position for a in armature_objects}
 
@@ -215,6 +156,8 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         armature_data.pose_position = 'REST'
 
     material_names = [m.name if m is not None else 'None' for m in materials]
+
+    scale_matrix = Matrix.Scale(options.scale, 4)
 
     for object_index, input_mesh_object in enumerate(input_objects.mesh_dfs_objects):
         obj, matrix_world = input_mesh_object.obj, input_mesh_object.matrix_world

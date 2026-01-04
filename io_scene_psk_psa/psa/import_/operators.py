@@ -452,18 +452,6 @@ def draw_psa_import_options_no_panels(layout, pg: PsaImportMixin):
     col.prop(pg, 'should_use_config_file')
 
 
-class PSA_FH_import(FileHandler):  # TODO: rename and add handling for PSA export.
-    bl_idname = 'PSA_FH_import'
-    bl_label = 'File handler for Unreal PSA import'
-    bl_import_operator = PSA_OT_import_drag_and_drop.bl_idname
-    # bl_export_operator = 'psa_export.export'
-    bl_file_extensions = '.psa'
-
-    @classmethod
-    def poll_drop(cls, context: Context) -> bool:
-        return context.area is not None and context.area.type == 'VIEW_3D'
-
-
 _classes = (
     PSA_OT_import_sequences_select_all,
     PSA_OT_import_sequences_deselect_all,
@@ -471,7 +459,6 @@ _classes = (
     PSA_OT_import,
     PSA_OT_import_all,
     PSA_OT_import_drag_and_drop,
-    PSA_FH_import,
 )
 
 from bpy.utils import register_classes_factory

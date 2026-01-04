@@ -1,22 +1,21 @@
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, cast as typing_cast
 
 import bpy
-from bpy.props import BoolProperty, StringProperty
+from bpy.props import StringProperty
 from bpy.types import Context, Depsgraph, Material, Object, Operator, Scene
 from bpy_extras.io_utils import ExportHelper
 
-from .properties import PskExportMixin
+from .properties import PSK_PG_export, PskExportMixin
 from ..builder import (
     PskBuildOptions,
     build_psk,
     get_materials_for_mesh_objects,
-    get_psk_input_objects_for_collection,
-    get_psk_input_objects_for_context,
 )
 from psk_psa_py.psk.writer import write_psk_to_path
-from ...shared.helpers import PsxBoneCollection, get_collection_export_operator_from_context, populate_bone_collection_list
+from ...shared.helpers import PsxBoneCollection, get_collection_export_operator_from_context, get_psk_input_objects_for_collection, populate_bone_collection_list, get_psk_input_objects_for_context
 from ...shared.ui import draw_bone_filter_mode
+from ...shared.operators import PSK_OT_bone_collection_list_populate, PSK_OT_bone_collection_list_select_all
 
 
 def populate_material_name_list(depsgraph: Depsgraph, mesh_objects: Iterable[Object], material_list):
@@ -34,51 +33,6 @@ def populate_material_name_list(depsgraph: Depsgraph, mesh_objects: Iterable[Obj
         m.index = index
 
 
-
-class PSK_OT_bone_collection_list_populate(Operator):
-    bl_idname = 'psk.bone_collection_list_populate'
-    bl_label = 'Populate Bone Collection List'
-    bl_description = 'Populate the bone collection list from the armature that will be used in this collection export'
-    bl_options = {'INTERNAL'}
-
-    def execute(self, context):
-        export_operator = get_collection_export_operator_from_context(context)
-        if export_operator is None:
-            self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
-            return {'CANCELLED'}
-        if context.collection is None:
-            self.report({'ERROR_INVALID_CONTEXT'}, 'No active collection')
-            return {'CANCELLED'}
-        try:
-            input_objects = get_psk_input_objects_for_collection(context.collection)
-        except RuntimeError as e:
-            self.report({'ERROR_INVALID_CONTEXT'}, str(e))
-            return {'CANCELLED'}
-        if not input_objects.armature_objects:
-            self.report({'ERROR_INVALID_CONTEXT'}, 'No armature modifiers found on mesh objects')
-            return {'CANCELLED'}
-        populate_bone_collection_list(export_operator.bone_collection_list, input_objects.armature_objects)
-        return {'FINISHED'}
-
-
-class PSK_OT_bone_collection_list_select_all(Operator):
-    bl_idname = 'psk.bone_collection_list_select_all'
-    bl_label = 'Select All'
-    bl_description = 'Select all bone collections'
-    bl_options = {'INTERNAL'}
-
-    is_selected: BoolProperty(default=True)
-
-    def execute(self, context):
-        export_operator = get_collection_export_operator_from_context(context)
-        if export_operator is None:
-            self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
-            return {'CANCELLED'}
-        for item in export_operator.bone_collection_list:
-            item.is_selected = self.is_selected
-        return {'FINISHED'}
-
-
 class PSK_OT_populate_material_name_list(Operator):
     bl_idname = 'psk.export_populate_material_name_list'
     bl_label = 'Populate Material Name List'
@@ -90,6 +44,7 @@ class PSK_OT_populate_material_name_list(Operator):
         if export_operator is None:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
             return {'CANCELLED'}
+        export_operator = typing_cast(PskExportMixin, export_operator)
         depsgraph = context.evaluated_depsgraph_get()
         assert context.collection
         input_objects = get_psk_input_objects_for_collection(context.collection)
@@ -124,6 +79,7 @@ class PSK_OT_material_list_name_add(Operator):
         if export_operator is None:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
             return {'CANCELLED'}
+        export_operator = typing_cast(PskExportMixin, export_operator)
         m = export_operator.material_name_list.add()
         m.material_name = self.name
         m.index = len(export_operator.material_name_list) - 1
@@ -139,11 +95,11 @@ class PSK_OT_material_list_move_up(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = getattr(context.scene, 'psk_export')
+        pg = typing_cast(PSK_PG_export, getattr(context.scene, 'psk_export'))
         return pg.material_name_list_index > 0
 
     def execute(self, context):
-        pg = getattr(context.scene, 'psk_export')
+        pg = typing_cast(PSK_PG_export, getattr(context.scene, 'psk_export'))
         pg.material_name_list.move(pg.material_name_list_index, pg.material_name_list_index - 1)
         pg.material_name_list_index -= 1
         return {'FINISHED'}
@@ -157,11 +113,11 @@ class PSK_OT_material_list_move_down(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = getattr(context.scene, 'psk_export')
+        pg = typing_cast(PSK_PG_export, getattr(context.scene, 'psk_export'))
         return pg.material_name_list_index < len(pg.material_name_list) - 1
 
     def execute(self, context):
-        pg = getattr(context.scene, 'psk_export')
+        pg = typing_cast(PSK_PG_export, getattr(context.scene, 'psk_export'))
         pg.material_name_list.move(pg.material_name_list_index, pg.material_name_list_index + 1)
         pg.material_name_list_index += 1
         return {'FINISHED'}
@@ -178,6 +134,7 @@ class PSK_OT_material_list_name_move_up(Operator):
         export_operator = get_collection_export_operator_from_context(context)
         if export_operator is None:
             return False
+        export_operator = typing_cast(PskExportMixin, export_operator)
         return export_operator.material_name_list_index > 0
 
     def execute(self, context):
@@ -185,6 +142,7 @@ class PSK_OT_material_list_name_move_up(Operator):
         if export_operator is None:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
             return {'CANCELLED'}
+        export_operator = typing_cast(PskExportMixin, export_operator)
         export_operator.material_name_list.move(export_operator.material_name_list_index, export_operator.material_name_list_index - 1)
         export_operator.material_name_list_index -= 1
         return {'FINISHED'}
@@ -201,6 +159,7 @@ class PSK_OT_material_list_name_move_down(Operator):
         export_operator = get_collection_export_operator_from_context(context)
         if export_operator is None:
             return False
+        export_operator = typing_cast(PskExportMixin, export_operator)
         return export_operator.material_name_list_index < len(export_operator.material_name_list) - 1
 
     def execute(self, context):
@@ -208,6 +167,7 @@ class PSK_OT_material_list_name_move_down(Operator):
         if export_operator is None:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
             return {'CANCELLED'}
+        export_operator = typing_cast(PskExportMixin, export_operator)
         export_operator.material_name_list.move(export_operator.material_name_list_index, export_operator.material_name_list_index + 1)
         export_operator.material_name_list_index += 1
         return {'FINISHED'}
@@ -411,7 +371,7 @@ class PSK_OT_export(Operator, ExportHelper):
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
-        pg = getattr(context.scene, 'psk_export')
+        pg = typing_cast(PSK_PG_export, getattr(context.scene, 'psk_export'))
 
         populate_bone_collection_list(pg.bone_collection_list, input_objects.armature_objects)
 
@@ -433,7 +393,7 @@ class PSK_OT_export(Operator, ExportHelper):
 
         assert layout
 
-        pg = getattr(context.scene, 'psk_export')
+        pg = typing_cast(PSK_PG_export, getattr(context.scene, 'psk_export'))
 
         # Mesh
         mesh_header, mesh_panel = layout.panel('Mesh', default_closed=False)
@@ -543,8 +503,6 @@ _classes = (
     PSK_OT_material_list_move_down,
     PSK_OT_export,
     PSK_OT_export_collection,
-    PSK_OT_bone_collection_list_populate,
-    PSK_OT_bone_collection_list_select_all,
     PSK_OT_populate_material_name_list,
     PSK_OT_material_list_name_move_up,
     PSK_OT_material_list_name_move_down,

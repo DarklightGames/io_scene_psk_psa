@@ -1,9 +1,11 @@
 import bpy
 from collections import Counter
 from typing import List, Iterable, Optional, Dict, Tuple, cast as typing_cast
-from bpy.types import Armature, AnimData, Collection, Context, Object, ArmatureModifier, SpaceProperties
+from bpy.types import Armature, AnimData, Collection, Context, Object, ArmatureModifier, SpaceProperties, PropertyGroup
 from mathutils import Matrix, Vector, Quaternion as BpyQuaternion
-from psk_psa_py.shared.data import PsxBone, Vector3, Quaternion
+from psk_psa_py.shared.data import PsxBone, Quaternion
+
+from ..shared.types import BpyCollectionProperty, PSX_PG_bone_collection_list_item
 
 
 def rgb_to_srgb(c: float) -> float:
@@ -23,7 +25,11 @@ def get_nla_strips_in_frame_range(animation_data: AnimData, frame_min: float, fr
                 yield strip
 
 
-def populate_bone_collection_list(bone_collection_list, armature_objects: Iterable[Object], primary_key: str = 'OBJECT'):
+def populate_bone_collection_list(
+        bone_collection_list: BpyCollectionProperty[PSX_PG_bone_collection_list_item], 
+        armature_objects: Iterable[Object],
+        primary_key: str = 'OBJECT'
+        ):
     """
     Updates the bone collection list.
 
@@ -146,31 +152,31 @@ def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_c
     # We use the bone names for the return values because the bone name is a more universal way of referencing them.
     # For example, users of this function may modify bone lists, which would invalidate the indices and require an
     # index mapping scheme to resolve it. Using strings is more comfy and results in less code downstream.
-    instigator_bone_names = [bones[x[1]].name if x[1] is not None else None for x in bone_indices]
     bone_names = [bones[x[0]].name for x in bone_indices]
 
-    # Ensure that the hierarchy we are sending back has a single root bone.
-    # TODO: This is only relevant if we are exporting a single armature; how should we reorganize this call?
-    bone_indices = [x[0] for x in bone_indices]
-    root_bones = [bones[bone_index] for bone_index in bone_indices if bones[bone_index].parent is None]
-    if len(root_bones) > 1:
-        # There is more than one root bone.
-        # Print out why each root bone was included by linking it to one of the explicitly included bones.
-        root_bone_names = [bone.name for bone in root_bones]
-        for root_bone_name in root_bone_names:
-            bone_name = root_bone_name
-            while True:
-                # Traverse the instigator chain until the end to find the true instigator bone.
-                # TODO: in future, it would be preferential to have a readout of *all* instigator bones.
-                instigator_bone_name = instigator_bone_names[bone_names.index(bone_name)]
-                if instigator_bone_name is None:
-                    print(f'Root bone "{root_bone_name}" was included because {bone_name} was marked for export')
-                    break
-                bone_name = instigator_bone_name
+    # instigator_bone_names = [bones[x[1]].name if x[1] is not None else None for x in bone_indices]
+    # # Ensure that the hierarchy we are sending back has a single root bone.
+    # # TODO: This is only relevant if we are exporting a single armature; how should we reorganize this call?
+    # bone_indices = [x[0] for x in bone_indices]
+    # root_bones = [bones[bone_index] for bone_index in bone_indices if bones[bone_index].parent is None]
+    # if len(root_bones) > 1:
+    #     # There is more than one root bone.
+    #     # Print out why each root bone was included by linking it to one of the explicitly included bones.
+    #     root_bone_names = [bone.name for bone in root_bones]
+    #     for root_bone_name in root_bone_names:
+    #         bone_name = root_bone_name
+    #         while True:
+    #             # Traverse the instigator chain until the end to find the true instigator bone.
+    #             # TODO: in future, it would be preferential to have a readout of *all* instigator bones.
+    #             instigator_bone_name = instigator_bone_names[bone_names.index(bone_name)]
+    #             if instigator_bone_name is None:
+    #                 print(f'Root bone "{root_bone_name}" was included because {bone_name} was marked for export')
+    #                 break
+    #             bone_name = instigator_bone_name
 
-        raise RuntimeError('Exported bone hierarchy must have a single root bone.\n'
-                           f'The bone hierarchy marked for export has {len(root_bones)} root bones: {root_bone_names}.\n'
-                           f'Additional debugging information has been written to the console.')
+    #     raise RuntimeError('Exported bone hierarchy must have a single root bone.\n'
+    #                        f'The bone hierarchy marked for export has {len(root_bones)} root bones: {root_bone_names}.\n'
+    #                        f'Additional debugging information has been written to the console.')
 
     return bone_names
 
@@ -194,7 +200,7 @@ def create_psx_bones_from_blender_bones(
         scale = 1.0,
         forward_axis: str = 'X',
         up_axis: str = 'Z',
-        root_bone: Optional = None,
+        root_bone: PsxBone | None = None
 ) -> List[PsxBone]:
 
     scale_matrix = Matrix.Scale(scale, 4)
@@ -207,55 +213,66 @@ def create_psx_bones_from_blender_bones(
         psx_bone = PsxBone()
         psx_bone.name = convert_string_to_cp1252_bytes(bone.name)
 
-        try:
-            parent_index = bones.index(bone.parent)
-            psx_bone.parent_index = parent_index
-            psx_bones[parent_index].children_count += 1
-        except ValueError:
-            psx_bone.parent_index = 0
+        if bone.parent is not None:
+            try:
+                parent_index = bones.index(bone.parent)
+                psx_bone.parent_index = parent_index
+                psx_bones[parent_index].children_count += 1
+            except ValueError:
+                pass
+
+        # TODO: Need to add handling here for case where the root is being parented to another armature.
+        # In that case, we need to convert the root bone from world space to the local space of the target bone.
+        # I think we actually have an opportunity to make this more understandable. If we pass the root_bone in here,
+        # we can handle both cases in the same logic, since `root_bone` is assumed to be at origin currently.
+        # `root_bone` could be changed to be (Bone, Object) tuple?
 
         if bone.parent is not None:
+            # Child bone.
             rotation = bone.matrix.to_quaternion().conjugated()
             inverse_parent_rotation = bone.parent.matrix.to_quaternion().inverted()
             parent_head = inverse_parent_rotation @ bone.parent.head
             parent_tail = inverse_parent_rotation @ bone.parent.tail
             location = (parent_tail - parent_head) + bone.head
-        elif bone.parent is None and root_bone is not None:
-            # This is a special case for the root bone when export
-            # Because the root bone and child bones are in different spaces, we need to treat the root bone of this
-            # armature as though it were a child bone.
-            bone_rotation = bone.matrix.to_quaternion().conjugated()
-            local_rotation = armature_object_matrix_world.to_3x3().to_quaternion().conjugated()
-            rotation = bone_rotation @ local_rotation
-            translation, _, scale = armature_object_matrix_world.decompose()
-            # Invert the scale of the armature object matrix.
-            inverse_scale_matrix = Matrix.Identity(4)
-            inverse_scale_matrix[0][0] = 1.0 / scale.x
-            inverse_scale_matrix[1][1] = 1.0 / scale.y
-            inverse_scale_matrix[2][2] = 1.0 / scale.z
+        else:  # bone.parent is None
+            if root_bone is not None:
+                # This is a special case for when a root bone is being passed.
+                # Because the root bone and child bones are in different spaces, we need to treat the root bone of this
+                # armature as though it were a child bone.
+                bone_rotation = bone.matrix.to_quaternion().conjugated()
+                local_rotation = armature_object_matrix_world.to_3x3().to_quaternion().conjugated()
+                rotation = bone_rotation @ local_rotation
+                translation, _, scale = armature_object_matrix_world.decompose()
+                # Invert the scale of the armature object matrix.
+                inverse_scale_matrix = Matrix.Identity(4)
+                inverse_scale_matrix[0][0] = 1.0 / scale.x
+                inverse_scale_matrix[1][1] = 1.0 / scale.y
+                inverse_scale_matrix[2][2] = 1.0 / scale.z
 
-            translation = translation @ inverse_scale_matrix
-            location = translation + bone.head
-        else:
-            def get_armature_local_matrix():
-                match export_space:
-                    case 'WORLD':
-                        return armature_object_matrix_world
-                    case 'ARMATURE':
-                        return Matrix.Identity(4)
-                    case 'ROOT':
-                        return bone.matrix.inverted()
-                    case _:
-                        assert False, f'Invalid export space: {export_space}'
+                translation = translation @ inverse_scale_matrix
+                location = translation + bone.head
+            else:
+                # Parent is none AND there is no special root bone.
+                # This is the default case for the root bone of single-armature exports.
+                def get_armature_local_matrix():
+                    match export_space:
+                        case 'WORLD':
+                            return armature_object_matrix_world
+                        case 'ARMATURE':
+                            return Matrix.Identity(4)
+                        case 'ROOT':
+                            return bone.matrix.inverted()
+                        case _:
+                            assert False, f'Invalid export space: {export_space}'
 
-            armature_local_matrix = get_armature_local_matrix()
-            location = armature_local_matrix @ bone.head
-            location = coordinate_system_transform @ location
-            bone_rotation = bone.matrix.to_quaternion().conjugated()
-            local_rotation = armature_local_matrix.to_3x3().to_quaternion().conjugated()
-            rotation = bone_rotation @ local_rotation
-            rotation.conjugate()
-            rotation = coordinate_system_default_rotation @ rotation
+                armature_local_matrix = get_armature_local_matrix()
+                location = armature_local_matrix @ bone.head
+                location = coordinate_system_transform @ location
+                bone_rotation = bone.matrix.to_quaternion().conjugated()
+                local_rotation = armature_local_matrix.to_3x3().to_quaternion().conjugated()
+                rotation = bone_rotation @ local_rotation
+                rotation.conjugate()
+                rotation = coordinate_system_default_rotation @ rotation
 
         location = scale_matrix @ location
 
@@ -265,6 +282,7 @@ def create_psx_bones_from_blender_bones(
         location.y *= armature_object_scale.y
         location.z *= armature_object_scale.z
 
+        # Copy the calculated location and rotation to the bone.
         psx_bone.location.x = location.x
         psx_bone.location.y = location.y
         psx_bone.location.z = location.z
@@ -313,6 +331,57 @@ class PsxBoneCollection:
         self.index = index
 
 
+class ObjectNode:
+    def __init__(self, obj: Object):
+        self.object = obj
+        self.children: List['ObjectNode'] = []
+
+
+class ObjectTree:
+    def __init__(self) -> None:
+        self.root_nodes: List[ObjectNode] = []
+    
+    @staticmethod
+    def from_objects(objects: Iterable[Object]) -> 'ObjectTree':
+        '''
+        Make a tree of the armature objects based on their hierarchy.
+        '''
+        tree = ObjectTree()
+        object_node_map: Dict[Object, ObjectNode] = {x: ObjectNode(x) for x in objects}
+        
+        for obj, object_node in object_node_map.items():
+            if obj.parent in object_node_map:
+                parent_node = object_node_map[obj.parent]
+                parent_node.children.append(object_node)
+            else:
+                tree.root_nodes.append(object_node)
+
+        return tree
+
+    def __iter__(self):
+        """
+        An depth-first iterator over the armature tree.
+        """
+        node_stack = self.root_nodes
+        while node_stack:
+            node = node_stack.pop()
+            yield node
+            node_stack = node.children + node_stack
+    
+    def objects_dfs(self):
+        for node in self:
+            yield node.object
+    
+    def dump(self):
+        # Print out the hierarchy of armature objects for debugging using the root nodes, with indentation to show parent-child relationships.
+        for root_node in self.root_nodes:
+            def print_object_node(node: ObjectNode, indent: int = 0):
+                print(' ' * indent + f'- {node.object.name}')
+                for child_node in node.children:
+                    print_object_node(child_node, indent + 2)
+            print_object_node(root_node)
+
+
 def create_psx_bones(
         armature_objects: List[Object],
         export_space: str = 'WORLD',
@@ -332,12 +401,13 @@ def create_psx_bones(
     if bone_collection_indices is None:
         bone_collection_indices = []
 
-    bones: List[Tuple[PsxBone, Optional[Object]]] = []
+    armature_tree = ObjectTree.from_objects(armature_objects)
 
-    if export_space != 'WORLD' and len(armature_objects) >= 2:
-        armature_object_names = [armature_object.name for armature_object in armature_objects]
+    # Check that there is only one root bone. If there are multiple armature objects, the export space must be WORLD.
+    if len(armature_tree.root_nodes) >= 2 and export_space != 'WORLD':
+        root_armature_names = [node.object.name for node in armature_tree.root_nodes]
         raise RuntimeError(f'When exporting multiple armatures, the Export Space must be World.\n' \
-            f'The following armatures are attempting to be exported: {armature_object_names}')
+            f'The following armatures are attempting to be exported: {root_armature_names}')
 
     coordinate_system_matrix = get_coordinate_system_transform(forward_axis, up_axis)
     coordinate_system_default_rotation = coordinate_system_matrix.to_quaternion()
@@ -364,29 +434,23 @@ def create_psx_bones(
     # Store the index of the root bone for each armature object.
     # We will need this later to correctly assign vertex weights.
     armature_object_root_bone_indices: Dict[Optional[Object], int] = dict()
+    bones: List[Tuple[PsxBone, Optional[Object]]] = []
 
     if len(armature_objects) == 0 or total_bone_count == 0:
         # If the mesh has no armature object or no bones, simply assign it a dummy bone at the root to satisfy the
         # requirement that a PSK file must have at least one bone.
         psx_bone = PsxBone()
         psx_bone.name = convert_string_to_cp1252_bytes(root_bone_name)
-        psx_bone.flags = 0
-        psx_bone.children_count = 0
-        psx_bone.parent_index = 0
-        psx_bone.location = Vector3.zero()
         psx_bone.rotation = convert_bpy_quaternion_to_psx_quaternion(coordinate_system_default_rotation)
         bones.append((psx_bone, None))
 
         armature_object_root_bone_indices[None] = 0
     else:
-        # If we have multiple armature objects, create a root bone at the world origin.
-        if len(armature_objects) > 1:
+        # If we have multiple root armature objects, create a root bone at the world origin.
+        if len(armature_tree.root_nodes) > 1:
             psx_bone = PsxBone()
             psx_bone.name = convert_string_to_cp1252_bytes(root_bone_name)
-            psx_bone.flags = 0
             psx_bone.children_count = total_bone_count
-            psx_bone.parent_index = 0
-            psx_bone.location = Vector3.zero()
             psx_bone.rotation = convert_bpy_quaternion_to_psx_quaternion(coordinate_system_default_rotation)
             bones.append((psx_bone, None))
 
@@ -394,6 +458,9 @@ def create_psx_bones(
 
         root_bone = bones[0][0] if len(bones) > 0 else None
 
+        # TODO: child armatures are not being correctly transformed when parented to a bone.
+
+        # Iterate through all the armature objects.
         for armature_object in armature_objects:
             bone_names = armature_object_bone_names[armature_object]
             armature_data = typing_cast(Armature, armature_object.data)
@@ -419,6 +486,36 @@ def create_psx_bones(
             armature_object_root_bone_indices[armature_object] = len(bones)
 
             bones.extend((psx_bone, armature_object) for psx_bone in armature_psx_bones)
+
+    # Check if any of the armatures are parented to one another.
+    # If so, adjust the hierarchy as though they are part of the same armature object.
+    # This will let us re-use rig components without destructively joining them.
+    for armature_object in armature_objects:
+        if armature_object.parent not in armature_objects:
+            continue
+        # This armature object is parented to another armature object that we are exporting.
+        # First fetch the root bone indices for the two armature objects.
+        root_bone_index = armature_object_root_bone_indices[armature_object]
+        parent_root_bone_index = armature_object_root_bone_indices[armature_object.parent]
+
+        match armature_object.parent_type:
+            case 'OBJECT':
+                # Parent this armature's root bone to the root bone of the parent object.
+                bones[root_bone_index][0].parent_index = parent_root_bone_index
+            case 'BONE':
+                # Parent this armature's root bone to the specified bone in the parent.
+                new_parent_index = None
+                for bone_index, (bone, bone_armature_object) in enumerate(bones):
+                    if bone.name == convert_string_to_cp1252_bytes(armature_object.parent_bone) and bone_armature_object == armature_object.parent:
+                        new_parent_index = bone_index
+                        break
+                if new_parent_index == None:
+                    raise RuntimeError(f'Bone \'{armature_object.parent_bone}\' could not be found in armature \'{armature_object.parent.name}\'.')
+                bones[root_bone_index][0].parent_index = new_parent_index
+            case _:
+                raise RuntimeError(f'Unhandled parent type ({armature_object.parent_type}) for object {armature_object.name}.\n'
+                                    f'Parent type must be \'Object\' or \'Bone\'.'
+                                    )
 
     # Check if there are bone name conflicts between armatures.
     bone_name_counts = Counter(bone[0].name.decode('windows-1252').upper() for bone in bones)
@@ -482,7 +579,7 @@ def get_armatures_for_mesh_objects(mesh_objects: Iterable[Object]):
     yield from armature_objects
 
 
-def get_collection_from_context(context: Context) -> Optional[Collection]:
+def get_collection_from_context(context: Context) -> Collection | None:
     if context.space_data is None or context.space_data.type != 'PROPERTIES':
         return None
     space_data = typing_cast(SpaceProperties, context.space_data)
@@ -492,7 +589,7 @@ def get_collection_from_context(context: Context) -> Optional[Collection]:
         return context.collection
 
 
-def get_collection_export_operator_from_context(context: Context) -> Optional[object]:
+def get_collection_export_operator_from_context(context: Context) -> PropertyGroup | None:
     collection = get_collection_from_context(context)
     if collection is None or collection.active_exporter_index is None:
         return None
@@ -500,3 +597,73 @@ def get_collection_export_operator_from_context(context: Context) -> Optional[ob
         return None
     exporter = collection.exporters[collection.active_exporter_index]
     return exporter.export_properties
+
+
+from ..shared.dfs import DfsObject, dfs_collection_objects, dfs_view_layer_objects
+from typing import Set
+from bpy.types import Depsgraph
+
+
+class PskInputObjects(object):
+    def __init__(self):
+        self.mesh_dfs_objects: List[DfsObject] = []
+        self.armature_objects: List[Object] = []
+
+
+def get_materials_for_mesh_objects(depsgraph: Depsgraph, mesh_objects: Iterable[Object]):
+    yielded_materials = set()
+    for mesh_object in mesh_objects:
+        evaluated_mesh_object = mesh_object.evaluated_get(depsgraph)
+        for i, material_slot in enumerate(evaluated_mesh_object.material_slots):
+            material = material_slot.material
+            if material is None:
+                raise RuntimeError(f'Material slots cannot be empty. ({mesh_object.name}, index {i})')
+            if material not in yielded_materials:
+                yielded_materials.add(material)
+                yield material
+
+
+def get_mesh_objects_for_collection(collection: Collection) -> Iterable[DfsObject]:
+    return filter(lambda x: x.obj.type == 'MESH', dfs_collection_objects(collection))
+
+
+def get_mesh_objects_for_context(context: Context) -> Iterable[DfsObject]:
+    if context.view_layer is None:
+        return
+    for dfs_object in dfs_view_layer_objects(context.view_layer):
+        if dfs_object.obj.type == 'MESH' and dfs_object.is_selected:
+            yield dfs_object
+
+
+def get_armature_for_mesh_object(mesh_object: Object) -> Optional[Object]:
+    if mesh_object.type != 'MESH':
+        return None
+    # Get the first armature modifier with a non-empty armature object.
+    for modifier in filter(lambda x: x.type == 'ARMATURE', mesh_object.modifiers):
+            armature_modifier = typing_cast(ArmatureModifier, modifier)
+            if armature_modifier.object is not None:
+                return armature_modifier.object
+    return None
+
+
+def _get_psk_input_objects(mesh_dfs_objects: Iterable[DfsObject]) -> PskInputObjects:
+    mesh_dfs_objects = list(mesh_dfs_objects)
+    if len(mesh_dfs_objects) == 0:
+        raise RuntimeError('At least one mesh must be selected')
+    input_objects = PskInputObjects()
+    input_objects.mesh_dfs_objects = mesh_dfs_objects
+    # Get the armature objects used on all the meshes being exported.
+    armature_objects = get_armatures_for_mesh_objects(map(lambda x: x.obj, mesh_dfs_objects))
+    # Sort them in hierarchy order.
+    input_objects.armature_objects = list(ObjectTree.from_objects(armature_objects).objects_dfs())
+    return input_objects
+
+
+def get_psk_input_objects_for_context(context: Context) -> PskInputObjects:
+    mesh_objects = list(get_mesh_objects_for_context(context))
+    return _get_psk_input_objects(mesh_objects)
+
+
+def get_psk_input_objects_for_collection(collection: Collection) -> PskInputObjects:
+    mesh_objects = get_mesh_objects_for_collection(collection)
+    return _get_psk_input_objects(mesh_objects)

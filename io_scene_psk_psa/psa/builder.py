@@ -48,14 +48,16 @@ class PsaBuildOptions:
 
 
 def _get_pose_bone_location_and_rotation(
-        pose_bone: Optional[PoseBone],
-        armature_object: Optional[Object],
+        pose_bone: PoseBone | None,
+        armature_object: Object | None,
         export_space: str,
         scale: Vector,
         coordinate_system_transform: Matrix,
         has_false_root_bone: bool,
 ) -> Tuple[Vector, Quaternion]:
     is_false_root_bone = pose_bone is None and armature_object is None
+
+    # TODO: this is such a disaster; the false root bone idea needs revising.
 
     if is_false_root_bone:
         pose_bone_matrix = coordinate_system_transform
@@ -144,7 +146,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         export_sequence.name = export_sequence.name.strip()
 
     # Save each armature object's current action and frame so that we can restore the state once we are done.
-    saved_armature_object_actions = {o: o.animation_data.action for o in options.armature_objects}
+    saved_armature_object_actions = {o: (o.animation_data.action if o.animation_data else None) for o in options.armature_objects}
     saved_frame_current = context.scene.frame_current
 
     # Now build the PSA sequences.
@@ -197,8 +199,10 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
 
         # Link the action to the animation data and update view layer.
         for armature_object in options.armature_objects:
-            armature_object.animation_data.action = export_sequence.nla_state.action
+            if armature_object.animation_data:
+                armature_object.animation_data.action = export_sequence.nla_state.action
 
+        assert context.view_layer
         context.view_layer.update()
 
         def add_key(location: Vector, rotation: Quaternion):

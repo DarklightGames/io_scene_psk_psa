@@ -25,7 +25,7 @@ class PskImportOptions:
         self.bone_length = 1.0
         self.should_import_materials = True
         self.scale = 1.0
-        self.bdk_repository_id = None
+        self.bdk_repository_id: str | None = None
 
 
 class ImportBone:
@@ -83,7 +83,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
 
         bpy.ops.object.mode_set(mode='EDIT')
 
-        import_bones = []
+        import_bones: List[ImportBone] = []
 
         for bone_index, psk_bone in enumerate(psk.bones):
             import_bone = ImportBone(bone_index, psk_bone)
@@ -107,9 +107,15 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
             bone.world_rotation_matrix = bone.local_rotation.conjugated().to_matrix()
             bone.world_rotation_matrix.rotate(parent.world_rotation_matrix)
 
+        # Create all the bones up-front.
+        # This allows us to set up the parent-child relationships properly even if the parent bone comes after the child bone in the PSK file.
         for import_bone in import_bones:
             bone_name = import_bone.psk_bone.name.decode('utf-8')
             edit_bone = armature_data.edit_bones.new(bone_name)
+
+        for import_bone in import_bones:
+            bone_name = import_bone.psk_bone.name.decode('utf-8')
+            edit_bone = armature_data.edit_bones[bone_name]
 
             if import_bone.parent is not None:
                 edit_bone.parent = armature_data.edit_bones[import_bone.psk_bone.parent_index]
