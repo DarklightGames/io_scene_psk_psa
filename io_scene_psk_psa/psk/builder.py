@@ -38,8 +38,9 @@ class PskBuildResult(object):
         self.warnings: List[str] = warnings
 
 
-def _get_mesh_export_space_matrix(armature_object: Optional[Object], export_space: str) -> Matrix:
-    if armature_object is None:
+def _get_mesh_export_space_matrix(armature_object: Object | None, export_space: str, root_armature_object: Object | None) -> Matrix:
+    # TODO: this should be a bundle of armature objects. otherwise this creates a scenario where you can have 
+    if armature_object is None or root_armature_object is None:
         return Matrix.Identity(4)
 
     def get_object_space_matrix(obj: Object) -> Matrix:
@@ -47,15 +48,20 @@ def _get_mesh_export_space_matrix(armature_object: Optional[Object], export_spac
         # We neutralize the scale here because the scale is already applied to the mesh objects implicitly.
         return Matrix.Translation(translation) @ rotation.to_matrix().to_4x4()
 
+    armature_space_matrix = get_object_space_matrix(armature_object)
+    root_armature_space_matrix = get_object_space_matrix(root_armature_object)
+    relative_matrix = root_armature_space_matrix @ armature_space_matrix.inverted()
+
     match export_space:
         case 'WORLD':
             return Matrix.Identity(4)
         case 'ARMATURE':
-            return get_object_space_matrix(armature_object).inverted()
+            return (armature_space_matrix @ relative_matrix).inverted()
         case 'ROOT':
-            armature_data = typing_cast(Armature, armature_object.data)
-            armature_space_matrix = get_object_space_matrix(armature_object) @ armature_data.bones[0].matrix_local
-            return armature_space_matrix.inverted()
+            root_armature_data = typing_cast(Armature, root_armature_object.data)
+            if len(root_armature_data.bones) == 0:
+                raise RuntimeError(f'Armature {root_armature_data.name} has no bones')
+            return (armature_space_matrix @ relative_matrix @ root_armature_data.bones[0].matrix_local).inverted()
         case _:
             assert False, f'Invalid export space: {export_space}'
 
@@ -131,26 +137,23 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         psk.materials.append(psk_material)
 
     context.window_manager.progress_begin(0, len(input_objects.mesh_dfs_objects))
-
     coordinate_system_matrix = get_coordinate_system_transform(options.forward_axis, options.up_axis)
+    root_armature_object = next(iter(input_objects.armature_objects), None)
 
     # Calculate the export spaces for the armature objects.
     # This is used later to transform the mesh object geometry into the export space.
-    armature_mesh_export_space_matrices: Dict[Optional[Object], Matrix] = {None: Matrix.Identity(4)}
+    armature_mesh_export_space_matrices: dict[Object | None, Matrix] = {None: Matrix.Identity(4)}
     if options.export_space == 'ARMATURE':
         # For meshes without an armature modifier, we need to set the export space to the first armature object.
-        armature_mesh_export_space_matrices[None] = _get_mesh_export_space_matrix(next(iter(input_objects.armature_objects), None), options.export_space)
+        armature_mesh_export_space_matrices[None] = _get_mesh_export_space_matrix(root_armature_object, options.export_space, root_armature_object)
     
     for armature_object in armature_objects:
-        armature_mesh_export_space_matrices[armature_object] = _get_mesh_export_space_matrix(armature_object, options.export_space)
-
-    # TODO: we need to handle armature hierarchies here. if an object is parented to another armature,
-    #  we need to take that into account when calculating the export space matrix.
-
-    original_armature_object_pose_positions = {a: a.data.pose_position for a in armature_objects}
-
+        # TODO: also handle the case of multiple roots; dont' just assume we have one!
+        armature_mesh_export_space_matrices[armature_object] = _get_mesh_export_space_matrix(armature_object, options.export_space, root_armature_object)
+    
     # Temporarily force the armature into the rest position.
-    # We will undo this later.
+    # The original pose position setting will be restored at the end.
+    original_armature_object_pose_positions = {a: a.data.pose_position for a in armature_objects}
     for armature_object in armature_objects:
         armature_data = typing_cast(Armature, armature_object.data)
         armature_data.pose_position = 'REST'
