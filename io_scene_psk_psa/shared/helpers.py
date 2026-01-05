@@ -334,41 +334,47 @@ class PsxBoneCollection:
 class ObjectNode:
     def __init__(self, obj: Object):
         self.object = obj
-        self.children: List['ObjectNode'] = []
+        self.parent: ObjectNode | None = None
+        self.children: List[ObjectNode] = []
+    
+    @property
+    def root(self):
+        """
+        Gets the root in the object hierarchy. This can return itself if this node has no parent.
+        """
+        n = self
+        while n.parent is not None:
+            n = n.parent
+        return n
 
 
 class ObjectTree:
-    def __init__(self) -> None:
+    '''
+    A tree of the armature objects based on their hierarchy.
+    '''
+    def __init__(self, objects: Iterable[Object]):
         self.root_nodes: List[ObjectNode] = []
-    
-    @staticmethod
-    def from_objects(objects: Iterable[Object]) -> 'ObjectTree':
-        '''
-        Make a tree of the armature objects based on their hierarchy.
-        '''
-        tree = ObjectTree()
         object_node_map: Dict[Object, ObjectNode] = {x: ObjectNode(x) for x in objects}
         
         for obj, object_node in object_node_map.items():
             if obj.parent in object_node_map:
                 parent_node = object_node_map[obj.parent]
+                object_node.parent = parent_node
                 parent_node.children.append(object_node)
             else:
-                tree.root_nodes.append(object_node)
-
-        return tree
+                self.root_nodes.append(object_node)
 
     def __iter__(self):
         """
         An depth-first iterator over the armature tree.
         """
-        node_stack = self.root_nodes
+        node_stack = [] + self.root_nodes
         while node_stack:
             node = node_stack.pop()
             yield node
             node_stack = node.children + node_stack
     
-    def objects_dfs(self):
+    def objects_iterator(self):
         for node in self:
             yield node.object
     
@@ -401,7 +407,7 @@ def create_psx_bones(
     if bone_collection_indices is None:
         bone_collection_indices = []
 
-    armature_tree = ObjectTree.from_objects(armature_objects)
+    armature_tree = ObjectTree(armature_objects)
 
     # Check that there is only one root bone. If there are multiple armature objects, the export space must be WORLD.
     if len(armature_tree.root_nodes) >= 2 and export_space != 'WORLD':
@@ -655,7 +661,7 @@ def _get_psk_input_objects(mesh_dfs_objects: Iterable[DfsObject]) -> PskInputObj
     # Get the armature objects used on all the meshes being exported.
     armature_objects = get_armatures_for_mesh_objects(map(lambda x: x.obj, mesh_dfs_objects))
     # Sort them in hierarchy order.
-    input_objects.armature_objects = list(ObjectTree.from_objects(armature_objects).objects_dfs())
+    input_objects.armature_objects = list(ObjectTree(armature_objects).objects_iterator())
     return input_objects
 
 

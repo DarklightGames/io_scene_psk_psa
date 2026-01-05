@@ -8,6 +8,8 @@ from psk_psa_py.shared.data import Vector3
 from psk_psa_py.psk.data import Psk
 from .properties import triangle_type_and_bit_flags_to_poly_flags
 from ..shared.helpers import (
+    ObjectNode,
+    ObjectTree,
     PskInputObjects,
     PsxBoneCollection,
     convert_string_to_cp1252_bytes,
@@ -38,10 +40,12 @@ class PskBuildResult(object):
         self.warnings: List[str] = warnings
 
 
-def _get_mesh_export_space_matrix(armature_object: Object | None, export_space: str, root_armature_object: Object | None) -> Matrix:
-    # TODO: this should be a bundle of armature objects. otherwise this creates a scenario where you can have 
-    if armature_object is None or root_armature_object is None:
+def _get_mesh_export_space_matrix(node: ObjectNode | None, export_space: str) -> Matrix:
+    if node is None:
         return Matrix.Identity(4)
+    
+    armature_object = node.object
+    root_armature_object = node.root.object
 
     def get_object_space_matrix(obj: Object) -> Matrix:
         translation, rotation, _ = obj.matrix_world.decompose()
@@ -86,6 +90,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
     assert context.window_manager
 
     armature_objects = list(input_objects.armature_objects)
+    armature_object_tree = ObjectTree(input_objects.armature_objects)    
 
     warnings: list[str] = []
     psk = Psk()
@@ -138,18 +143,19 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
     context.window_manager.progress_begin(0, len(input_objects.mesh_dfs_objects))
     coordinate_system_matrix = get_coordinate_system_transform(options.forward_axis, options.up_axis)
-    root_armature_object = next(iter(input_objects.armature_objects), None)
+    root_armature_object = next(iter(armature_object_tree), None)
 
     # Calculate the export spaces for the armature objects.
     # This is used later to transform the mesh object geometry into the export space.
     armature_mesh_export_space_matrices: dict[Object | None, Matrix] = {None: Matrix.Identity(4)}
+
     if options.export_space == 'ARMATURE':
         # For meshes without an armature modifier, we need to set the export space to the first armature object.
-        armature_mesh_export_space_matrices[None] = _get_mesh_export_space_matrix(root_armature_object, options.export_space, root_armature_object)
+        armature_mesh_export_space_matrices[None] = _get_mesh_export_space_matrix(root_armature_object, options.export_space)
     
-    for armature_object in armature_objects:
-        # TODO: also handle the case of multiple roots; dont' just assume we have one!
-        armature_mesh_export_space_matrices[armature_object] = _get_mesh_export_space_matrix(armature_object, options.export_space, root_armature_object)
+    # TODO: also handle the case of multiple roots; dont' just assume we have one!
+    for armature_node in iter(armature_object_tree):
+        armature_mesh_export_space_matrices[armature_node.object] = _get_mesh_export_space_matrix(armature_node, options.export_space)
     
     # Temporarily force the armature into the rest position.
     # The original pose position setting will be restored at the end.
