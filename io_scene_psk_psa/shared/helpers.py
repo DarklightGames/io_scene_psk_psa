@@ -154,30 +154,6 @@ def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_c
     # index mapping scheme to resolve it. Using strings is more comfy and results in less code downstream.
     bone_names = [bones[x[0]].name for x in bone_indices]
 
-    # instigator_bone_names = [bones[x[1]].name if x[1] is not None else None for x in bone_indices]
-    # # Ensure that the hierarchy we are sending back has a single root bone.
-    # # TODO: This is only relevant if we are exporting a single armature; how should we reorganize this call?
-    # bone_indices = [x[0] for x in bone_indices]
-    # root_bones = [bones[bone_index] for bone_index in bone_indices if bones[bone_index].parent is None]
-    # if len(root_bones) > 1:
-    #     # There is more than one root bone.
-    #     # Print out why each root bone was included by linking it to one of the explicitly included bones.
-    #     root_bone_names = [bone.name for bone in root_bones]
-    #     for root_bone_name in root_bone_names:
-    #         bone_name = root_bone_name
-    #         while True:
-    #             # Traverse the instigator chain until the end to find the true instigator bone.
-    #             # TODO: in future, it would be preferential to have a readout of *all* instigator bones.
-    #             instigator_bone_name = instigator_bone_names[bone_names.index(bone_name)]
-    #             if instigator_bone_name is None:
-    #                 print(f'Root bone "{root_bone_name}" was included because {bone_name} was marked for export')
-    #                 break
-    #             bone_name = instigator_bone_name
-
-    #     raise RuntimeError('Exported bone hierarchy must have a single root bone.\n'
-    #                        f'The bone hierarchy marked for export has {len(root_bones)} root bones: {root_bone_names}.\n'
-    #                        f'Additional debugging information has been written to the console.')
-
     return bone_names
 
 
@@ -195,20 +171,23 @@ def convert_string_to_cp1252_bytes(string: str) -> bytes:
 # TODO: Perhaps export space should just be a transform matrix, since the below is not actually used unless we're using WORLD space.
 def create_psx_bones_from_blender_bones(
         bones: List[bpy.types.Bone],
-        export_space: str = 'WORLD',
-        armature_object_matrix_world: Matrix = Matrix.Identity(4),
-        scale = 1.0,
+        armature_object_matrix_world: Matrix,
         forward_axis: str = 'X',
         up_axis: str = 'Z',
-        root_bone: PsxBone | None = None
 ) -> List[PsxBone]:
-
-    scale_matrix = Matrix.Scale(scale, 4)
+    """
+    Creates PSX bones from the given Blender bones.
+    
+    The bones are in world space based on the armature object's world matrix.
+    """
 
     coordinate_system_transform = get_coordinate_system_transform(forward_axis, up_axis)
     coordinate_system_default_rotation = coordinate_system_transform.to_quaternion()
 
-    psx_bones = []
+    # Apply the scale of the armature object to the bone location.
+    _, _, armature_object_scale = armature_object_matrix_world.decompose()
+
+    psx_bones: List[PsxBone] = []
     for bone in bones:
         psx_bone = PsxBone()
         psx_bone.name = convert_string_to_cp1252_bytes(bone.name)
@@ -221,12 +200,6 @@ def create_psx_bones_from_blender_bones(
             except ValueError:
                 pass
 
-        # TODO: Need to add handling here for case where the root is being parented to another armature.
-        # In that case, we need to convert the root bone from world space to the local space of the target bone.
-        # I think we actually have an opportunity to make this more understandable. If we pass the root_bone in here,
-        # we can handle both cases in the same logic, since `root_bone` is assumed to be at origin currently.
-        # `root_bone` could be changed to be (Bone, Object) tuple?
-
         if bone.parent is not None:
             # Child bone.
             rotation = bone.matrix.to_quaternion().conjugated()
@@ -234,50 +207,14 @@ def create_psx_bones_from_blender_bones(
             parent_head = inverse_parent_rotation @ bone.parent.head
             parent_tail = inverse_parent_rotation @ bone.parent.tail
             location = (parent_tail - parent_head) + bone.head
-        else:  # bone.parent is None
-            if root_bone is not None:
-                # This is a special case for when a root bone is being passed.
-                # Because the root bone and child bones are in different spaces, we need to treat the root bone of this
-                # armature as though it were a child bone.
-                bone_rotation = bone.matrix.to_quaternion().conjugated()
-                local_rotation = armature_object_matrix_world.to_3x3().to_quaternion().conjugated()
-                rotation = bone_rotation @ local_rotation
-                translation, _, scale = armature_object_matrix_world.decompose()
-                # Invert the scale of the armature object matrix.
-                inverse_scale_matrix = Matrix.Identity(4)
-                inverse_scale_matrix[0][0] = 1.0 / scale.x
-                inverse_scale_matrix[1][1] = 1.0 / scale.y
-                inverse_scale_matrix[2][2] = 1.0 / scale.z
+        else:
+            location = armature_object_matrix_world @ bone.head
+            location = coordinate_system_transform @ location
+            bone_rotation = bone.matrix.to_quaternion().conjugated()
+            rotation = bone_rotation @ armature_object_matrix_world.to_3x3().to_quaternion()
+            rotation.conjugate()
+            rotation = coordinate_system_default_rotation @ rotation
 
-                translation = translation @ inverse_scale_matrix
-                location = translation + bone.head
-            else:
-                # Parent is none AND there is no special root bone.
-                # This is the default case for the root bone of single-armature exports.
-                def get_armature_local_matrix():
-                    match export_space:
-                        case 'WORLD':
-                            return armature_object_matrix_world
-                        case 'ARMATURE':
-                            return Matrix.Identity(4)
-                        case 'ROOT':
-                            return bone.matrix.inverted()
-                        case _:
-                            assert False, f'Invalid export space: {export_space}'
-
-                armature_local_matrix = get_armature_local_matrix()
-                location = armature_local_matrix @ bone.head
-                location = coordinate_system_transform @ location
-                bone_rotation = bone.matrix.to_quaternion().conjugated()
-                local_rotation = armature_local_matrix.to_3x3().to_quaternion().conjugated()
-                rotation = bone_rotation @ local_rotation
-                rotation.conjugate()
-                rotation = coordinate_system_default_rotation @ rotation
-
-        location = scale_matrix @ location
-
-        # If the armature object has been scaled, we need to scale the bone's location to match.
-        _, _, armature_object_scale = armature_object_matrix_world.decompose()
         location.x *= armature_object_scale.x
         location.y *= armature_object_scale.y
         location.z *= armature_object_scale.z
@@ -299,9 +236,9 @@ def create_psx_bones_from_blender_bones(
 
 class PsxBoneCreateResult:
     def __init__(self,
-                 bones: List[Tuple[PsxBone, Optional[Object]]],  # List of tuples of (psx_bone, armature_object)
-                 armature_object_root_bone_indices: Dict[Object, int],
-                 armature_object_bone_names: Dict[Object, List[str]],
+                 bones: list[tuple[PsxBone, Object | None]],  # List of tuples of (psx_bone, armature_object)
+                 armature_object_root_bone_indices: dict[Object, int],
+                 armature_object_bone_names: dict[Object, list[str]],
                  ):
         self.bones = bones
         self.armature_object_root_bone_indices = armature_object_root_bone_indices
@@ -439,8 +376,8 @@ def create_psx_bones(
 
     # Store the index of the root bone for each armature object.
     # We will need this later to correctly assign vertex weights.
-    armature_object_root_bone_indices: Dict[Optional[Object], int] = dict()
-    bones: List[Tuple[PsxBone, Optional[Object]]] = []
+    armature_object_root_bone_indices: dict[Object | None, int] = dict()
+    bones: list[tuple[PsxBone, Object | None]] = []
 
     if len(armature_objects) == 0 or total_bone_count == 0:
         # If the mesh has no armature object or no bones, simply assign it a dummy bone at the root to satisfy the
@@ -462,10 +399,6 @@ def create_psx_bones(
 
             armature_object_root_bone_indices[None] = 0
 
-        root_bone = bones[0][0] if len(bones) > 0 else None
-
-        # TODO: child armatures are not being correctly transformed when parented to a bone.
-
         # Iterate through all the armature objects.
         for armature_object in armature_objects:
             bone_names = armature_object_bone_names[armature_object]
@@ -474,13 +407,52 @@ def create_psx_bones(
 
             armature_psx_bones = create_psx_bones_from_blender_bones(
                 bones=armature_bones,
-                export_space=export_space,
                 armature_object_matrix_world=armature_object.matrix_world,
-                scale=scale,
                 forward_axis=forward_axis,
                 up_axis=up_axis,
-                root_bone=root_bone,
             )
+
+            # We have the bones in world space. If we are attaching this armature to a parent bone, we need to convert
+            # the root bone to be relative to the target parent bone.
+            if armature_object.parent in armature_objects:
+                match armature_object.parent_type:
+                    case 'BONE':
+                        # Parent to a bone in the parent armature object.
+                        # We just need to get the world-space location of each of the bones and get the relative pose, then
+                        # assign that location and rotation to the root bone.
+                        parent_bone_name = armature_object.parent_bone
+                        parent_armature_data = typing_cast(Armature, armature_object.parent.data)
+                        if parent_armature_data is None:
+                            raise RuntimeError(f'Parent object {armature_object.parent.name} is not an armature.')
+                        try:
+                            parent_bone = parent_armature_data.bones[parent_bone_name]
+                        except KeyError:
+                            raise RuntimeError(f'Bone \'{parent_bone_name}\' could not be found in armature \'{armature_object.parent.name}\'.')    
+                        
+                        parent_bone_world_matrix = armature_object.parent.matrix_world @ parent_bone.matrix_local.to_4x4()
+                        parent_bone_world_location, parent_bone_world_rotation, _ = parent_bone_world_matrix.decompose()
+
+                        # Convert the root bone location to be relative to the parent bone.
+                        root_bone = armature_psx_bones[0]
+                        root_bone_location = Vector((root_bone.location.x, root_bone.location.y, root_bone.location.z))
+                        relative_location = parent_bone_world_rotation.inverted() @ (root_bone_location - parent_bone_world_location)
+                        root_bone.location.x = relative_location.x
+                        root_bone.location.y = relative_location.y
+                        root_bone.location.z = relative_location.z
+                        # Convert the root bone rotation to be relative to the parent bone.
+                        root_bone_rotation = BpyQuaternion((root_bone.rotation.w, root_bone.rotation.x, root_bone.rotation.y, root_bone.rotation.z))
+                        relative_rotation = parent_bone_world_rotation.inverted() @ root_bone_rotation
+                        root_bone.rotation.w = relative_rotation.w
+                        root_bone.rotation.x = relative_rotation.x
+                        root_bone.rotation.y = relative_rotation.y
+                        root_bone.rotation.z = relative_rotation.z
+
+                    case 'OBJECT':
+                        raise NotImplementedError('Parenting armature objects to other armature objects is not yet implemented.')
+                    case _:
+                        raise RuntimeError(f'Unhandled parent type ({armature_object.parent_type}) for object {armature_object.name}.\n'
+                                            f'Parent type must be \'Object\' or \'Bone\'.'
+                                            )
 
             # If we are appending these bones to an existing list of bones, we need to adjust the parent indices for
             # all the non-root bones.
@@ -522,6 +494,40 @@ def create_psx_bones(
                 raise RuntimeError(f'Unhandled parent type ({armature_object.parent_type}) for object {armature_object.name}.\n'
                                     f'Parent type must be \'Object\' or \'Bone\'.'
                                     )
+
+    match export_space:
+        case 'WORLD':
+            # No action needed, bones are already in world space.
+            pass
+        case 'ARMATURE':
+            # The bone is in world-space. We need to convert it to armature (object) space.
+            # Get this from matrix_local.
+            root_bone, root_bone_armature_object = bones[0]
+            if root_bone_armature_object is None:
+                raise RuntimeError('Cannot export to Armature space when multiple armatures are being exported.')
+        
+            armature_data = typing_cast(Armature, root_bone_armature_object.data)
+            matrix_local = armature_data.bones[root_bone.name.decode('windows-1252')].matrix_local
+            location, rotation, _ = matrix_local.decompose()
+            root_bone.location.x = location.x
+            root_bone.location.y = location.y
+            root_bone.location.z = location.z
+            root_bone.rotation.w = rotation.w
+            root_bone.rotation.x = rotation.x
+            root_bone.rotation.y = rotation.y
+            root_bone.rotation.z = rotation.z
+        case 'ROOT':
+            # Zero out the root bone transforms.
+            root_bone = bones[0][0]
+            root_bone.location.x = 0.0
+            root_bone.location.y = 0.0
+            root_bone.location.z = 0.0
+            root_bone.rotation.w = 1.0
+            root_bone.rotation.x = 0.0
+            root_bone.rotation.y = 0.0
+            root_bone.rotation.z = 0.0
+        case _:
+            assert False, f'Invalid export space: {export_space}'
 
     # Check if there are bone name conflicts between armatures.
     bone_name_counts = Counter(bone[0].name.decode('windows-1252').upper() for bone in bones)
