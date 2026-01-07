@@ -238,7 +238,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             case _:
                 assert False, f'Invalid export space: {options.export_space}'
 
-        vertex_transform_matrix = scale_matrix @ coordinate_system_matrix @ mesh_export_space_matrix
+        vertex_transform_matrix = scale_matrix @ coordinate_system_matrix.inverted() @ mesh_export_space_matrix
         point_transform_matrix = vertex_transform_matrix @ mesh_object.matrix_world
 
         # Vertices

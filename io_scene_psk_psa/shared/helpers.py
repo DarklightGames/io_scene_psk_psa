@@ -172,18 +172,12 @@ def convert_string_to_cp1252_bytes(string: str) -> bytes:
 def create_psx_bones_from_blender_bones(
         bones: List[bpy.types.Bone],
         armature_object_matrix_world: Matrix,
-        forward_axis: str = 'X',
-        up_axis: str = 'Z',
 ) -> List[PsxBone]:
     """
     Creates PSX bones from the given Blender bones.
     
     The bones are in world space based on the armature object's world matrix.
     """
-
-    coordinate_system_transform = get_coordinate_system_transform(forward_axis, up_axis)
-    coordinate_system_default_rotation = coordinate_system_transform.to_quaternion()
-
     # Apply the scale of the armature object to the bone location.
     _, _, armature_object_scale = armature_object_matrix_world.decompose()
 
@@ -209,11 +203,9 @@ def create_psx_bones_from_blender_bones(
             location = (parent_tail - parent_head) + bone.head
         else:
             location = armature_object_matrix_world @ bone.head
-            location = coordinate_system_transform @ location
             bone_rotation = bone.matrix.to_quaternion().conjugated()
             rotation = bone_rotation @ armature_object_matrix_world.to_3x3().to_quaternion()
             rotation.conjugate()
-            rotation = coordinate_system_default_rotation @ rotation
 
         location.x *= armature_object_scale.x
         location.y *= armature_object_scale.y
@@ -352,9 +344,6 @@ def create_psx_bones(
         raise RuntimeError(f'When exporting multiple armatures, the Export Space must be World.\n' \
             f'The following armatures are attempting to be exported: {root_armature_names}')
 
-    coordinate_system_matrix = get_coordinate_system_transform(forward_axis, up_axis)
-    coordinate_system_default_rotation = coordinate_system_matrix.to_quaternion()
-
     total_bone_count = 0
     for armature_object in filter(lambda x: x.data is not None, armature_objects):
         armature_data = typing_cast(Armature, armature_object.data)
@@ -384,7 +373,7 @@ def create_psx_bones(
         # requirement that a PSK file must have at least one bone.
         psx_bone = PsxBone()
         psx_bone.name = convert_string_to_cp1252_bytes(root_bone_name)
-        psx_bone.rotation = convert_bpy_quaternion_to_psx_quaternion(coordinate_system_default_rotation)
+        psx_bone.rotation = Quaternion(0.0, 0.0, 0.0, 1.0)
         bones.append((psx_bone, None))
 
         armature_object_root_bone_indices[None] = 0
@@ -394,7 +383,7 @@ def create_psx_bones(
             psx_bone = PsxBone()
             psx_bone.name = convert_string_to_cp1252_bytes(root_bone_name)
             psx_bone.children_count = total_bone_count
-            psx_bone.rotation = convert_bpy_quaternion_to_psx_quaternion(coordinate_system_default_rotation)
+            psx_bone.rotation = Quaternion(0.0, 0.0, 0.0, 1.0)
             bones.append((psx_bone, None))
 
             armature_object_root_bone_indices[None] = 0
@@ -408,8 +397,6 @@ def create_psx_bones(
             armature_psx_bones = create_psx_bones_from_blender_bones(
                 bones=armature_bones,
                 armature_object_matrix_world=armature_object.matrix_world,
-                forward_axis=forward_axis,
-                up_axis=up_axis,
             )
 
             # We have the bones in world space. If we are attaching this armature to a parent bone, we need to convert
@@ -540,6 +527,36 @@ def create_psx_bones(
                 error_message += f' This is the name of the automatically generated root bone. Consider changing this '
                 f''
                 raise RuntimeError(error_message)
+    
+    # Apply the scale to the bone locations.
+    for psx_bone, _ in bones:
+        psx_bone.location.x *= scale
+        psx_bone.location.y *= scale
+        psx_bone.location.z *= scale
+    
+    coordinate_system_matrix = get_coordinate_system_transform(forward_axis, up_axis)
+    coordinate_system_default_rotation = coordinate_system_matrix.to_quaternion()
+
+    # Apply the coordinate system transform to the root bone.
+    root_psx_bone = bones[0][0]
+    # Get transform matrix from root bone location and rotation.
+    root_bone_location = Vector((root_psx_bone.location.x, root_psx_bone.location.y, root_psx_bone.location.z))
+    root_bone_rotation = BpyQuaternion((root_psx_bone.rotation.w, root_psx_bone.rotation.x, root_psx_bone.rotation.y, root_psx_bone.rotation.z))
+    root_bone_matrix = (
+        Matrix.Translation(root_bone_location) @
+        root_bone_rotation.to_matrix().to_4x4()
+    )
+    root_bone_matrix = coordinate_system_default_rotation.inverted().to_matrix().to_4x4() @ root_bone_matrix
+    location, rotation, _ = root_bone_matrix.decompose()
+    root_psx_bone.location.x = location.x
+    root_psx_bone.location.y = location.y
+    root_psx_bone.location.z = location.z
+    root_psx_bone.rotation.w = rotation.w
+    root_psx_bone.rotation.x = rotation.x
+    root_psx_bone.rotation.y = rotation.y
+    root_psx_bone.rotation.z = rotation.z
+
+    convert_bpy_quaternion_to_psx_quaternion(coordinate_system_default_rotation)
 
     return PsxBoneCreateResult(
         bones=bones,
