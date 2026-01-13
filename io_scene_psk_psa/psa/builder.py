@@ -4,7 +4,7 @@ from psk_psa_py.psa.data import Psa
 from typing import Dict, List, Optional, Tuple
 from mathutils import Matrix, Quaternion, Vector
 
-from ..shared.helpers import PsxBoneCollection, create_psx_bones, get_coordinate_system_transform
+from ..shared.helpers import PsxBoneCollection, convert_bpy_quaternion_to_psx_quaternion, convert_vector_to_vector3, create_psx_bones, get_coordinate_system_transform
 
 
 class PsaBuildSequence:
@@ -47,12 +47,57 @@ class PsaBuildOptions:
         return 'DATA' if self.sequence_source == 'ACTIVE_ACTION' else 'OBJECT'
 
 
+class PsaExportBone:
+    def __init__(self,
+                    pose_bone: PoseBone | None,
+                    armature_object: Object | None,
+                    scale: Vector):
+        self.pose_bone = pose_bone
+        self.armature_object = armature_object
+        self.scale = scale
+    
+    @property
+    def is_armature_root_bone(self) -> bool:
+        return self.pose_bone is not None and self.pose_bone.parent is None
+    
+    @property
+    def is_attached_to_armature(self) -> bool:
+        return self.get_attached_armature() is not None
+    
+    def get_attached_armature(self) -> tuple[Object, PoseBone] | None:
+        if not self.is_armature_root_bone:
+            return None
+        assert self.armature_object is not None
+        match self.armature_object.parent_type:
+            case 'BONE':
+                parent_bone_name = self.armature_object.parent_bone
+                assert self.armature_object.parent is not None
+                parent_armature_object = self.armature_object.parent
+                assert parent_armature_object.pose is not None
+                parent_pose_bone = parent_armature_object.pose.bones.get(parent_bone_name)
+                if parent_pose_bone is None:
+                    return None
+                return (parent_armature_object, parent_pose_bone)
+            case _:
+                return None
+    
+    def get_attached_armature_transform(self) -> Matrix:
+        attached_armature, attached_pose_bone = self.get_attached_armature() or (None, None)
+        if attached_armature is None or attached_pose_bone is None:
+            return Matrix.Identity(4)
+        if attached_pose_bone.parent is not None:
+            attached_bone_matrix = attached_pose_bone.parent.matrix.inverted() @ attached_pose_bone.matrix
+        else:
+            attached_bone_matrix = attached_armature.matrix_world @ attached_pose_bone.matrix
+        return attached_bone_matrix
+
 def _get_pose_bone_location_and_rotation(
-        pose_bone: PoseBone,
-        armature_object: Object,
-        export_space: str,
-        scale: Vector,
-        coordinate_system_transform: Matrix,
+    pose_bone: PoseBone,
+    armature_object: Object,
+    export_bone: PsaExportBone,
+    export_space: str,
+    scale: Vector,
+    coordinate_system_transform: Matrix,
 ) -> Tuple[Vector, Quaternion]:
     if pose_bone.parent is not None:
         pose_bone_matrix = pose_bone.parent.matrix.inverted() @ pose_bone.matrix
@@ -61,19 +106,32 @@ def _get_pose_bone_location_and_rotation(
         # Get the bone's pose matrix and transform it into the export space.
         # In the case of an 'ARMATURE' export space, this will be the inverse of armature object's world matrix.
         # Otherwise, it will be the identity matrix.
-        match export_space:
-            case 'ARMATURE':
-                pose_bone_matrix = pose_bone.matrix
-            case 'WORLD':
-                pose_bone_matrix = armature_object.matrix_world @ pose_bone.matrix
-            case 'ROOT':
-                pose_bone_matrix = Matrix.Identity(4)
-            case _:
-                assert False, f'Invalid export space: {export_space}'
 
-        # The root bone is the only bone that should be transformed by the coordinate system transform, since all
-        # other bones are relative to their parent bones.
-        pose_bone_matrix = coordinate_system_transform @ pose_bone_matrix
+        if export_bone.is_attached_to_armature:
+            # Get the world space matrix of both this bone and the bone that we're attached to,
+            # then calculate a matrix relative to the attached bone.
+            world_matrix = armature_object.matrix_world @ pose_bone.matrix
+            assert export_bone.armature_object
+            my_parent = export_bone.armature_object.parent
+            assert my_parent
+            my_parent_bone = export_bone.armature_object.parent_bone
+            assert my_parent.pose
+            parent_pose_bone = my_parent.pose.bones[my_parent_bone]
+            parent_world_matrix = my_parent.matrix_world @ parent_pose_bone.matrix
+            pose_bone_matrix = parent_world_matrix.inverted() @ world_matrix
+        else:
+            match export_space:
+                case 'ARMATURE':
+                    pose_bone_matrix = pose_bone.matrix
+                case 'WORLD':
+                    pose_bone_matrix = armature_object.matrix_world @ pose_bone.matrix
+                case 'ROOT':
+                    pose_bone_matrix = Matrix.Identity(4)
+                case _:
+                    assert False, f'Invalid export space: {export_space}'
+            # The root bone is the only bone that should be transformed by the coordinate system transform, since all
+            # other bones are relative to their parent bones.
+            pose_bone_matrix = coordinate_system_transform @ pose_bone_matrix
 
     location = pose_bone_matrix.to_translation()
     rotation = pose_bone_matrix.to_quaternion().normalized()
@@ -81,7 +139,7 @@ def _get_pose_bone_location_and_rotation(
     if pose_bone.parent is not None:
         # Don't apply scale to the root bone of armatures if we have a false root.
         # TODO: probably remove this?
-        location *= scale   
+        location *= scale
         rotation.conjugate()
 
     return location, rotation
@@ -116,7 +174,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
     # Build list of PSA bones.
     # Note that the PSA bones are just here to validate the hierarchy.
     # The bind pose information is not used by the engine.
-    psa.bones = [psx_bone for psx_bone, _ in psx_bone_create_result.bones]
+    psa.bones = [bone.psx_bone for bone in psx_bone_create_result.bones]
 
     # No bones are going to be exported.
     if len(psa.bones) == 0:
@@ -189,21 +247,10 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
 
         def add_key(location: Vector, rotation: Quaternion):
             key = Psa.Key()
-            key.location.x = location.x
-            key.location.y = location.y
-            key.location.z = location.z
-            key.rotation.x = rotation.x
-            key.rotation.y = rotation.y
-            key.rotation.z = rotation.z
-            key.rotation.w = rotation.w
+            key.location = convert_vector_to_vector3(location)
+            key.rotation = convert_bpy_quaternion_to_psx_quaternion(rotation)
             key.time = 1.0 / psa_sequence.fps
             psa.keys.append(key)
-
-        class PsaExportBone:
-            def __init__(self, pose_bone: PoseBone | None, armature_object: Object | None, scale: Vector):
-                self.pose_bone = pose_bone
-                self.armature_object = armature_object
-                self.scale = scale
 
         armature_scales: dict[Object, Vector] = {}
 
@@ -219,15 +266,16 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         # locations.
         export_bones: list[PsaExportBone] = []
 
-        for psx_bone, armature_object in psx_bone_create_result.bones:
-            if armature_object is None:
-                export_bones.append(PsaExportBone(None, None, Vector((1.0, 1.0, 1.0))))
+        for bone in psx_bone_create_result.bones:
+            if bone.armature_object is None:
+                export_bone = PsaExportBone(None, None, Vector((1.0, 1.0, 1.0)))
+                export_bones.append(export_bone)
                 continue
 
-            assert armature_object.pose
-            pose_bone = armature_object.pose.bones[psx_bone.name.decode('windows-1252')]
+            assert bone.armature_object.pose
+            pose_bone = bone.armature_object.pose.bones[bone.psx_bone.name.decode('windows-1252')]
 
-            export_bones.append(PsaExportBone(pose_bone, armature_object, armature_scales[armature_object]))
+            export_bones.append(PsaExportBone(pose_bone, bone.armature_object, armature_scales[bone.armature_object]))
 
         match options.sampling_mode:
             case 'INTERPOLATED':
@@ -255,6 +303,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
                                 location, rotation = _get_pose_bone_location_and_rotation(
                                     export_bone.pose_bone,
                                     export_bone.armature_object,
+                                    export_bone,
                                     options.export_space,
                                     export_bone.scale,
                                     coordinate_system_transform=coordinate_system_transform
@@ -278,6 +327,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
                                 location, rotation = _get_pose_bone_location_and_rotation(
                                     pose_bone=export_bone.pose_bone,
                                     armature_object=export_bone.armature_object,
+                                    export_bone=export_bone,
                                     export_space=options.export_space,
                                     scale=export_bone.scale,
                                     coordinate_system_transform=coordinate_system_transform,
@@ -305,6 +355,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
                         location, rotation = _get_pose_bone_location_and_rotation(
                             pose_bone=export_bone.pose_bone,
                             armature_object=export_bone.armature_object,
+                            export_bone=export_bone,
                             export_space=options.export_space,
                             scale=export_bone.scale,
                             coordinate_system_transform=coordinate_system_transform,

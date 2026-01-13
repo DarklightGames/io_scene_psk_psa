@@ -40,7 +40,7 @@ class PSK_OT_bone_collection_list_populate(Operator):
         populate_bone_collection_list(export_operator.bone_collection_list, input_objects.armature_objects)
 
         for bone_collection in export_operator.bone_collection_list:
-            bone_collection.is_selected = selected_status[hash(bone_collection)]
+            bone_collection.is_selected = selected_status.get(hash(bone_collection), False)
 
         return {'FINISHED'}
 

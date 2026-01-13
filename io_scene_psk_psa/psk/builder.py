@@ -106,7 +106,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         bone_collection_indices=options.bone_collection_indices
     )
 
-    psk.bones = [psx_bone for psx_bone, _ in psx_bone_create_result.bones]
+    psk.bones = [bone.psx_bone for bone in psx_bone_create_result.bones]
 
     # Materials
     match options.material_order_mode:

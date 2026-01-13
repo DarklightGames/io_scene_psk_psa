@@ -847,7 +847,12 @@ class PSA_OT_export_collection_populate_sequences(Operator):
         if collection is None:
             self.report({'ERROR'}, 'No collection found in context')
             return {'CANCELLED'}
-        input_objects = get_psk_input_objects_for_collection(collection)
+        
+        try:
+            input_objects = get_psk_input_objects_for_collection(collection)
+        except RuntimeError as e:
+            self.report({'ERROR_INVALID_CONTEXT'}, str(e))
+            return {'CANCELLED'}
 
         # Keep track of what sequences were selected, then restore the selected status after we have updated the lists.
         def store_is_selected_for_sequence_list(sequences: Iterable[PsaExportSequenceMixin]) -> dict[int, bool]:
