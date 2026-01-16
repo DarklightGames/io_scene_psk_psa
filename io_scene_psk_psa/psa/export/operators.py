@@ -289,7 +289,12 @@ class PSA_OT_export_collection(Operator, ExportHelper, PsaExportMixin):
         if collection is None:
             self.report({'ERROR'}, 'No collection found for export')
             return {'CANCELLED'}
-        import_objects = get_psk_input_objects_for_collection(collection)
+
+        try:
+            import_objects = get_psk_input_objects_for_collection(collection)
+        except RuntimeError as e:
+            self.report({'ERROR_INVALID_CONTEXT'}, str(e))
+            return {'CANCELLED'}
 
         options = create_psa_export_options(context, import_objects.armature_objects, self)
 
