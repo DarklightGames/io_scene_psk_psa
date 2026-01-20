@@ -8,30 +8,23 @@ class PsaExportSequenceMixin(PropertyGroup):
     frame_start: int
     frame_end: int
     group: str
-
-class PsaExportSequenceWithActionMixin(PsaExportSequenceMixin):
     action_name: str
-
-    @property
-    def action(self) -> Action | None:
-        pass
-
-class PSA_PG_export_action_list_item(PsaExportSequenceWithActionMixin):
+    armature_object_name: str
+    marker_index: int
     is_pose_marker: bool
 
-
-class PSA_PG_export_active_action_list_item(PsaExportSequenceWithActionMixin):
-    armature_object_name: str
+    @property
+    def action(self) -> Action | None: ...
 
     @property
-    def armature_object(self) -> Object | None:
-        pass
+    def armature_object(self) -> Object | None: ...
+
+    @property
+    def is_reversed(self) -> bool: ...
 
 
-class PSA_PG_export_timeline_marker(PsaExportSequenceMixin):
-    marker_index: int
-
-class PSA_PG_export_nla_strip_list_item(PsaExportSequenceWithActionMixin):
+class PSA_PG_export_sequence(PsaExportSequenceMixin):
+    """Concrete type for PSA export sequences."""
     pass
 
 
@@ -43,13 +36,13 @@ class PsaExportMixin(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExp
     fps_custom: float
     compression_ratio_source: str
     compression_ratio_custom: float
-    action_list: BpyCollectionProperty[PSA_PG_export_action_list_item]
+    action_list: BpyCollectionProperty[PSA_PG_export_sequence]
     action_list_index: int
-    marker_list: BpyCollectionProperty[PSA_PG_export_timeline_marker]
+    marker_list: BpyCollectionProperty[PSA_PG_export_sequence]
     marker_list_index: int
-    nla_strip_list: BpyCollectionProperty[PSA_PG_export_nla_strip_list_item]
+    nla_strip_list: BpyCollectionProperty[PSA_PG_export_sequence]
     nla_strip_list_index: int
-    active_action_list: BpyCollectionProperty[PSA_PG_export_active_action_list_item]
+    active_action_list: BpyCollectionProperty[PSA_PG_export_sequence]
     active_action_list_index: int
     sequence_name_prefix: str
     sequence_name_suffix: str

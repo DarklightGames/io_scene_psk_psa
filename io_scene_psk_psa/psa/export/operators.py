@@ -10,10 +10,8 @@ from bpy_extras.io_utils import ExportHelper
 
 from .properties import (
     PSA_PG_export,
-    PSA_PG_export_action_list_item,
     PsaExportMixin,
     PsaExportSequenceMixin,
-    PsaExportSequenceWithActionMixin,
     filter_sequences,
     get_sequences_from_name_and_frame_range,
 )
@@ -261,7 +259,7 @@ def get_sequences_from_action_pose_markers(
     yield from get_sequences_from_name_and_frame_range(sequence_name, frame_start, frame_end)
 
 
-def get_visible_sequences(pg: PsaExportMixin, sequences) -> List[PSA_PG_export_action_list_item]:
+def get_visible_sequences(pg: PsaExportMixin, sequences) -> List[PsaExportSequenceMixin]:
     visible_sequences = []
     for i, flag in enumerate(filter_sequences(pg, sequences)):
         if bool(flag & (1 << 30)):

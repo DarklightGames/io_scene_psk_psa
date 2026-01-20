@@ -2,7 +2,7 @@ from typing import cast as typing_cast
 
 from bpy.types import UIList
 
-from .properties import PSA_PG_export_action_list_item, filter_sequences
+from .properties import PsaExportSequenceMixin, filter_sequences
 
 
 class PSA_UL_export_sequences(UIList):
@@ -14,7 +14,7 @@ class PSA_UL_export_sequences(UIList):
         self.use_filter_show = True
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        item = typing_cast(PSA_PG_export_action_list_item, item)
+        item = typing_cast(PsaExportSequenceMixin, item)
 
         is_pose_marker = hasattr(item, 'is_pose_marker') and item.is_pose_marker
         layout.prop(item, 'is_selected', icon_only=True, text=item.name)
@@ -24,9 +24,9 @@ class PSA_UL_export_sequences(UIList):
         row = layout.row(align=True)
         row.alignment = 'RIGHT'
 
-        row.label(text=str(abs(item.frame_end - item.frame_start) + 1), icon='FRAME_PREV' if item.frame_end < item.frame_start else 'KEYFRAME')
+        row.label(text=str(abs(item.frame_end - item.frame_start) + 1), icon='FRAME_PREV' if item.is_reversed else 'KEYFRAME')
 
-        if hasattr(item, 'armature_object') and item.armature_object is not None:
+        if item.armature_object is not None:
             row.label(text=item.armature_object.name, icon='ARMATURE_DATA')
 
         # row.label(text=item.action.name, icon='PMARKER' if is_pose_marker else 'ACTION_DATA')

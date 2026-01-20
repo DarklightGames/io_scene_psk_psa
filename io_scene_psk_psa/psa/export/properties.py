@@ -21,43 +21,38 @@ from ...shared.types import TransformMixin, ExportSpaceMixin, PsxBoneExportMixin
 def psa_export_property_group_animation_data_override_poll(_context, obj):
     return obj.animation_data is not None
 
+
 class PsaExportSequenceMixin(PropertyGroup):
     name: StringProperty(name='Name')
     is_selected: BoolProperty(name='Selected', default=True)
     frame_start: IntProperty(name='Start Frame', options={'HIDDEN'})
     frame_end: IntProperty(name='End Frame', options={'HIDDEN'})
     group: StringProperty(name='Group')
+    action_name: StringProperty(name='Action Name',default='', options={'HIDDEN'})
+    armature_object_name: StringProperty(name='Armature Object Name',default='', options={'HIDDEN'})
+    marker_index: IntProperty(name='Marker Index',default=-1, options={'HIDDEN'})
+    is_pose_marker: BoolProperty(name='Is Pose Marker',default=False, options={'HIDDEN'})
+
+    @property
+    def action(self) -> Action | None:
+        """Get the action associated with this sequence (if any)."""
+        return bpy.data.actions.get(self.action_name) if self.action_name else None
+
+    @property
+    def armature_object(self) -> Object | None:
+        """Get the armature object associated with this sequence (if any)."""
+        return bpy.data.objects.get(self.armature_object_name) if self.armature_object_name else None
+    
+    @property
+    def is_reversed(self) -> bool:
+        """Check if the sequence is reversed (end frame before start frame)."""
+        return self.frame_end < self.frame_start
 
     def __hash__(self) -> int:
         return hash(self.name)
 
-class PsaExportSequenceWithActionMixin(PsaExportSequenceMixin):
-    action_name: StringProperty()
 
-    @property
-    def action(self) -> Optional[Action]:
-        return bpy.data.actions.get(self.action_name)
-
-class PSA_PG_export_action_list_item(PsaExportSequenceWithActionMixin):
-    is_pose_marker: BoolProperty(options={'HIDDEN'})
-
-
-class PSA_PG_export_active_action_list_item(PsaExportSequenceWithActionMixin):
-    armature_object_name: StringProperty()
-
-    @property
-    def armature_object(self) -> Optional[Object]:
-        return bpy.data.objects.get(self.armature_object_name)
-    
-    def __hash__(self) -> int:
-        return super().__hash__()
-
-
-class PSA_PG_export_timeline_marker(PsaExportSequenceMixin):
-    marker_index: IntProperty()
-
-
-class PSA_PG_export_nla_strip_list_item(PsaExportSequenceWithActionMixin):
+class PSA_PG_export_sequence(PsaExportSequenceMixin):
     pass
 
 
@@ -105,7 +100,7 @@ def nla_track_update_cb(self: 'PSA_PG_export', context: Context) -> None:
         nla_track = animation_data.nla_tracks[self.nla_track_index]
         for nla_strip in nla_track.strips:
             for sequence_name, frame_start, frame_end in get_sequences_from_name_and_frame_range(nla_strip.name, nla_strip.frame_start, nla_strip.frame_end):
-                strip: PSA_PG_export_nla_strip_list_item = self.nla_strip_list.add()
+                strip: PSA_PG_export_sequence = self.nla_strip_list.add()
                 strip.action_name = nla_strip.action
                 strip.name = sequence_name
                 strip.frame_start = frame_start
@@ -203,13 +198,13 @@ class PsaExportMixin(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExp
     )
     compression_ratio_custom: FloatProperty(default=1.0, min=0.0, max=1.0, subtype='FACTOR', description='The key sampling ratio of the exported sequence.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames')
 
-    action_list: CollectionProperty(type=PSA_PG_export_action_list_item)
+    action_list: CollectionProperty(type=PSA_PG_export_sequence)
     action_list_index: IntProperty(default=0)
-    marker_list: CollectionProperty(type=PSA_PG_export_timeline_marker)
+    marker_list: CollectionProperty(type=PSA_PG_export_sequence)
     marker_list_index: IntProperty(default=0)
-    nla_strip_list: CollectionProperty(type=PSA_PG_export_nla_strip_list_item)
+    nla_strip_list: CollectionProperty(type=PSA_PG_export_sequence)
     nla_strip_list_index: IntProperty(default=0)
-    active_action_list: CollectionProperty(type=PSA_PG_export_active_action_list_item)
+    active_action_list: CollectionProperty(type=PSA_PG_export_sequence)
     active_action_list_index: IntProperty(default=0)
 
     sequence_name_prefix: StringProperty(name='Prefix', options=set())
@@ -264,7 +259,7 @@ class PSA_PG_export(PsaExportMixin):
     pass
 
 
-def filter_sequences(pg: PsaExportMixin, sequences: Sequence[PsaExportSequenceMixin]) -> List[int]:
+def filter_sequences(pg: PsaExportMixin, sequences: Sequence[PsaExportSequenceMixin]) -> list[int]:
     bitflag_filter_item = 1 << 30
     flt_flags = [bitflag_filter_item] * len(sequences)
 
@@ -279,31 +274,26 @@ def filter_sequences(pg: PsaExportMixin, sequences: Sequence[PsaExportSequenceMi
             for i, sequence in enumerate(sequences):
                 flt_flags[i] ^= bitflag_filter_item
 
-    # TODO: perhaps just make one type that has all of the possible data types? hasattr is very flakey.
-    # we could just add the "type" as a variable and switch on that for different behaviors.
     if not pg.sequence_filter_asset:
         for i, sequence in enumerate(sequences):
-            if hasattr(sequence, 'action') and sequence.action is not None and sequence.action.asset_data is not None:
+            if sequence.action is not None and sequence.action.asset_data is not None:
                 flt_flags[i] &= ~bitflag_filter_item
 
     if not pg.sequence_filter_pose_marker:
         for i, sequence in enumerate(sequences):
-            if hasattr(sequence, 'is_pose_marker') and sequence.is_pose_marker:
+            if sequence.is_pose_marker:
                 flt_flags[i] &= ~bitflag_filter_item
 
     if not pg.sequence_filter_reversed:
         for i, sequence in enumerate(sequences):
-            if sequence.frame_start > sequence.frame_end:
+            if sequence.is_reversed:
                 flt_flags[i] &= ~bitflag_filter_item
 
     return flt_flags
 
 
 _classes = (
-    PSA_PG_export_action_list_item,
-    PSA_PG_export_timeline_marker,
-    PSA_PG_export_nla_strip_list_item,
-    PSA_PG_export_active_action_list_item,
+    PSA_PG_export_sequence,
     PSA_PG_export,
 )
 
