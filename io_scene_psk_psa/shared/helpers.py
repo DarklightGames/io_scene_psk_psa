@@ -1,6 +1,6 @@
 import bpy
 from collections import Counter
-from typing import List, Iterable, Optional, Dict, Tuple, cast as typing_cast
+from typing import Iterable, cast as typing_cast
 from bpy.types import Armature, AnimData, Collection, Context, Object, ArmatureModifier, SpaceProperties, PropertyGroup
 from mathutils import Matrix, Vector, Quaternion as BpyQuaternion
 from psk_psa_py.shared.data import PsxBone, Quaternion, Vector3
@@ -102,7 +102,7 @@ def populate_bone_collection_list(
             item.is_selected = bone_collection.name in selected_assigned_collection_names if has_selected_collections else True
 
 
-def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_collection_indices: Iterable[int]) -> List[str]:
+def get_export_bone_names(armature_object: Object, bone_filter_mode: str, bone_collection_indices: Iterable[int]) -> list[str]:
     """
     Returns a sorted list of bone indices that should be exported for the given bone filter mode and bone collections.
 
@@ -172,9 +172,9 @@ def convert_string_to_cp1252_bytes(string: str) -> bytes:
 
 
 def create_psx_bones_from_blender_bones(
-        bones: List[bpy.types.Bone],
+        bones: list[bpy.types.Bone],
         armature_object_matrix_world: Matrix,
-) -> List[PsxBone]:
+) -> list[PsxBone]:
     """
     Creates PSX bones from the given Blender bones.
     
@@ -183,7 +183,7 @@ def create_psx_bones_from_blender_bones(
     # Apply the scale of the armature object to the bone location.
     _, _, armature_object_scale = armature_object_matrix_world.decompose()
 
-    psx_bones: List[PsxBone] = []
+    psx_bones: list[PsxBone] = []
     for bone in bones:
         psx_bone = PsxBone()
         psx_bone.name = convert_string_to_cp1252_bytes(bone.name)
@@ -237,10 +237,6 @@ class PsxBoneCreateResult:
         self.bones = bones
         self.armature_object_root_bone_indices = armature_object_root_bone_indices
         self.armature_object_bone_names = armature_object_bone_names
-    
-    @property
-    def has_false_root_bone(self) -> bool:
-        return len(self.bones) > 0 and self.bones[0].armature_object is None
 
 
 def convert_vector_to_vector3(vector: Vector) -> Vector3:
@@ -280,7 +276,7 @@ class ObjectNode:
     def __init__(self, obj: Object):
         self.object = obj
         self.parent: ObjectNode | None = None
-        self.children: List[ObjectNode] = []
+        self.children: list[ObjectNode] = []
     
     @property
     def root(self):
@@ -298,8 +294,8 @@ class ObjectTree:
     A tree of the armature objects based on their hierarchy.
     '''
     def __init__(self, objects: Iterable[Object]):
-        self.root_nodes: List[ObjectNode] = []
-        object_node_map: Dict[Object, ObjectNode] = {x: ObjectNode(x) for x in objects}
+        self.root_nodes: list[ObjectNode] = []
+        object_node_map: dict[Object, ObjectNode] = {x: ObjectNode(x) for x in objects}
         
         for obj, object_node in object_node_map.items():
             if obj.parent in object_node_map:
@@ -334,14 +330,14 @@ class ObjectTree:
 
 
 def create_psx_bones(
-        armature_objects: List[Object],
+        armature_objects: list[Object],
         export_space: str = 'WORLD',
         root_bone_name: str = 'ROOT',
         forward_axis: str = 'X',
         up_axis: str = 'Z',
         scale: float = 1.0,
         bone_filter_mode: str = 'ALL',
-        bone_collection_indices: Optional[List[PsxBoneCollection]] = None,
+        bone_collection_indices: list[PsxBoneCollection] | None = None,
         bone_collection_primary_key: str = 'OBJECT',
 ) -> PsxBoneCreateResult:
     """
@@ -366,9 +362,9 @@ def create_psx_bones(
         total_bone_count += len(armature_data.bones)
 
     # Store the bone names to be exported for each armature object.
-    armature_object_bone_names: Dict[Object, List[str]] = dict()
+    armature_object_bone_names: dict[Object, list[str]] = dict()
     for armature_object in  armature_objects:
-        armature_bone_collection_indices: List[int] = []
+        armature_bone_collection_indices: list[int] = []
         match bone_collection_primary_key:
             case 'OBJECT':
                 armature_bone_collection_indices.extend([x.index for x in bone_collection_indices if x.armature_object_name == armature_object.name])
@@ -389,6 +385,13 @@ def create_psx_bones(
         bone_names = armature_object_bone_names[armature_object]
         armature_data = typing_cast(Armature, armature_object.data)
         armature_bones = [armature_data.bones[bone_name] for bone_name in bone_names]
+
+        # Ensure that we don't have multiple root bones in this armature.
+        root_bone_count = sum(1 for bone in armature_bones if bone.parent is None)
+        if root_bone_count > 1:
+            raise RuntimeError(f'Armature object \'{armature_object.name}\' has multiple root bones. '
+                               f'Only one root bone is allowed per armature.'
+                               )
 
         armature_psx_bones = create_psx_bones_from_blender_bones(
             bones=armature_bones,
@@ -611,8 +614,8 @@ from bpy.types import Depsgraph
 
 class PskInputObjects(object):
     def __init__(self):
-        self.mesh_dfs_objects: List[DfsObject] = []
-        self.armature_objects: List[Object] = []
+        self.mesh_dfs_objects: list[DfsObject] = []
+        self.armature_objects: list[Object] = []
 
 
 def get_materials_for_mesh_objects(depsgraph: Depsgraph, mesh_objects: Iterable[Object]):
@@ -640,7 +643,7 @@ def get_mesh_objects_for_context(context: Context) -> Iterable[DfsObject]:
             yield dfs_object
 
 
-def get_armature_for_mesh_object(mesh_object: Object) -> Optional[Object]:
+def get_armature_for_mesh_object(mesh_object: Object) -> Object | None:
     if mesh_object.type != 'MESH':
         return None
     # Get the first armature modifier with a non-empty armature object.

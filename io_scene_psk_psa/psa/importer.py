@@ -1,4 +1,4 @@
-from typing import Sequence, Iterable, List, Optional, cast as typing_cast
+from typing import Sequence, Iterable, cast as typing_cast
 
 import bpy
 import numpy as np
@@ -32,7 +32,7 @@ class PsaImportOptions(object):
                  fps_custom: float = 30.0,
                  fps_source: str = 'SEQUENCE',
                  psa_config: PsaConfig = PsaConfig(),
-                 sequence_names: Optional[List[str]] = None,
+                 sequence_names: list[str] | None = None,
                  should_convert_to_samples: bool = False,
                  should_overwrite: bool = False,
                  should_stash: bool = False,
@@ -61,13 +61,13 @@ class PsaImportOptions(object):
 class ImportBone(object):
     def __init__(self, psa_bone: PsxBone):
         self.psa_bone: PsxBone = psa_bone
-        self.parent: Optional[ImportBone] = None
-        self.armature_bone: Optional[Bone] = None
-        self.pose_bone: Optional[PoseBone] = None
+        self.parent: ImportBone | None = None
+        self.armature_bone: Bone | None = None
+        self.pose_bone: PoseBone | None = None
         self.original_location: Vector = Vector()
         self.original_rotation: Quaternion = Quaternion()
         self.post_rotation: Quaternion = Quaternion()
-        self.fcurves: List[FCurve] = []
+        self.fcurves: list[FCurve] = []
 
 
 def _calculate_fcurve_data(import_bone: ImportBone, key_data: Sequence[float]):
@@ -90,10 +90,10 @@ def _calculate_fcurve_data(import_bone: ImportBone, key_data: Sequence[float]):
 
 class PsaImportResult:
     def __init__(self):
-        self.warnings: List[str] = []
+        self.warnings: list[str] = []
 
 
-def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_names: List[str], bone_mapping: BoneMapping) -> Optional[int]:
+def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_names: list[str], bone_mapping: BoneMapping) -> int | None:
     """
     @param psa_bone_name: The name of the PSA bone.
     @param armature_bone_names: The names of the bones in the armature.

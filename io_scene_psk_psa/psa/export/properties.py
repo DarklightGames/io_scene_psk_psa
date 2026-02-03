@@ -1,7 +1,7 @@
 import re
 import sys
 from fnmatch import fnmatch
-from typing import List, Optional, Sequence
+from typing import Sequence
 import bpy
 from bpy.props import (
     BoolProperty,
@@ -58,7 +58,7 @@ class PSA_PG_export_sequence(PsaExportSequenceMixin):
 
 def get_sequences_from_name_and_frame_range(name: str, frame_start: int, frame_end: int):
     # Check for loop
-    anims: List[tuple[str, int, int]] = []
+    anims: list[tuple[str, int, int]] = []
     loop_pattern = r'\@(\d+)\:(.+)'
     loop_match = re.match(loop_pattern, name)
     if loop_match:
@@ -107,7 +107,7 @@ def nla_track_update_cb(self: 'PSA_PG_export', context: Context) -> None:
                 strip.frame_end = frame_end
 
 
-def get_animation_data(pg: 'PSA_PG_export', context: Context) -> Optional[AnimData]:
+def get_animation_data(pg: 'PSA_PG_export', context: Context) -> AnimData | None:
     animation_data_object = context.object
     return animation_data_object.animation_data if animation_data_object else None
 

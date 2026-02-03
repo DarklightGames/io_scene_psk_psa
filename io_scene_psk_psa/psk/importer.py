@@ -4,7 +4,7 @@ import numpy as np
 
 from bpy.types import Context, Object, VertexGroup, ArmatureModifier, FloatColorAttribute
 from mathutils import Matrix, Quaternion, Vector
-from typing import List, Optional, cast as typing_cast
+from typing import cast as typing_cast
 
 from psk_psa_py.psk.data import Psk
 from psk_psa_py.shared.data import PsxBone
@@ -35,12 +35,11 @@ class ImportBone:
     def __init__(self, index: int, psk_bone: PsxBone):
         self.index: int = index
         self.psk_bone: PsxBone = psk_bone
-        self.parent: Optional[ImportBone] = None
+        self.parent: ImportBone | None = None
         self.local_rotation: Quaternion = Quaternion()
         self.local_translation: Vector = Vector()
         self.world_rotation_matrix: Matrix = Matrix()
         self.world_matrix: Matrix = Matrix()
-        self.vertex_group = None
         self.original_rotation: Quaternion = Quaternion()
         self.original_location: Vector = Vector()
         self.post_rotation: Quaternion = Quaternion()
@@ -48,9 +47,9 @@ class ImportBone:
 
 class PskImportResult:
     def __init__(self):
-        self.warnings: List[str] = []
-        self.armature_object: Optional[Object] = None
-        self.mesh_object: Optional[Object] = None
+        self.warnings: list[str] = []
+        self.armature_object: Object | None = None
+        self.mesh_object: Object | None = None
 
     @property
     def root_object(self) -> Object:
@@ -83,7 +82,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
 
         bpy.ops.object.mode_set(mode='EDIT')
 
-        import_bones: List[ImportBone] = []
+        import_bones: list[ImportBone] = []
 
         for bone_index, psk_bone in enumerate(psk.bones):
             import_bone = ImportBone(bone_index, psk_bone)
@@ -263,7 +262,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
         # Weights
         # Get a list of all bones that have weights associated with them.
         vertex_group_bone_indices = set(map(lambda weight: weight.bone_index, psk.weights))
-        vertex_groups: List[Optional[VertexGroup]] = [None] * len(psk.bones)
+        vertex_groups: list[VertexGroup | None] = [None] * len(psk.bones)
         for bone_index, psk_bone in map(lambda x: (x, psk.bones[x]), vertex_group_bone_indices):
             vertex_groups[bone_index] = mesh_object.vertex_groups.new(name=psk_bone.name.decode('windows-1252'))
 

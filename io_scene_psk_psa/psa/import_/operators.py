@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Iterable
 
 from bpy.props import CollectionProperty, StringProperty
-from bpy.types import Context, Event, FileHandler, Object, Operator, OperatorFileListElement
+from bpy.types import Context, Event, Object, Operator, OperatorFileListElement
 from bpy_extras.io_utils import ImportHelper
 
 from .properties import PsaImportMixin, get_visible_sequences

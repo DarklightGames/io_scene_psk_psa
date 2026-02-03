@@ -1,6 +1,5 @@
 import re
 from fnmatch import fnmatch
-from typing import List
 
 from bpy.props import (
     BoolProperty,
@@ -133,7 +132,7 @@ class PSA_PG_import(PropertyGroup):
     select_text: PointerProperty(type=Text)
 
 
-def filter_sequences(pg: PSA_PG_import, sequences) -> List[int]:
+def filter_sequences(pg: PSA_PG_import, sequences) -> list[int]:
     bitflag_filter_item = 1 << 30
     flt_flags = [bitflag_filter_item] * len(sequences)
 
@@ -167,7 +166,7 @@ def filter_sequences(pg: PSA_PG_import, sequences) -> List[int]:
     return flt_flags
 
 
-def get_visible_sequences(pg: PSA_PG_import, sequences) -> List[PSA_PG_import_action_list_item]:
+def get_visible_sequences(pg: PSA_PG_import, sequences) -> list[PSA_PG_import_action_list_item]:
     bitflag_filter_item = 1 << 30
     visible_sequences = []
     for i, flag in enumerate(filter_sequences(pg, sequences)):

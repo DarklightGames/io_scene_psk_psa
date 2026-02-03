@@ -1,9 +1,9 @@
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import Armature, Context, Object, Mesh
+from bpy.types import Armature, Context, Object, Mesh, Material
 from mathutils import Matrix
-from typing import Dict, Iterable, List, Optional, cast as typing_cast
+from typing import Iterable, Sequence, cast as typing_cast
 from psk_psa_py.shared.data import Vector3
 from psk_psa_py.psk.data import Psk
 from .properties import triangle_type_and_bit_flags_to_poly_flags
@@ -23,10 +23,10 @@ from ..shared.helpers import (
 class PskBuildOptions(object):
     def __init__(self):
         self.bone_filter_mode = 'ALL'
-        self.bone_collection_indices: List[PsxBoneCollection] = []
+        self.bone_collection_indices: list[PsxBoneCollection] = []
         self.object_eval_state = 'EVALUATED'
         self.material_order_mode = 'AUTOMATIC'
-        self.material_name_list: List[str] = []
+        self.material_name_list: list[str] = []
         self.scale = 1.0
         self.export_space = 'WORLD'
         self.forward_axis = 'X'
@@ -37,7 +37,7 @@ class PskBuildOptions(object):
 class PskBuildResult(object):
     def __init__(self, psk: Psk, warnings: list[str]):
         self.psk: Psk = psk
-        self.warnings: List[str] = warnings
+        self.warnings: list[str] = warnings
 
 
 def _get_mesh_export_space_matrix(node: ObjectNode | None, export_space: str) -> Matrix:
@@ -70,7 +70,7 @@ def _get_mesh_export_space_matrix(node: ObjectNode | None, export_space: str) ->
             assert False, f'Invalid export space: {export_space}'
 
 
-def _get_material_name_indices(obj: Object, material_names: List[str]) -> Iterable[int]:
+def _get_material_name_indices(obj: Object, material_names: list[str]) -> Iterable[int]:
     """
     Returns the index of the material in the list of material names.
     If the material is not found, the index 0 is returned.
@@ -206,7 +206,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
                 bm.to_mesh(mesh_data)
                 del bm
                 evaluated_mesh_object = bpy.data.objects.new('', mesh_data)
-                mesh_object =  evaluated_mesh_object
+                mesh_object = evaluated_mesh_object
                 mesh_object.matrix_world = matrix_world
 
                 # Extract the scale from the matrix.
@@ -271,6 +271,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             for loop_index, loop in enumerate(mesh_data.loops):
                 wedges.append(Psk.Wedge(point_index=loop.vertex_index + vertex_offset, u=0.0, v=0.0))
 
+
         # Assign material indices to the wedges.
         for triangle in mesh_data.loop_triangles:
             for loop_index in triangle.loops:
@@ -315,7 +316,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
             bone_names = psx_bone_create_result.armature_object_bone_names[armature_object]
             vertex_group_names = [x.name for x in mesh_object.vertex_groups]
-            vertex_group_bone_indices: Dict[int, int] = dict()
+            vertex_group_bone_indices: dict[int, int] = dict()
             for vertex_group_index, vertex_group_name in enumerate(vertex_group_names):
                 try:
                     vertex_group_bone_indices[vertex_group_index] = bone_names.index(vertex_group_name) + bone_index_offset

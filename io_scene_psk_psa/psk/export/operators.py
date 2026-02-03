@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, List, cast as typing_cast
+from typing import Iterable, cast as typing_cast
 
 import bpy
 from bpy.props import StringProperty
@@ -173,7 +173,7 @@ class PSK_OT_material_list_name_move_down(Operator):
         return {'FINISHED'}
 
 
-def get_sorted_materials_by_names(materials: Iterable[Material], material_names: List[str]) -> List[Material]:
+def get_sorted_materials_by_names(materials: Iterable[Material], material_names: list[str]) -> list[Material]:
     """
     Sorts the materials by the order of the material names list. Any materials not in the list will be appended to the
     end of the list in the order they are found.

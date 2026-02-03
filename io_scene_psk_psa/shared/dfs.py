@@ -5,7 +5,7 @@ These functions are used to iterate over objects in a collection or view layer i
 instances. This is useful for exporters that need to traverse the object hierarchy in a predictable order.
 """
 
-from typing import Optional, Set, Iterable, List
+from typing import Iterable
 
 from bpy.types import Collection, Object, ViewLayer, LayerCollection
 from mathutils import Matrix
@@ -15,7 +15,7 @@ class DfsObject:
     """
     Represents an object in a depth-first search.
     """
-    def __init__(self, obj: Object, instance_objects: List[Object], matrix_world: Matrix):
+    def __init__(self, obj: Object, instance_objects: list[Object], matrix_world: Matrix):
         self.obj = obj
         self.instance_objects = instance_objects
         self.matrix_world = matrix_world
@@ -85,9 +85,9 @@ def dfs_collection_objects(collection: Collection, visible_only: bool = False) -
 
 def _dfs_collection_objects_recursive(
         collection: Collection,
-        instance_objects: Optional[List[Object]] = None,
+        instance_objects: list[Object] | None = None,
         matrix_world: Matrix = Matrix.Identity(4),
-        visited: Optional[Set[Object]]=None
+        visited: set[Object] | None = None
 ) -> Iterable[DfsObject]:
     """
     Depth-first search of objects in a collection, including recursing into instances.

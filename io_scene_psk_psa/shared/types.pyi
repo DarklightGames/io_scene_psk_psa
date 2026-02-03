@@ -59,3 +59,5 @@ class PsxBoneExportMixin:
 
 class PSX_PG_scene_export(TransformSourceMixin):
     pass
+
+bone_filter_mode_items: tuple[tuple[str, str, str]]

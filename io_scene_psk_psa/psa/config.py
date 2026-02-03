@@ -1,6 +1,5 @@
 import re
 from configparser import ConfigParser
-from typing import Dict, List
 
 REMOVE_TRACK_LOCATION = (1 << 0)
 REMOVE_TRACK_ROTATION = (1 << 1)
@@ -8,7 +7,7 @@ REMOVE_TRACK_ROTATION = (1 << 1)
 
 class PsaConfig:
     def __init__(self):
-        self.sequence_bone_flags: Dict[str, Dict[int, int]] = dict()
+        self.sequence_bone_flags: dict[str, dict[int, int]] = dict()
 
 
 def _load_config_file(file_path: str) -> ConfigParser:
@@ -48,7 +47,7 @@ def _get_bone_flags_from_value(value: str) -> int:
             return 0
 
 
-def read_psa_config(psa_sequence_names: List[str], file_path: str) -> PsaConfig:
+def read_psa_config(psa_sequence_names: list[str], file_path: str) -> PsaConfig:
     psa_config = PsaConfig()
 
     config = _load_config_file(file_path)

@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from collections import Counter
-from typing import List, Iterable, Dict, Protocol, Sequence, Tuple, cast as typing_cast
+from typing import Iterable, Sequence, Tuple, cast as typing_cast
 
 import bpy
 import re
@@ -19,7 +19,7 @@ from .ui import PSA_UL_export_sequences
 from ..builder import build_psa, PsaBuildSequence, PsaBuildOptions
 from psk_psa_py.psa.writer import write_psa_to_file
 from ...shared.helpers import get_collection_export_operator_from_context, get_collection_from_context, get_psk_input_objects_for_collection, populate_bone_collection_list, get_nla_strips_in_frame_range, PsxBoneCollection
-from ...shared.types import BpyCollectionProperty, PSX_PG_action_export
+from ...shared.types import PSX_PG_action_export
 from ...shared.ui import draw_bone_filter_mode
 from ...shared.operators import PSK_OT_bone_collection_list_populate, PSK_OT_bone_collection_list_select_all
 
@@ -179,7 +179,7 @@ def get_sequence_compression_ratio(
 def get_timeline_marker_sequence_frame_ranges(
         animation_data: AnimData, 
         scene: Scene,
-        marker_names: List[str],
+        marker_names: list[str],
         ) -> dict[str, tuple[int, int]]:
     # Timeline markers need to be sorted so that we can determine the sequence start and end positions.
     sequence_frame_ranges: dict[str, tuple[int, int]] = dict()
@@ -240,7 +240,7 @@ def get_sequences_from_action(action: Action):
 
 def get_sequences_from_action_pose_markers(
         action: Action, 
-        pose_markers: List[TimelineMarker], 
+        pose_markers: list[TimelineMarker], 
         pose_marker: TimelineMarker, 
         pose_marker_index: int,
         ):
@@ -259,7 +259,7 @@ def get_sequences_from_action_pose_markers(
     yield from get_sequences_from_name_and_frame_range(sequence_name, frame_start, frame_end)
 
 
-def get_visible_sequences(pg: PsaExportMixin, sequences) -> List[PsaExportSequenceMixin]:
+def get_visible_sequences(pg: PsaExportMixin, sequences) -> list[PsaExportSequenceMixin]:
     visible_sequences = []
     for i, flag in enumerate(filter_sequences(pg, sequences)):
         if bool(flag & (1 << 30)):
@@ -471,7 +471,7 @@ def create_psa_export_options(context: Context, armature_objects: Sequence[Objec
         raise RuntimeError(f'No armatures')
 
     animation_data = armature_objects[0].animation_data
-    export_sequences: List[PsaBuildSequence] = []
+    export_sequences: list[PsaBuildSequence] = []
 
     # TODO: this needs to be changed so that we iterate over all of the armature objects?
     # do we need to check for primary key? (data vs. object?)
@@ -507,7 +507,7 @@ def create_psa_export_options(context: Context, armature_objects: Sequence[Objec
                 export_sequences.append(export_sequence)
         case 'TIMELINE_MARKERS':
             for marker_item in filter(lambda x: x.is_selected, pg.marker_list):
-                nla_strips_actions: List[Action] = []
+                nla_strips_actions: list[Action] = []
                 for nla_strip in get_nla_strips_in_frame_range(animation_data, marker_item.frame_start, marker_item.frame_end):
                     if nla_strip.action:
                         nla_strips_actions.append(nla_strip.action)
@@ -584,7 +584,7 @@ class PSA_OT_export(Operator, ExportHelper):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.armature_objects: List[Object] = []
+        self.armature_objects: list[Object] = []
 
     @classmethod
     def poll(cls, context):

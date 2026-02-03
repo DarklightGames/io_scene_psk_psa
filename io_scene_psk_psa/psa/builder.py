@@ -1,7 +1,7 @@
 from bpy.types import Action, AnimData, Context, Object, PoseBone
 
 from psk_psa_py.psa.data import Psa
-from typing import Dict, List, Optional, Tuple
+from typing import Tuple
 from mathutils import Matrix, Quaternion, Vector
 
 from ..shared.helpers import PsxBoneCollection, convert_bpy_quaternion_to_psx_quaternion, convert_vector_to_vector3, create_psx_bones, get_coordinate_system_transform
@@ -10,7 +10,7 @@ from ..shared.helpers import PsxBoneCollection, convert_bpy_quaternion_to_psx_qu
 class PsaBuildSequence:
     class NlaState:
         def __init__(self):
-            self.action: Optional[Action] = None
+            self.action: Action | None = None
             self.frame_start: int = 0
             self.frame_end: int = 0
 
@@ -22,16 +22,16 @@ class PsaBuildSequence:
         self.compression_ratio: float = 1.0
         self.key_quota: int = 0
         self.fps: float = 30.0
-        self.group: Optional[str] = None
+        self.group: str | None = None
 
 
 class PsaBuildOptions:
     def __init__(self):
-        self.armature_objects: List[Object] = []
-        self.animation_data: Optional[AnimData] = None
-        self.sequences: List[PsaBuildSequence] = []
+        self.armature_objects: list[Object] = []
+        self.animation_data: AnimData | None = None
+        self.sequences: list[PsaBuildSequence] = []
         self.bone_filter_mode: str = 'ALL'
-        self.bone_collection_indices: List[PsxBoneCollection] = []
+        self.bone_collection_indices: list[PsxBoneCollection] = []
         self.sequence_name_prefix: str = ''
         self.sequence_name_suffix: str = ''
         self.scale = 1.0
@@ -307,7 +307,6 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
                                     options.export_space,
                                     export_bone.scale,
                                     coordinate_system_transform=coordinate_system_transform
-                                    # has_false_root_bone=psx_bone_create_result.has_false_root_bone,
                                 )
                                 last_frame_bone_poses.append((location, rotation))
 
@@ -331,7 +330,6 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
                                     export_space=options.export_space,
                                     scale=export_bone.scale,
                                     coordinate_system_transform=coordinate_system_transform,
-                                    # has_false_root_bone=psx_bone_create_result.has_false_root_bone,
                                 )
                                 next_frame_bone_poses.append((location, rotation))
 
@@ -359,7 +357,6 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
                             export_space=options.export_space,
                             scale=export_bone.scale,
                             coordinate_system_transform=coordinate_system_transform,
-                            # has_false_root_bone=psx_bone_create_result.has_false_root_bone,
                         )
                         add_key(location, rotation)
 
