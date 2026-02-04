@@ -73,16 +73,14 @@ def _get_mesh_export_space_matrix(node: ObjectNode | None, export_space: str) ->
 def _get_material_name_indices(obj: Object, material_names: list[str]) -> Iterable[int]:
     """
     Returns the index of the material in the list of material names.
-    If the material is not found, the index 0 is returned.
+    If the material is not found or the slot is empty, the index of 'None' is returned.
     """
     for material_slot in obj.material_slots:
-        if material_slot.material is None:
+        try:
+            material_name = material_slot.material.name if material_slot.material is not None else 'None'
+            yield material_names.index(material_name)
+        except ValueError:
             yield 0
-        else:
-            try:
-                yield material_names.index(material_slot.material.name)
-            except ValueError:
-                yield 0
 
 
 def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuildOptions) -> PskBuildResult:
@@ -109,15 +107,34 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
     psk.bones = [bone.psx_bone for bone in psx_bone_create_result.bones]
 
     # Materials
+    mesh_objects = [dfs_object.obj for dfs_object in input_objects.mesh_dfs_objects]
+    
     match options.material_order_mode:
         case 'AUTOMATIC':
-            mesh_objects = [dfs_object.obj for dfs_object in input_objects.mesh_dfs_objects]
             materials = list(get_materials_for_mesh_objects(context.evaluated_depsgraph_get(), mesh_objects))
         case 'MANUAL':
             # The material name list may contain materials that are not on the mesh objects.
             # Therefore, we can take the material_name_list as gospel and simply use it as a lookup table.
             # If a look-up fails, replace it with an empty material.
             materials = [bpy.data.materials.get(x, None) for x in options.material_name_list]
+            
+            # Check if any mesh needs a None material (has no slots or empty slots)
+            needs_none_material = False
+            for mesh_object in mesh_objects:
+                evaluated_mesh_object = mesh_object.evaluated_get(context.evaluated_depsgraph_get())
+                if len(evaluated_mesh_object.material_slots) == 0:
+                    needs_none_material = True
+                    break
+                for material_slot in evaluated_mesh_object.material_slots:
+                    if material_slot.material is None:
+                        needs_none_material = True
+                        break
+                if needs_none_material:
+                    break
+            
+            # Append None at the end if needed and not already present
+            if needs_none_material and None not in materials:
+                materials.append(None)
         case _:
             assert False, f'Invalid material order mode: {options.material_order_mode}'
 
@@ -130,11 +147,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
                                                                                 material.psk.mesh_triangle_bit_flags)
         psk.materials.append(psk_material)
 
-    # TODO: This wasn't left in a good state. We should detect if we need to add a "default" material.
-    #  This can be done by checking if there is an empty material slot on any of the mesh objects, or if there are
-    #  no material slots on any of the mesh objects.
-    #  If so, it should be added to the end of the list of materials, and its index should mapped to a None value in the
-    #  material indices list.
+    # Ensure at least one material exists
     if len(psk.materials) == 0:
         # Add a default material if no materials are present.
         psk_material = Psk.Material()
@@ -177,8 +190,12 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         material_indices = list(_get_material_name_indices(obj, material_names))
 
         if len(material_indices) == 0:
-            # Add a default material if no materials are present.
-            material_indices = [0]
+            # If the mesh has no material slots, map to the 'None' material index
+            try:
+                none_material_index = material_names.index('None')
+            except ValueError:
+                none_material_index = 0
+            material_indices = [none_material_index]
 
         # Store the reference to the evaluated object and data so that we can clean them up later.
         evaluated_mesh_object = None

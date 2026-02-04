@@ -29,7 +29,7 @@ def populate_material_name_list(depsgraph: Depsgraph, mesh_objects: Iterable[Obj
     material_list.clear()
     for index, material in enumerate(materials):
         m = material_list.add()
-        m.material_name = material.name
+        m.material_name = material.name if material is not None else 'None'
         m.index = index
 
 
@@ -173,19 +173,32 @@ class PSK_OT_material_list_name_move_down(Operator):
         return {'FINISHED'}
 
 
-def get_sorted_materials_by_names(materials: Iterable[Material], material_names: list[str]) -> list[Material]:
+def get_sorted_materials_by_names(materials: Iterable[Material | None], material_names: list[str]) -> list[Material | None]:
     """
     Sorts the materials by the order of the material names list. Any materials not in the list will be appended to the
-    end of the list in the order they are found.
+    end of the list in the order they are found. None materials (representing empty material slots) are always
+    appended at the very end.
 
-    @param materials: A list of materials to sort
+    @param materials: A list of materials to sort (can include None)
     @param material_names: A list of material names to sort by
-    @return: A sorted list of materials
+    @return: A sorted list of materials (with None at the end if present)
     """
+    materials = list(materials)
+    has_none = None in materials
+    materials = [m for m in materials if m is not None]
+    
     materials_in_collection = [m for m in materials if m.name in material_names]
     materials_not_in_collection = [m for m in materials if m.name not in material_names]
     materials_in_collection = sorted(materials_in_collection, key=lambda x: material_names.index(x.name))
-    return materials_in_collection + materials_not_in_collection
+    
+    result: list[Material | None] = []
+    result.extend(materials_in_collection)
+    result.extend(materials_not_in_collection)
+    
+    if has_none:
+        result.append(None)
+    
+    return result
 
 
 def get_psk_build_options_from_property_group(scene: Scene, pg: PskExportMixin) -> PskBuildOptions:

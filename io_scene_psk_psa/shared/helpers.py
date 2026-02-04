@@ -1,7 +1,7 @@
 import bpy
 from collections import Counter
 from typing import Iterable, cast as typing_cast
-from bpy.types import Armature, AnimData, Collection, Context, Object, ArmatureModifier, SpaceProperties, PropertyGroup
+from bpy.types import Armature, AnimData, Collection, Context, Object, ArmatureModifier, SpaceProperties, PropertyGroup, Material
 from mathutils import Matrix, Vector, Quaternion as BpyQuaternion
 from psk_psa_py.shared.data import PsxBone, Quaternion, Vector3
 
@@ -619,16 +619,29 @@ class PskInputObjects(object):
 
 
 def get_materials_for_mesh_objects(depsgraph: Depsgraph, mesh_objects: Iterable[Object]):
-    yielded_materials = set()
+    '''
+    Yields unique materials used by the given mesh objects.
+    If any mesh has no material slots or any empty material slots, None is yielded at the end.
+    '''
+    yielded_materials: Set[Material] = set()
+    has_none_material = False
     for mesh_object in mesh_objects:
         evaluated_mesh_object = mesh_object.evaluated_get(depsgraph)
-        for i, material_slot in enumerate(evaluated_mesh_object.material_slots):
-            material = material_slot.material
-            if material is None:
-                raise RuntimeError(f'Material slots cannot be empty. ({mesh_object.name}, index {i})')
-            if material not in yielded_materials:
-                yielded_materials.add(material)
-                yield material
+        # Check if mesh has no material slots or any empty material slots
+        if len(evaluated_mesh_object.material_slots) == 0:
+            has_none_material = True
+        else:
+            for material_slot in evaluated_mesh_object.material_slots:
+                material = material_slot.material
+                if material is None:
+                    has_none_material = True
+                else:
+                    if material not in yielded_materials:
+                        yielded_materials.add(material)
+                        yield material
+    # Yield None at the end if any mesh had no material slots or empty material slots
+    if has_none_material:
+        yield None
 
 
 def get_mesh_objects_for_collection(collection: Collection) -> Iterable[DfsObject]:
