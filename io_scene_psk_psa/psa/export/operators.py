@@ -5,7 +5,7 @@ from typing import Iterable, Sequence, Tuple, cast as typing_cast
 import bpy
 import re
 from bpy.props import StringProperty
-from bpy.types import Context, Action, Object, AnimData, TimelineMarker, Operator, Armature, UILayout, Scene
+from bpy.types import Context, Action, Object, AnimData, TimelineMarker, Operator, Armature, UILayout, Scene, ActionKeyframeStrip
 from bpy_extras.io_utils import ExportHelper
 
 from .properties import (
@@ -51,6 +51,8 @@ def is_action_for_object(obj: Object, action: Action):
     # The nesting here is absolutely bonkers.
     for layer in action.layers:
         for strip in layer.strips:
+            if not isinstance(strip, ActionKeyframeStrip):
+                continue
             for channelbag in strip.channelbags:
                 for fcurve in channelbag.fcurves:
                     match = re.match(r'pose\.bones\[\"([^\"]+)\"](\[\"([^\"]+)\"])?', fcurve.data_path)
