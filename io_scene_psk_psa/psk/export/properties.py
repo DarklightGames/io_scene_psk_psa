@@ -20,10 +20,6 @@ material_order_mode_items = (
     ('MANUAL', 'Manual', 'Manually arrange the materials'),
 )
 
-class PSK_PG_material_list_item(PropertyGroup):
-    material: PointerProperty(type=Material)
-    index: IntProperty()
-
 
 class PSK_PG_material_name_list_item(PropertyGroup):
     material_name: StringProperty()
@@ -56,7 +52,6 @@ class PSK_PG_export(PropertyGroup, PskExportMixin):
 
 
 _classes = (
-    PSK_PG_material_list_item,
     PSK_PG_material_name_list_item,
     PSK_PG_export,
 )
