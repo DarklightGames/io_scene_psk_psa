@@ -264,6 +264,9 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
                 self.report({'WARNING'}, f'PSK export successful with {len(result.warnings)} warnings')
             else:
                 self.report({'INFO'}, f'PSK export successful')
+        except IOError as e:
+            self.report({'ERROR'}, f'Failed to write PSK file ({filepath}): {e}')
+            return {'CANCELLED'}
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
@@ -504,6 +507,9 @@ class PSK_OT_export(Operator, ExportHelper):
                 self.report({'WARNING'}, f'PSK export successful with {len(result.warnings)} warnings')
             else:
                 self.report({'INFO'}, f'PSK export successful')
+        except IOError as e:
+            self.report({'ERROR'}, f'Failed to write PSK file ({self.filepath}): {e}')
+            return {'CANCELLED'}
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}

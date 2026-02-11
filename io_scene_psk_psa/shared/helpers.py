@@ -350,11 +350,14 @@ def create_psx_bones(
 
     armature_tree = ObjectTree(armature_objects)
 
-    # Check that there is only one root bone. If there are multiple armature objects, the export space must be WORLD.
-    if len(armature_tree.root_nodes) >= 2 and export_space != 'WORLD':
-        root_armature_names = [node.object.name for node in armature_tree.root_nodes]
-        raise RuntimeError(f'When exporting multiple armatures, the Export Space must be World.\n' \
-            f'The following armatures are attempting to be exported: {root_armature_names}')
+    if len(armature_tree.root_nodes) >= 2:
+        raise RuntimeError(
+            'Multiple root armature objects were found. '
+            'Only one root armature object is allowed. '
+            'To use multiple armature objects, parent them to one another in a hierarchy using Bone parenting.'
+        )
+
+    # TODO: confirm this to be working with non-bone parented armature hierarchies.
 
     total_bone_count = 0
     for armature_object in filter(lambda x: x.data is not None, armature_objects):
@@ -398,6 +401,9 @@ def create_psx_bones(
             armature_object_matrix_world=armature_object.matrix_world,
         )
 
+        if len(armature_psx_bones) == 0:
+            continue
+
         # We have the bones in world space. If we are attaching this armature to a parent bone, we need to convert
         # the root bone to be relative to the target parent bone.
         if armature_object.parent in armature_objects:
@@ -407,9 +413,13 @@ def create_psx_bones(
                     # We just need to get the world-space location of each of the bones and get the relative pose, then
                     # assign that location and rotation to the root bone.
                     parent_bone_name = armature_object.parent_bone
+
+                    if parent_bone_name == '':
+                        raise RuntimeError(f'Armature object \'{armature_object.name}\' is parented to a bone but no parent bone name is specified.')
+
                     parent_armature_data = typing_cast(Armature, armature_object.parent.data)
                     if parent_armature_data is None:
-                        raise RuntimeError(f'Parent object {armature_object.parent.name} is not an armature.')
+                        raise RuntimeError(f'Parent object \'{armature_object.parent.name}\' is not an armature.')
                     try:
                         parent_bone = parent_armature_data.bones[parent_bone_name]
                     except KeyError:
@@ -427,12 +437,9 @@ def create_psx_bones(
                     root_bone_rotation = BpyQuaternion((root_bone.rotation.w, root_bone.rotation.x, root_bone.rotation.y, root_bone.rotation.z))
                     relative_rotation = parent_bone_world_rotation.inverted() @ root_bone_rotation
                     root_bone.rotation = convert_bpy_quaternion_to_psx_quaternion(relative_rotation)
-
-                case 'OBJECT':
-                    raise NotImplementedError('Parenting armature objects to other armature objects is not yet implemented.')
                 case _:
                     raise RuntimeError(f'Unhandled parent type ({armature_object.parent_type}) for object {armature_object.name}.\n'
-                                        f'Parent type must be \'Object\' or \'Bone\'.'
+                                        f'Parent type must be \'Bone\'.'
                                         )
 
         # If we are appending these bones to an existing list of bones, we need to adjust the parent indices for
@@ -452,10 +459,16 @@ def create_psx_bones(
     for armature_object in armature_objects:
         if armature_object.parent not in armature_objects:
             continue
+
         # This armature object is parented to another armature object that we are exporting.
         # First fetch the root bone indices for the two armature objects.
-        root_bone_index = armature_object_root_bone_indices[armature_object]
-        parent_root_bone_index = armature_object_root_bone_indices[armature_object.parent]
+        root_bone_index = armature_object_root_bone_indices.get(armature_object, None)
+        parent_root_bone_index = armature_object_root_bone_indices.get(armature_object.parent, None)
+
+        if root_bone_index is None or parent_root_bone_index is None:
+            raise RuntimeError(f'Could not find root bone index for armature object \'{armature_object.name}\' or its parent \'{armature_object.parent.name}\'.\n'
+                               'This likely means that one of the armatures does not have any bones that are being exported, which is not allowed when using armature parenting between multiple armatures.'
+                               )
 
         match armature_object.parent_type:
             case 'OBJECT':
