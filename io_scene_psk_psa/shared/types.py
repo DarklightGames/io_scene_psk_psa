@@ -179,11 +179,6 @@ class PsxBoneExportMixin:
     )
     bone_collection_list: CollectionProperty(type=PSX_PG_bone_collection_list_item)
     bone_collection_list_index: IntProperty(default=0, name='', description='')
-    root_bone_name: StringProperty(
-        name='Root Bone Name',
-        description='The name of the root bone when exporting a PSK with either no armature or multiple armatures',
-        default='ROOT',
-    )
 
 
 class PSX_PG_scene_export(PropertyGroup, TransformMixin):

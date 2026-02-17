@@ -31,7 +31,6 @@ class PskBuildOptions(object):
         self.export_space = 'WORLD'
         self.forward_axis = 'X'
         self.up_axis = 'Z'
-        self.root_bone_name = 'ROOT'
 
 
 class PskBuildResult(object):
@@ -99,7 +98,6 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         forward_axis=options.forward_axis,
         up_axis=options.up_axis,
         scale=options.scale,
-        root_bone_name=options.root_bone_name,
         bone_filter_mode=options.bone_filter_mode,
         bone_collection_indices=options.bone_collection_indices
     )

@@ -346,14 +346,6 @@ class PSA_OT_export_collection(Operator, ExportHelper, PsaExportMixin):
                 op = col.operator(PSK_OT_bone_collection_list_select_all.bl_idname, text='', icon='CHECKBOX_DEHLT')
                 op.is_selected = False
 
-            advanced_bones_header, advanced_bones_panel = bones_panel.panel('Advanced', default_closed=True)
-            advanced_bones_header.label(text='Advanced')
-            if advanced_bones_panel:
-                flow = advanced_bones_panel.grid_flow(row_major=True)
-                flow.use_property_split = True
-                flow.use_property_decorate = False
-                flow.prop(self, 'root_bone_name')
-
         # Transform
         transform_header, transform_panel = layout.panel('Transform', default_closed=False)
         transform_header.label(text='Transform', icon='DRIVER_TRANSFORM')
@@ -565,7 +557,6 @@ def create_psa_export_options(context: Context, armature_objects: Sequence[Objec
     options.scale = pg.scale
     options.forward_axis = pg.forward_axis
     options.up_axis = pg.up_axis
-    options.root_bone_name = pg.root_bone_name
     options.sequence_source = pg.sequence_source
 
     return options
@@ -625,14 +616,6 @@ class PSA_OT_export(Operator, ExportHelper):
                     'PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index',
                     rows=rows
                     )
-
-            bones_advanced_header, bones_advanced_panel = bones_panel.panel('Bones Advanced', default_closed=True)
-            bones_advanced_header.label(text='Advanced')
-            if bones_advanced_panel:
-                flow = bones_advanced_panel.grid_flow()
-                flow.use_property_split = True
-                flow.use_property_decorate = False
-                flow.prop(pg, 'root_bone_name', text='Root Bone Name')
 
         # TRANSFORM
         transform_header, transform_panel = layout.panel('Advanced', default_closed=False)

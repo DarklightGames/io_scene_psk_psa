@@ -39,7 +39,6 @@ class PsaBuildOptions:
         self.export_space = 'WORLD'
         self.forward_axis = 'X'
         self.up_axis = 'Z'
-        self.root_bone_name = 'ROOT'
         self.sequence_source = 'ACTIONS'  # One of ('ACTIONS', 'TIMELINE_MARKERS', 'NLA_STRIPS')
     
     @property
@@ -162,7 +161,6 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
     psx_bone_create_result = create_psx_bones(
         armature_objects=armature_objects_for_bones,
         export_space=options.export_space,
-        root_bone_name=options.root_bone_name,
         forward_axis=options.forward_axis,
         up_axis=options.up_axis,
         scale=options.scale,
