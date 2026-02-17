@@ -13,36 +13,42 @@ For Blender 4.2 and higher, download the latest version from the [Blender Extens
 For Blender 4.1 and lower, see [Legacy Compatibility](#legacy-compatibility).
 
 # Features
-* Full PSK/PSA import and export capabilities.
-* Non-standard file section data (.pskx) is supported for import only (vertex normals, extra UV channels, vertex colors, shape keys).
+* [Bone collections](https://docs.blender.org/manual/en/latest/animation/armatures/bones/bone_collections.html#bone-collections) can be excluded from PSK/PSA export (useful for excluding non-contributing bones such as IK controllers).
+* [Collection Exporters](https://docs.blender.org/manual/en/latest/scene_layout/collections/collections.html#exporters) for reliable, repeatable export workflow.
+* Non-standard model data (.pskx) is supported for import only (vertex normals, extra UV channels, vertex colors, shape keys).
+* Manual re-ordering of material slots on export.
+* Non-standard animation data is supported for import only (scale keys).
 * Fine-grained PSA sequence importing for efficient workflow when working with large PSA files.
 * PSA sequence metadata (e.g., frame rate) is preserved on import, allowing this data to be reused on export.
-* [Bone collections](https://docs.blender.org/manual/en/latest/animation/armatures/bones/bone_collections.html#bone-collections) can be excluded from PSK/PSA export (useful for excluding non-contributing bones such as IK controllers).
 * PSA sequences can be exported directly from actions or delineated using a scene's [timeline markers](https://docs.blender.org/manual/en/latest/animation/markers.html), pose markers, or NLA track strips, allowing direct use of the [NLA](https://docs.blender.org/manual/en/latest/editors/nla/index.html) when creating sequences.
-* Manual re-ordering of material slots.
-* Multiple armature objects can be exported to a single PSK or PSA file, allowing seamless use of [action slots](https://docs.blender.org/manual/en/latest/animation/actions.html#action-slots).
-* Support for exporting instance collections.
+* Compress exported sequences via resampling ratios or frame quotas.
 
 # Usage
-## Exporting a PSK
-1. Select the mesh objects you wish to export.
-2. Navigate to `File` > `Export` > `Unreal PSK (.psk)`.
-3. Enter the file name and click `Export`.
 
-## Importing a PSK/PSKX
+## Import
+
+### Importing a PSK/PSKX
 1. Navigate to `File` > `Import` > `Unreal PSK (.psk/.pskx)`.
 2. Select the PSK file you want to import and click `Import`.
 
-## Exporting a PSA
-1. Select the armature objects you wish to export.
-2. Navigate to `File` > `Export` > `Unreal PSA (.psa)`.
-3. Enter the file name and click `Export`.
-
-## Importing a PSA
+### Importing a PSA
 1. Select an armature that you want import animations for.
 2. Navigate to `File` > `Import` > `Unreal PSA (.psa)`.
 3. Select the PSA file you want to import.
 4. Select the sequences that you want to import and click `Import`.
+
+## Export
+It is highly recommended to use the provided [Collection Exporters](https://docs.blender.org/manual/en/latest/scene_layout/collections/collections.html#exporters) workflow, since it allows for highly reliable, repeatable exports of both PSK and PSA files. However, the traditional export workflow is available as well.
+
+### Exporting a PSK
+1. Select the mesh objects you wish to export.
+2. Navigate to `File` > `Export` > `Unreal PSK (.psk)`.
+3. Enter the file name and click `Export`.
+
+### Exporting a PSA
+1. Select the armature objects you wish to export.
+2. Navigate to `File` > `Export` > `Unreal PSA (.psa)`.
+3. Enter the file name and click `Export`.
 
 > Note that in order to see the imported actions applied to your armature, you must use the [Dope Sheet](https://docs.blender.org/manual/en/latest/editors/dope_sheet/introduction.html) or [Nonlinear Animation](https://docs.blender.org/manual/en/latest/editors/nla/introduction.html) editors.
 
