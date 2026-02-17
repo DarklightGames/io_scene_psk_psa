@@ -40,6 +40,7 @@ class PsaImportOptions(object):
                  should_use_fake_user: bool = False,
                  should_write_keyframes: bool = True,
                  should_write_metadata: bool = True,
+                 should_write_scale_keys: bool = True,
                  translation_scale: float = 1.0
                  ):
         self.action_name_prefix = action_name_prefix
@@ -55,6 +56,7 @@ class PsaImportOptions(object):
         self.should_use_fake_user = should_use_fake_user
         self.should_write_keyframes = should_write_keyframes
         self.should_write_metadata = should_write_metadata
+        self.should_write_scale_keys = should_write_scale_keys
         self.translation_scale = translation_scale
 
 
@@ -73,7 +75,7 @@ class ImportBone(object):
 def _calculate_fcurve_data(import_bone: ImportBone, key_data: Sequence[float]):
     # Convert world-space transforms to local-space transforms.
     key_rotation = Quaternion(key_data[0:4])
-    key_location = Vector(key_data[4:])
+    key_location = Vector(key_data[4:7])
     q = import_bone.post_rotation.copy()
     q.rotate(import_bone.original_rotation)
     rotation = q
@@ -85,7 +87,8 @@ def _calculate_fcurve_data(import_bone: ImportBone, key_data: Sequence[float]):
     rotation.rotate(q.conjugated())
     location = key_location - import_bone.original_location
     location.rotate(import_bone.post_rotation.conjugated())
-    return rotation.w, rotation.x, rotation.y, rotation.z, location.x, location.y, location.z
+    scale = Vector(key_data[7:10])
+    return rotation.w, rotation.x, rotation.y, rotation.z, location.x, location.y, location.z, scale.x, scale.y, scale.z
 
 
 class PsaImportResult:
@@ -167,6 +170,34 @@ def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, frame_step:
                 resampled_sequence_data_matrix[sample_frame_index, bone_index, :] = q.w, q.x, q.y, q.z, l.x, l.y, l.z
 
     return resampled_sequence_data_matrix
+
+
+def _read_sequence_data_matrix(psa_reader: PsaReader, sequence_name: str) -> np.ndarray:
+    """
+    Reads and returns the data matrix for the given sequence.
+    The order of the data in the third axis is Qw, Qx, Qy, Qz, Lx, Ly, Lz, Sx, Sy, Sz
+    
+    @param sequence_name: The name of the sequence.
+    @return: An FxBx10 matrix where F is the number of frames, B is the number of bones.
+    """
+    sequence = psa_reader.sequences[sequence_name]
+    keys = psa_reader.read_sequence_keys(sequence_name)
+    bone_count = len(psa_reader.bones)
+    matrix_size = sequence.frame_count, bone_count, 10
+    matrix = np.ones(matrix_size)
+    keys_iter = iter(keys)
+    # Populate rotation and location data.
+    for frame_index in range(sequence.frame_count):
+        for bone_index in range(bone_count):
+            matrix[frame_index, bone_index, :7] = list(next(keys_iter).data)
+    # Populate scale data, if it exists.
+    scale_keys = psa_reader.read_sequence_scale_keys(sequence_name)
+    if len(scale_keys) > 0:
+        scale_keys_iter = iter(scale_keys)
+        for frame_index in range(sequence.frame_count):
+            for bone_index in range(bone_count):
+                matrix[frame_index, bone_index, 7:] = list(next(scale_keys_iter).data)
+    return matrix
 
 
 def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object, options: PsaImportOptions) -> PsaImportResult:
@@ -311,8 +342,10 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
                 pose_bone = import_bone.pose_bone
                 rotation_data_path = pose_bone.path_from_id('rotation_quaternion')
                 location_data_path = pose_bone.path_from_id('location')
+                scale_data_path = pose_bone.path_from_id('scale')
                 add_rotation_fcurves = (bone_track_flags & REMOVE_TRACK_ROTATION) == 0
                 add_location_fcurves = (bone_track_flags & REMOVE_TRACK_LOCATION) == 0
+                add_scale_fcurves = psa_reader.has_scale_keys and options.should_write_scale_keys
                 import_bone.fcurves = [
                     channelbag.fcurves.ensure(rotation_data_path, index=0, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qw
                     channelbag.fcurves.ensure(rotation_data_path, index=1, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qx
@@ -321,14 +354,17 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
                     channelbag.fcurves.ensure(location_data_path, index=0, group_name=pose_bone.name) if add_location_fcurves else None,  # Lx
                     channelbag.fcurves.ensure(location_data_path, index=1, group_name=pose_bone.name) if add_location_fcurves else None,  # Ly
                     channelbag.fcurves.ensure(location_data_path, index=2, group_name=pose_bone.name) if add_location_fcurves else None,  # Lz
+                    channelbag.fcurves.ensure(scale_data_path,    index=0, group_name=pose_bone.name) if add_scale_fcurves    else None,  # Sx
+                    channelbag.fcurves.ensure(scale_data_path,    index=1, group_name=pose_bone.name) if add_scale_fcurves    else None,  # Sy
+                    channelbag.fcurves.ensure(scale_data_path,    index=2, group_name=pose_bone.name) if add_scale_fcurves    else None,  # Sz
                 ]
 
             # Read the sequence data matrix from the PSA.
-            sequence_data_matrix = psa_reader.read_sequence_data_matrix(sequence_name)
+            sequence_data_matrix = _read_sequence_data_matrix(psa_reader, sequence_name)
 
             if options.translation_scale != 1.0:
                 # Scale the translation data.
-                sequence_data_matrix[:, :, 4:] *= options.translation_scale
+                sequence_data_matrix[:, :, 4:7] *= options.translation_scale
 
             # Convert the sequence's data from world-space to local-space.
             for bone_index, import_bone in enumerate(import_bones):
@@ -366,7 +402,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
             if options.should_convert_to_samples:
                 # Bake the curve to samples.
-                for fcurve in action.fcurves:
+                for fcurve in channelbag.fcurves:
                     fcurve.convert_to_samples(start=0, end=sequence.frame_count)
 
         # Write meta-data.

@@ -25,6 +25,7 @@ class PsaImportMixin:
     should_overwrite: bool
     should_write_keyframes: bool
     should_write_metadata: bool
+    should_write_scale_keys: bool
     sequence_filter_name: str
     sequence_filter_is_selected: bool
     sequence_use_filter_invert: bool

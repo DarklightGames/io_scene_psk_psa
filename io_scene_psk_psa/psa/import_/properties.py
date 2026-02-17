@@ -66,6 +66,7 @@ class PsaImportMixin:
     should_write_metadata: BoolProperty(default=True, name='Metadata', options=set(),
                                         description='Additional data will be written to the custom properties of the '
                                                     'Action (e.g., frame rate)')
+    should_write_scale_keys: BoolProperty(default=True, name='Scale Keys', options=set())
     sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
     sequence_filter_is_selected: BoolProperty(default=False, options=set(), name='Only Show Selected',
                                               description='Only show selected sequences')

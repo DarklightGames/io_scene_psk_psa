@@ -20,9 +20,10 @@ RUN BLENDER_EXECUTABLE=$(blender-downloader $BLENDER_VERSION --extract --remove-
 RUN pip install pytest-cov
 
 # Source the environment variables and install Python dependencies
+# TODO: would be nice to have these installed in the bash script below.
 RUN . /etc/environment && \
     $BLENDER_PYTHON -m ensurepip && \
-    $BLENDER_PYTHON -m pip install pytest pytest-cov psk-psa-py
+    $BLENDER_PYTHON -m pip install pytest pytest-cov psk-psa-py==0.0.4
 
 # Persist BLENDER_EXECUTABLE as an environment variable
 RUN echo $(cat /blender_executable_path) > /tmp/blender_executable_path_env && \

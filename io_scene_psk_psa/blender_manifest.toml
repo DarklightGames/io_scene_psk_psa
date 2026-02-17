@@ -1,6 +1,6 @@
 schema_version = "1.0.0"
 id = "io_scene_psk_psa"
-version = "9.0.2"
+version = "9.1.0"
 name = "Unreal PSK/PSA (.psk/.psa)"
 tagline = "Import and export PSK and PSA files used in Unreal Engine"
 maintainer = "Colin Basnett <cmbasnett@gmail.com>"
@@ -14,7 +14,7 @@ license = [
   "SPDX:GPL-3.0-or-later",
 ]
 wheels = [
-  './wheels/psk_psa_py-0.0.1-py3-none-any.whl'
+  './wheels/psk_psa_py-0.0.4-py3-none-any.whl'
 ]
 
 [build]

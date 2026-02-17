@@ -110,7 +110,7 @@ def load_psa_file(context, filepath: str):
     try:
         # Read the file and populate the action list.
         p = os.path.abspath(filepath)
-        psa_reader = PsaReader(p)
+        psa_reader = PsaReader.from_path(p)
         for sequence in psa_reader.sequences.values():
             item = pg.sequence_list.add()
             item.action_name = sequence.name.decode('windows-1252')
@@ -142,7 +142,7 @@ class PSA_OT_import_drag_and_drop(Operator, PsaImportMixin):
 
         for file in self.files:
             psa_path = str(os.path.join(self.directory, file.name))
-            psa_reader = PsaReader(psa_path)
+            psa_reader = PsaReader.from_path(psa_path)
             sequence_names = list(psa_reader.sequences.keys())
             options = psa_import_options_from_property_group(self, sequence_names)
 
@@ -188,6 +188,7 @@ def psa_import_options_from_property_group(pg: PsaImportMixin, sequence_names: I
     options.should_overwrite = pg.should_overwrite
     options.should_write_metadata = pg.should_write_metadata
     options.should_write_keyframes = pg.should_write_keyframes
+    options.should_write_scale_keys = pg.should_write_scale_keys
     options.should_convert_to_samples = pg.should_convert_to_samples
     options.bone_mapping = BoneMapping(
         is_case_sensitive=pg.bone_mapping_is_case_sensitive,
@@ -215,7 +216,7 @@ def _import_psa(context,
             except Exception as e:
                 warnings.append(f'Failed to read PSA config file: {e}')
 
-    psa_reader = PsaReader(filepath)
+    psa_reader = PsaReader.from_path(filepath)
 
     result = import_psa(context, psa_reader, armature_object, options)
     result.warnings.extend(warnings)
@@ -242,7 +243,7 @@ class PSA_OT_import_all(Operator, PsaImportMixin):
 
     def execute(self, context):
         sequence_names = []
-        with PsaReader(self.filepath) as psa_reader:
+        with PsaReader.from_path(self.filepath) as psa_reader:
             sequence_names.extend(psa_reader.sequences.keys())
 
         options = PsaImportOptions(
@@ -376,6 +377,7 @@ class PSA_OT_import(Operator, ImportHelper, PsaImportMixin):
             col.use_property_decorate = False
             col.prop(self, 'should_write_keyframes')
             col.prop(self, 'should_write_metadata')
+            col.prop(self, 'should_write_scale_keys')
 
             if self.should_write_keyframes:
                 col = col.column(heading='Keyframes')
@@ -426,6 +428,7 @@ def draw_psa_import_options_no_panels(layout, pg: PsaImportMixin):
     col.use_property_decorate = False
     col.prop(pg, 'should_write_keyframes')
     col.prop(pg, 'should_write_metadata')
+    col.prop(pg, 'should_write_scale_keys')
 
     if pg.should_write_keyframes:
         col = col.column(heading='Keyframes')
