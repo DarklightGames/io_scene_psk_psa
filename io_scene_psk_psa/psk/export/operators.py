@@ -207,7 +207,6 @@ def get_psk_build_options_from_property_group(scene: Scene, pg: PskExportMixin) 
     options.export_space = pg.export_space
     options.bone_filter_mode = pg.bone_filter_mode
     options.bone_collection_indices = [PsxBoneCollection(x.armature_object_name, x.armature_data_name, x.index) for x in pg.bone_collection_list if x.is_selected]
-    options.root_bone_name = pg.root_bone_name
     options.material_order_mode = pg.material_order_mode
     options.material_name_list = [x.material_name for x in pg.material_name_list]
     
@@ -308,14 +307,6 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
                 op.is_selected = True
                 op = col.operator(PSK_OT_bone_collection_list_select_all.bl_idname, text='', icon='CHECKBOX_DEHLT')
                 op.is_selected = False
-
-            advanced_bones_header, advanced_bones_panel = bones_panel.panel('Advanced', default_closed=True)
-            advanced_bones_header.label(text='Advanced')
-            if advanced_bones_panel:
-                flow = advanced_bones_panel.grid_flow(row_major=True)
-                flow.use_property_split = True
-                flow.use_property_decorate = False
-                flow.prop(self, 'root_bone_name')
 
         # Materials
         materials_header, materials_panel = layout.panel('Materials', default_closed=False)
@@ -429,13 +420,6 @@ class PSK_OT_export(Operator, ExportHelper):
                 row = bones_panel.row()
                 rows = max(3, min(len(pg.bone_collection_list), 10))
                 row.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index', rows=rows)
-            bones_advanced_header, bones_advanced_panel = bones_panel.panel('Advanced', default_closed=True)
-            bones_advanced_header.label(text='Advanced')
-            if bones_advanced_panel:
-                flow = bones_advanced_panel.grid_flow(row_major=True)
-                flow.use_property_split = True
-                flow.use_property_decorate = False
-                flow.prop(pg, 'root_bone_name')
 
         # Materials
         materials_header, materials_panel = layout.panel('Materials', default_closed=False)

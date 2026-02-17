@@ -332,7 +332,6 @@ class ObjectTree:
 def create_psx_bones(
         armature_objects: list[Object],
         export_space: str = 'WORLD',
-        root_bone_name: str = 'ROOT',
         forward_axis: str = 'X',
         up_axis: str = 'Z',
         scale: float = 1.0,
@@ -517,13 +516,10 @@ def create_psx_bones(
     bone_name_counts = Counter(bone.psx_bone.name.decode('windows-1252').upper() for bone in bones)
     for bone_name, count in bone_name_counts.items():
         if count > 1:
-            error_message = f'Found {count} bones with the name "{bone_name}". '
-            f'Bone names must be unique when compared case-insensitively.'
-
-            if len(armature_objects) > 1 and bone_name == root_bone_name.upper():
-                error_message += f' This is the name of the automatically generated root bone. Consider changing this '
-                f''
-                raise RuntimeError(error_message)
+            raise RuntimeError(
+                f'Found {count} bones with the name "{bone_name}". '
+                f'Bone names must be unique when compared case-insensitively.'
+            )
     
     # Apply the scale to the bone locations.
     for bone in bones:

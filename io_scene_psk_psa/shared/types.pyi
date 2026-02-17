@@ -54,7 +54,6 @@ class PsxBoneExportMixin:
     bone_filter_mode: str
     bone_collection_list: BpyCollectionProperty[PSX_PG_bone_collection_list_item]
     bone_collection_list_index: int
-    root_bone_name: str
 
 
 class PSX_PG_scene_export(TransformSourceMixin):
