@@ -1,9 +1,9 @@
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import Armature, Context, Object, Mesh, Material
+from bpy.types import Armature, Context, Object, Mesh
 from mathutils import Matrix
-from typing import Iterable, Sequence, cast as typing_cast
+from typing import Iterable, cast as typing_cast
 from psk_psa_py.shared.data import Vector3
 from psk_psa_py.psk.data import Psk
 from .properties import triangle_type_and_bit_flags_to_poly_flags

@@ -1,5 +1,3 @@
-from bpy.types import Material
-
 from ...shared.types import BpyCollectionProperty, ExportSpaceMixin, TransformMixin, PsxBoneExportMixin, TransformSourceMixin
 
 

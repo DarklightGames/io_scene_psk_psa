@@ -3,10 +3,9 @@ from bpy.props import (
     CollectionProperty,
     EnumProperty,
     IntProperty,
-    PointerProperty,
     StringProperty,
 )
-from bpy.types import Material, PropertyGroup
+from bpy.types import PropertyGroup
 
 from ...shared.types import ExportSpaceMixin, TransformMixin, PsxBoneExportMixin, TransformSourceMixin
 
