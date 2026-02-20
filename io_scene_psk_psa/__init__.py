@@ -1,35 +1,40 @@
-from bpy.app.handlers import persistent
-
-from .shared import types as shared_types, helpers as shared_helpers
-from .shared import dfs as shared_dfs, ui as shared_ui
-from .shared import operators as shared_operators
+from .shared import (
+    types as shared_types,
+    helpers as shared_helpers,
+    dfs as shared_dfs,
+    ui as shared_ui,
+    operators as shared_operators,
+)
 from .psk import (
     builder as psk_builder,
     importer as psk_importer,
     properties as psk_properties,
-)
-from .psk import ui as psk_ui
+    ui as psk_ui,
+) 
 from .psk.export import (
     operators as psk_export_operators,
     properties as psk_export_properties,
     ui as psk_export_ui,
 )
-from .psk.import_ import operators as psk_import_operators
-
+from .psk.import_ import (
+    operators as psk_import_operators,
+)
 from .psa import (
     config as psa_config,
     builder as psa_builder,
     importer as psa_importer,
+    file_handlers as psa_file_handlers,
 )
 from .psa.export import (
     properties as psa_export_properties,
     ui as psa_export_ui,
     operators as psa_export_operators,
 )
-from .psa.import_ import operators as psa_import_operators
-from .psa.import_ import ui as psa_import_ui, properties as psa_import_properties
-
-from .psa import file_handlers as psa_file_handlers
+from .psa.import_ import (
+    operators as psa_import_operators,
+    ui as psa_import_ui,
+    properties as psa_import_properties,
+)
 
 _needs_reload = 'bpy' in locals()
 
@@ -108,7 +113,6 @@ def register():
     bpy.types.TOPBAR_MT_file_import.append(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.append(psa_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.append(psa_import_menu_func)
-
     setattr(bpy.types.Material, 'psk', PointerProperty(type=psk_properties.PSX_PG_material, options={'HIDDEN'}))
     setattr(bpy.types.Scene, 'psx_export', PointerProperty(type=shared_types.PSX_PG_scene_export, options={'HIDDEN'}))
     setattr(bpy.types.Scene, 'psa_import', PointerProperty(type=psa_import_properties.PSA_PG_import, options={'HIDDEN'}))
@@ -124,7 +128,6 @@ def unregister():
     delattr(bpy.types.Scene, 'psa_export')
     delattr(bpy.types.Scene, 'psk_export')
     delattr(bpy.types.Action, 'psa_export')
-
     bpy.types.TOPBAR_MT_file_export.remove(psk_export_menu_func)
     bpy.types.TOPBAR_MT_file_import.remove(psk_import_menu_func)
     bpy.types.TOPBAR_MT_file_export.remove(psa_export_menu_func)
@@ -135,16 +138,3 @@ def unregister():
 
 if __name__ == '__main__':
     register()
-
-
-@persistent
-def load_handler(dummy):
-    # Convert old `psa_sequence_fps` property to new `psa_export.fps` property.
-    # This is only needed for backwards compatibility with files that may have used older versions of the addon.
-    for action in bpy.data.actions:
-        if 'psa_sequence_fps' in action:
-            action.psa_export.fps = action['psa_sequence_fps']
-            del action['psa_sequence_fps']
-
-
-bpy.app.handlers.load_post.append(load_handler)
