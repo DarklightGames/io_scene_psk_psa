@@ -309,18 +309,17 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         poly_groups, groups = mesh_data.calc_smooth_groups(use_bitflags=True)
         psk_face_start_index = len(psk.faces)
         for f in mesh_data.loop_triangles:
-            face = Psk.Face()
-            face.material_index = material_indices[f.material_index]
-            face.wedge_indices[0] = loop_wedge_indices[f.loops[2]]
-            face.wedge_indices[1] = loop_wedge_indices[f.loops[1]]
-            face.wedge_indices[2] = loop_wedge_indices[f.loops[0]]
-            face.smoothing_groups = poly_groups[f.polygon_index]
+            face = Psk.Face(
+                wedge_indices=(loop_wedge_indices[f.loops[2]], loop_wedge_indices[f.loops[1]], loop_wedge_indices[f.loops[0]]),
+                material_index=material_indices[f.material_index],
+                smoothing_groups=poly_groups[f.polygon_index],
+            )
             psk.faces.append(face)
 
         if should_flip_normals:
             # Invert the normals of the faces.
             for face in psk.faces[psk_face_start_index:]:
-                face.wedge_indices[0], face.wedge_indices[2] = face.wedge_indices[2], face.wedge_indices[0]
+                face.wedge_indices = (face.wedge_indices[2], face.wedge_indices[1], face.wedge_indices[0])
 
         # Weights
         if armature_object is not None:
