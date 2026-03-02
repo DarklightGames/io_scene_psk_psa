@@ -2,9 +2,9 @@ import bmesh
 import bpy
 import numpy as np
 from bpy.types import Armature, Context, Object, Mesh
-from mathutils import Matrix
+from mathutils import Matrix, Quaternion
 from typing import Iterable, cast as typing_cast
-from psk_psa_py.shared.data import Vector3
+from psk_psa_py.shared.data import PsxBone, Vector3
 from psk_psa_py.psk.data import Psk
 from .properties import triangle_type_and_bit_flags_to_poly_flags
 from ..shared.helpers import (
@@ -12,6 +12,7 @@ from ..shared.helpers import (
     ObjectTree,
     PskInputObjects,
     PsxBoneCollection,
+    convert_bpy_quaternion_to_psx_quaternion,
     convert_string_to_cp1252_bytes,
     create_psx_bones,
     get_armature_for_mesh_object,
@@ -103,6 +104,14 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
     )
 
     psk.bones = [bone.psx_bone for bone in psx_bone_create_result.bones]
+
+    if len(psk.bones) == 0:
+        # Add a default root bone if there are no bones to export.
+        # This is necessary because Unreal Engine requires at least one bone in the PSK file.
+        psx_bone = PsxBone()
+        psx_bone.name = b'ROOT'
+        psx_bone.rotation = convert_bpy_quaternion_to_psx_quaternion(Quaternion())
+        psk.bones.append(psx_bone)
 
     # Materials
     mesh_objects = [dfs_object.obj for dfs_object in input_objects.mesh_dfs_objects]

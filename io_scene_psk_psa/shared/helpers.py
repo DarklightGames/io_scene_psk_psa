@@ -452,6 +452,14 @@ def create_psx_bones(
 
         bones.extend(PsxBoneResult(psx_bone, armature_object) for psx_bone in armature_psx_bones)
 
+    # Check that we have any bones to export at this point. If not, we can skip the rest of the processing.
+    if len(bones) == 0:
+        return PsxBoneCreateResult(
+            bones=[],
+            armature_object_root_bone_indices=armature_object_root_bone_indices,
+            armature_object_bone_names=armature_object_bone_names,
+        )
+
     # Check if any of the armatures are parented to one another.
     # If so, adjust the hierarchy as though they are part of the same armature object.
     # This will let us re-use rig components without destructively joining them.
