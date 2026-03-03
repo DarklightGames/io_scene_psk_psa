@@ -350,9 +350,12 @@ def create_psx_bones(
     armature_tree = ObjectTree(armature_objects)
 
     if len(armature_tree.root_nodes) >= 2:
+        root_bone_names = []
+        for root_node in armature_tree.root_nodes:
+            root_bone_names.append(root_node.object.name)
         raise RuntimeError(
-            'Multiple root armature objects were found. '
-            'Only one root armature object is allowed. '
+            f'Multiple root armature objects were found: {root_bone_names}.\n'
+            'Only one root armature object is allowed.\n'
             'To use multiple armature objects, parent them to one another in a hierarchy using Bone parenting.'
         )
 
