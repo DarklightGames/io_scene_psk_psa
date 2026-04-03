@@ -8,7 +8,7 @@ RUN pip install --upgrade pip
 RUN pip install pytest-blender
 RUN pip install blender-downloader
 
-ARG BLENDER_VERSION=5.0
+ARG BLENDER_VERSION=5.1
 
 # Set BLENDER_EXECUTABLE and BLENDER_PYTHON as environment variables
 RUN BLENDER_EXECUTABLE=$(blender-downloader $BLENDER_VERSION --extract --remove-compressed --print-blender-executable) && \
