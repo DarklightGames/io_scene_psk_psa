@@ -13,3 +13,4 @@ ignore_errors = true
 
 [tool.pyright]
 reportInvalidTypeForm = false
+reportMissingModuleSource = false
