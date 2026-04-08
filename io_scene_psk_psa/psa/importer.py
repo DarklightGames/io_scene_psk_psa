@@ -409,6 +409,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
         if options.should_write_metadata:
             pg = typing_cast(PSX_PG_action_export, getattr(action, 'psa_export'))
             pg.fps = target_fps
+            pg.group = sequence.group.decode('windows-1252', errors='ignore')
 
         action.use_fake_user = options.should_use_fake_user
 
