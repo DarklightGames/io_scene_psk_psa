@@ -84,7 +84,7 @@ def test_psa_import_resampling():
 
     # Set the scene FPS to differ from that of the sequence's FPS.
     assert bpy.context.scene is not None
-    bpy.context.scene.render.fps = 33.3
+    bpy.context.scene.render.fps = 33
 
     # Ensure that we will in fact trigger the resampling.
     psa = read_psa(open(BROADSWORD_PSA_FILEPATH, 'rb'))
