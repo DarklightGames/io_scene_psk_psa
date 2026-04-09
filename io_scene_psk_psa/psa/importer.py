@@ -150,7 +150,7 @@ def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, frame_step:
     source_frame_count, bone_count = sequence_data_matrix.shape[:2]
     sample_frame_times = list(_get_sample_frame_times(source_frame_count, frame_step))
     target_frame_count = len(sample_frame_times)
-    resampled_sequence_data_matrix = np.zeros((target_frame_count, bone_count, 7), dtype=float)
+    resampled_sequence_data_matrix = np.zeros((target_frame_count, bone_count, 10), dtype=float)
 
     for sample_frame_index, sample_frame_time in enumerate(sample_frame_times):
         frame_index = int(sample_frame_time)
@@ -166,8 +166,9 @@ def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, frame_step:
                 factor = sample_frame_time - frame_index
                 q = Quaternion((source_frame_1_data[:4])).slerp(Quaternion((source_frame_2_data[:4])), factor)
                 q.normalize()
-                l = Vector(source_frame_1_data[4:]).lerp(Vector(source_frame_2_data[4:]), factor)
-                resampled_sequence_data_matrix[sample_frame_index, bone_index, :] = q.w, q.x, q.y, q.z, l.x, l.y, l.z
+                l = Vector(source_frame_1_data[4:7]).lerp(Vector(source_frame_2_data[4:7]), factor)
+                s = Vector(source_frame_1_data[7:]).lerp(Vector(source_frame_2_data[4:7]), factor)
+                resampled_sequence_data_matrix[sample_frame_index, bone_index, :] = q.w, q.x, q.y, q.z, l.x, l.y, l.z, s.x, s.y, s.z
 
     return resampled_sequence_data_matrix
 
