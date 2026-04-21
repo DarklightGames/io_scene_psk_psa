@@ -43,7 +43,7 @@ class PskBuildResult(object):
 def _get_mesh_export_space_matrix(node: ObjectNode | None, export_space: str) -> Matrix:
     if node is None:
         return Matrix.Identity(4)
-    
+
     armature_object = node.object
     root_armature_object = node.root.object
 
@@ -83,12 +83,36 @@ def _get_material_name_indices(obj: Object, material_names: list[str]) -> Iterab
             yield 0
 
 
+def _transform_vertices_numpy(vertices, matrix: Matrix) -> list[Vector3]:
+    """
+    Apply a 4x4 transform matrix to a mesh's vertices.
+    Returns a list of Vector3 with the transformed positions.
+    """
+    V = len(vertices)
+    co_flat = np.empty(V * 3, dtype=np.float32)
+    vertices.foreach_get("co", co_flat)
+
+    matrix_np = np.array([matrix[i][j] for i in range(4) for j in range(4)], dtype=np.float32).reshape(4, 4)
+    ones = np.ones(V, dtype=np.float32)
+    coords_h = np.column_stack([co_flat.reshape(V, 3), ones])  # (V, 4)
+    transformed = (coords_h @ matrix_np.T)[:, :3]              # (V, 3)
+
+    points = []
+    for i in range(V):
+        point = Vector3()
+        point.x = float(transformed[i, 0])
+        point.y = float(transformed[i, 1])
+        point.z = float(transformed[i, 2])
+        points.append(point)
+    return points
+
+
 def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuildOptions) -> PskBuildResult:
 
     assert context.window_manager
 
     armature_objects = list(input_objects.armature_objects)
-    armature_object_tree = ObjectTree(input_objects.armature_objects)    
+    armature_object_tree = ObjectTree(input_objects.armature_objects)
 
     warnings: list[str] = []
     psk = Psk()
@@ -115,7 +139,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
     # Materials
     mesh_objects = [dfs_object.obj for dfs_object in input_objects.mesh_dfs_objects]
-    
+
     match options.material_order_mode:
         case 'AUTOMATIC':
             materials = list(get_materials_for_mesh_objects(context.evaluated_depsgraph_get(), mesh_objects))
@@ -124,7 +148,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             # Therefore, we can take the material_name_list as gospel and simply use it as a lookup table.
             # If a look-up fails, replace it with an empty material.
             materials = [bpy.data.materials.get(x, None) for x in options.material_name_list]
-            
+
             # Check if any mesh needs a None material (has no slots or empty slots)
             needs_none_material = False
             for mesh_object in mesh_objects:
@@ -138,7 +162,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
                         break
                 if needs_none_material:
                     break
-            
+
             # Append None at the end if needed and not already present
             if needs_none_material and None not in materials:
                 materials.append(None)
@@ -172,11 +196,11 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
     if options.export_space == 'ARMATURE':
         # For meshes without an armature modifier, we need to set the export space to the first armature object.
         armature_mesh_export_space_matrices[None] = _get_mesh_export_space_matrix(root_armature_object, options.export_space)
-    
+
     # TODO: also handle the case of multiple roots; dont' just assume we have one!
     for armature_node in iter(armature_object_tree):
         armature_mesh_export_space_matrices[armature_node.object] = _get_mesh_export_space_matrix(armature_node, options.export_space)
-    
+
     # Temporarily force the armature into the rest position.
     # The original pose position setting will be restored at the end.
     original_armature_object_pose_positions = {a: a.data.pose_position for a in armature_objects}
@@ -267,13 +291,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
         # Vertices
         vertex_offset = len(psk.points)
-        for vertex in mesh_data.vertices:
-            point = Vector3()
-            v = point_transform_matrix @ vertex.co
-            point.x = v.x
-            point.y = v.y
-            point.z = v.z
-            psk.points.append(point)
+        psk.points.extend(_transform_vertices_numpy(mesh_data.vertices, point_transform_matrix))
 
         # Wedges
         mesh_data.calc_loop_triangles()
@@ -294,7 +312,6 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         else:
             for loop_index, loop in enumerate(mesh_data.loops):
                 wedges.append(Psk.Wedge(point_index=loop.vertex_index + vertex_offset, u=0.0, v=0.0))
-
 
         # Assign material indices to the wedges.
         for triangle in mesh_data.loop_triangles:
@@ -336,7 +353,6 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             bone_index_offset = psx_bone_create_result.armature_object_root_bone_indices[armature_object]
             # Because the vertex groups may contain entries for which there is no matching bone in the armature,
             # we must filter them out and not export any weights for these vertex groups.
-
             bone_names = psx_bone_create_result.armature_object_bone_names[armature_object]
             vertex_group_names = [x.name for x in mesh_object.vertex_groups]
             vertex_group_bone_indices: dict[int, int] = dict()
