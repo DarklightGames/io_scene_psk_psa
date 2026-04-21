@@ -83,28 +83,21 @@ def _get_material_name_indices(obj: Object, material_names: list[str]) -> Iterab
             yield 0
 
 
-def _transform_vertices_numpy(vertices, matrix: Matrix) -> list[Vector3]:
-    """
-    Apply a 4x4 transform matrix to a mesh's vertices.
-    Returns a list of Vector3 with the transformed positions.
-    """
-    V = len(vertices)
-    co_flat = np.empty(V * 3, dtype=np.float32)
-    vertices.foreach_get("co", co_flat)
+def _matrix_to_numpy(matrix: Matrix) -> np.ndarray:
+    """Convert a 4x4 mathutils.Matrix to a (4, 4) float32 numpy array."""
+    return np.array([matrix[i][j] for i in range(4) for j in range(4)], dtype=np.float32).reshape(4, 4)
 
-    matrix_np = np.array([matrix[i][j] for i in range(4) for j in range(4)], dtype=np.float32).reshape(4, 4)
+
+def _transform_vertices_numpy(co_flat: np.ndarray, matrix_np: np.ndarray) -> np.ndarray:
+    """
+    Apply a 4x4 transform matrix to a flat (V*3,) array of vertex coordinates.
+    Returns a (V, 3) float32 array of transformed positions.
+    """
+    V = len(co_flat) // 3
     ones = np.ones(V, dtype=np.float32)
-    coords_h = np.column_stack([co_flat.reshape(V, 3), ones])  # (V, 4)
-    transformed = (coords_h @ matrix_np.T)[:, :3]              # (V, 3)
-
-    points = []
-    for i in range(V):
-        point = Vector3()
-        point.x = float(transformed[i, 0])
-        point.y = float(transformed[i, 1])
-        point.z = float(transformed[i, 2])
-        points.append(point)
-    return points
+    coords_h = np.column_stack([co_flat.reshape(V, 3), ones])   # (V, 4)
+    transformed = coords_h @ matrix_np.T                         # (V, 4)
+    return transformed[:, :3]                                    # (V, 3)
 
 
 def _build_wedges_numpy(
@@ -227,6 +220,86 @@ def _build_faces_numpy(
         faces.append(face)
 
     return faces
+
+
+def _build_weights_numpy(
+    mesh_data: Mesh,
+    mesh_object,
+    vertex_offset: int,
+    vertex_group_bone_indices: dict[int, int],
+    fallback_weight_bone_index: int,
+) -> list['Psk.Weight']:
+    """
+    Build PSK vertex weights from the mesh's vertex groups.
+    """
+    V = len(mesh_data.vertices)
+
+    # Single O(V) pass: collect all raw influence records.
+    v_indices_list  = []
+    vg_indices_list = []
+    weights_list    = []
+
+    for vertex_index, vertex in enumerate(mesh_data.vertices):
+        for group_element in vertex.groups:
+            if group_element.weight > 0.0:
+                v_indices_list.append(vertex_index)
+                vg_indices_list.append(group_element.group)
+                weights_list.append(group_element.weight)
+
+    if not v_indices_list:
+        # No weights at all – assign everything to the fallback bone.
+        weights = []
+        for vertex_index in range(V):
+            w = Psk.Weight()
+            w.bone_index = fallback_weight_bone_index
+            w.point_index = vertex_offset + vertex_index
+            w.weight = 1.0
+            weights.append(w)
+        return weights
+
+    v_indices  = np.array(v_indices_list,  dtype=np.int32)
+    vg_indices = np.array(vg_indices_list, dtype=np.int32)
+    raw_weights = np.array(weights_list,   dtype=np.float32)
+
+    # Because the vertex groups may contain entries for which there is no matching bone in the armature,
+    # we must filter them out and not export any weights for these vertex groups.
+    max_vg = int(vg_indices.max()) + 1
+    vg_to_bone_map = np.full(max_vg, -1, dtype=np.int32)
+    for vg_idx, bone_idx in vertex_group_bone_indices.items():
+        if vg_idx < max_vg:
+            vg_to_bone_map[vg_idx] = bone_idx
+
+    bone_indices = vg_to_bone_map[vg_indices]  # (N,)
+    valid_mask   = bone_indices >= 0
+    v_indices    = v_indices[valid_mask]
+    bone_indices = bone_indices[valid_mask]
+    raw_weights  = raw_weights[valid_mask]
+
+    # Keep track of which vertices have been assigned weights.
+    # The ones that have not been assigned weights will be assigned to the root bone.
+    # Without this, some older versions of UnrealEd may have corrupted meshes.
+    has_weight = np.zeros(V, dtype=bool)
+    if len(v_indices):
+        has_weight[v_indices] = True
+
+    weights = []
+    for i in range(len(v_indices)):
+        w = Psk.Weight()
+        w.bone_index  = int(bone_indices[i])
+        w.point_index = vertex_offset + int(v_indices[i])
+        w.weight      = float(raw_weights[i])
+        weights.append(w)
+
+    # Assign vertices that have not been assigned weights to the root bone of the armature.
+    unweighted = np.where(~has_weight)[0]
+    for vertex_index in unweighted:
+        w = Psk.Weight()
+        w.bone_index  = fallback_weight_bone_index
+        w.point_index = vertex_offset + int(vertex_index)
+        w.weight      = 1.0
+        weights.append(w)
+
+    return weights
 
 
 def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuildOptions) -> PskBuildResult:
@@ -413,7 +486,20 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
         # Vertices
         vertex_offset = len(psk.points)
-        psk.points.extend(_transform_vertices_numpy(mesh_data.vertices, point_transform_matrix))
+        V = len(mesh_data.vertices)
+
+        co_flat = np.empty(V * 3, dtype=np.float32)
+        mesh_data.vertices.foreach_get("co", co_flat)
+
+        point_transform_np = _matrix_to_numpy(point_transform_matrix)
+        transformed = _transform_vertices_numpy(co_flat, point_transform_np)  # (V, 3)
+
+        for i in range(V):
+            point = Vector3()
+            point.x = float(transformed[i, 0])
+            point.y = float(transformed[i, 1])
+            point.z = float(transformed[i, 2])
+            psk.points.append(point)
 
         # Wedges
         mesh_data.calc_loop_triangles()
@@ -443,6 +529,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         if armature_object is not None:
             armature_data = typing_cast(Armature, armature_object.data)
             bone_index_offset = psx_bone_create_result.armature_object_root_bone_indices[armature_object]
+
             # Because the vertex groups may contain entries for which there is no matching bone in the armature,
             # we must filter them out and not export any weights for these vertex groups.
             bone_names = psx_bone_create_result.armature_object_bone_names[armature_object]
@@ -465,39 +552,15 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
                             except ValueError:
                                 bone = bone.parent
 
-            # Keep track of which vertices have been assigned weights.
-            # The ones that have not been assigned weights will be assigned to the root bone.
-            # Without this, some older versions of UnrealEd may have corrupted meshes.
-            vertices_assigned_weights = np.full(len(mesh_data.vertices), False)
-
-            for vertex_group_index, vertex_group in enumerate(mesh_object.vertex_groups):
-                if vertex_group_index not in vertex_group_bone_indices:
-                    # Vertex group has no associated bone, skip it.
-                    continue
-                bone_index = vertex_group_bone_indices[vertex_group_index]
-                for vertex_index in range(len(mesh_data.vertices)):
-                    try:
-                        weight = vertex_group.weight(vertex_index)
-                    except RuntimeError:
-                        continue
-                    if weight == 0.0:
-                        continue
-                    w = Psk.Weight()
-                    w.bone_index = bone_index
-                    w.point_index = vertex_offset + vertex_index
-                    w.weight = weight
-                    psk.weights.append(w)
-                    vertices_assigned_weights[vertex_index] = True
-
-            # Assign vertices that have not been assigned weights to the root bone of the armature.
             fallback_weight_bone_index = psx_bone_create_result.armature_object_root_bone_indices[armature_object]
-            for vertex_index, assigned in enumerate(vertices_assigned_weights):
-                if not assigned:
-                    w = Psk.Weight()
-                    w.bone_index = fallback_weight_bone_index
-                    w.point_index = vertex_offset + vertex_index
-                    w.weight = 1.0
-                    psk.weights.append(w)
+            new_weights = _build_weights_numpy(
+                mesh_data,
+                mesh_object,
+                vertex_offset,
+                vertex_group_bone_indices,
+                fallback_weight_bone_index,
+            )
+            psk.weights.extend(new_weights)
 
         if evaluated_mesh_object is not None:
             bpy.data.objects.remove(mesh_object)
