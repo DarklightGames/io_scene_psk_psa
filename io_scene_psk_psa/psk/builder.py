@@ -187,6 +187,48 @@ def _build_wedges_numpy(
     return unique_wedges, loop_wedge_indices
 
 
+def _build_faces_numpy(
+    mesh_data: Mesh,
+    loop_wedge_indices: np.ndarray,
+    wedge_index_offset: int,
+    material_indices: list[int],
+) -> list['Psk.Face']:
+    """
+    Build the list of PSK faces from loop_triangles using numpy bulk reads.
+    """
+    T = len(mesh_data.loop_triangles)
+
+    tri_loops_flat   = np.empty(T * 3, dtype=np.int32)
+    tri_mat_flat     = np.empty(T,     dtype=np.int32)
+    tri_poly_indices = np.empty(T,     dtype=np.int32)
+
+    mesh_data.loop_triangles.foreach_get("loops",          tri_loops_flat)
+    mesh_data.loop_triangles.foreach_get("material_index", tri_mat_flat)
+    mesh_data.loop_triangles.foreach_get("polygon_index",  tri_poly_indices)
+
+    tri_loops = tri_loops_flat.reshape(T, 3)  # (T, 3)
+
+    w_all = (loop_wedge_indices + wedge_index_offset).astype(np.int32)  # (L,)
+    tri_wedges = w_all[tri_loops]  # (T, 3)
+
+    resolved_mat = np.array(material_indices, dtype=np.int32)[tri_mat_flat]  # (T,)
+
+    poly_groups, _groups = mesh_data.calc_smooth_groups(use_bitflags=True)
+    poly_groups_np = np.array(poly_groups, dtype=np.uint32)
+    tri_smooth = poly_groups_np[tri_poly_indices]  # (T,)
+
+    faces = []
+    for i in range(T):
+        face = Psk.Face(
+            wedge_indices=(int(tri_wedges[i, 2]), int(tri_wedges[i, 1]), int(tri_wedges[i, 0])),
+            material_index=int(resolved_mat[i]),
+            smoothing_groups=int(tri_smooth[i]),
+        )
+        faces.append(face)
+
+    return faces
+
+
 def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuildOptions) -> PskBuildResult:
 
     assert context.window_manager
@@ -386,15 +428,11 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         psk.wedges.extend(unique_wedges)
 
         # Faces
-        poly_groups, groups = mesh_data.calc_smooth_groups(use_bitflags=True)
         psk_face_start_index = len(psk.faces)
-        for f in mesh_data.loop_triangles:
-            face = Psk.Face(
-                wedge_indices=(loop_wedge_indices[f.loops[2]], loop_wedge_indices[f.loops[1]], loop_wedge_indices[f.loops[0]]),
-                material_index=material_indices[f.material_index],
-                smoothing_groups=poly_groups[f.polygon_index],
-            )
-            psk.faces.append(face)
+        new_faces = _build_faces_numpy(
+            mesh_data, loop_wedge_indices, wedge_index_offset, material_indices
+        )
+        psk.faces.extend(new_faces)
 
         if should_flip_normals:
             # Invert the normals of the faces.
