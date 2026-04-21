@@ -107,6 +107,86 @@ def _transform_vertices_numpy(vertices, matrix: Matrix) -> list[Vector3]:
     return points
 
 
+def _build_wedges_numpy(
+    mesh_data: Mesh,
+    vertex_offset: int,
+    material_indices: list[int],
+) -> tuple[list['Psk.Wedge'], np.ndarray]:
+    """
+    Build the list of unique PSK wedges and a per-loop wedge index mapping.
+
+    Returns
+    -------
+    unique_wedges      : list[Psk.Wedge]  -- deduplicated wedges ready to extend psk.wedges
+    loop_wedge_indices : np.ndarray (L,) int32  -- maps every loop to its wedge index
+                         (indices are relative to the start of this mesh's wedge block)
+    """
+    L = len(mesh_data.loops)
+    T = len(mesh_data.loop_triangles)
+
+    loop_verts = np.empty(L, dtype=np.int32)
+    mesh_data.loops.foreach_get("vertex_index", loop_verts)
+
+    if mesh_data.uv_layers.active:
+        uv_flat = np.empty(L * 2, dtype=np.float32)
+        mesh_data.uv_layers.active.data.foreach_get("uv", uv_flat)
+        uv_flat = uv_flat.reshape(L, 2)
+        us = uv_flat[:, 0]
+        vs = 1.0 - uv_flat[:, 1]
+    else:
+        us = np.zeros(L, dtype=np.float32)
+        vs = np.zeros(L, dtype=np.float32)
+
+    # Each loop belongs to exactly one triangle. We need a (L,) array of
+    # resolved material indices. Build a loop -> triangle map via foreach_get.
+    tri_loops_flat = np.empty(T * 3, dtype=np.int32)
+    tri_mat_flat   = np.empty(T,     dtype=np.int32)
+    mesh_data.loop_triangles.foreach_get("loops",          tri_loops_flat)
+    mesh_data.loop_triangles.foreach_get("material_index", tri_mat_flat)
+
+    # Map each triangle's raw material index through the slot remapping table.
+    resolved_tri_mat = np.array(material_indices, dtype=np.int32)[tri_mat_flat]  # (T,)
+
+    # Scatter: for each triangle corner, write the resolved mat index to that loop slot.
+    loop_mat = np.empty(L, dtype=np.int32)
+    loop_mat[tri_loops_flat] = np.repeat(resolved_tri_mat, 3)
+
+    # Build (L, 4) key array for deduplication.
+    # Key = (point_index_global, u_bits, v_bits, mat_index)
+    # Float bits reinterpreted as uint32 to allow exact integer comparison.
+    point_indices_global = loop_verts + vertex_offset
+
+    u_bits = np.ascontiguousarray(us).view(np.uint32)
+    v_bits = np.ascontiguousarray(vs).view(np.uint32)
+
+    keys = np.stack(
+        [point_indices_global.astype(np.uint32), u_bits, v_bits, loop_mat.astype(np.uint32)],
+        axis=1,
+    )  # (L, 4) uint32, C-contiguous
+
+    void_view = keys.view(np.dtype((np.void, 16))).ravel()
+    _, uniq_idx, inv_idx = np.unique(void_view, return_index=True, return_inverse=True)
+
+    # inv_idx is the wedge index (relative to this mesh) for every loop.
+    loop_wedge_indices = inv_idx.astype(np.int32)  # (L,)
+
+    unique_keys = keys[uniq_idx]  # (W, 4)
+    u_unique    = unique_keys[:, 1].view(np.float32)
+    v_unique    = unique_keys[:, 2].view(np.float32)
+
+    unique_wedges = []
+    for i in range(len(unique_keys)):
+        wedge = Psk.Wedge(
+            point_index=int(unique_keys[i, 0]),
+            u=float(u_unique[i]),
+            v=float(v_unique[i]),
+        )
+        wedge.material_index = int(unique_keys[i, 3])
+        unique_wedges.append(wedge)
+
+    return unique_wedges, loop_wedge_indices
+
+
 def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuildOptions) -> PskBuildResult:
 
     assert context.window_manager
@@ -299,37 +379,11 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         if mesh_data.uv_layers.active is None:
             warnings.append(f'"{mesh_object.name}" has no active UV Map')
 
-        # Build a list of non-unique wedges.
-        wedges = []
-        if mesh_data.uv_layers.active:
-            uv_layer = mesh_data.uv_layers.active.data
-            for loop_index, loop in enumerate(mesh_data.loops):
-                wedges.append(Psk.Wedge(
-                    point_index=loop.vertex_index + vertex_offset,
-                    u=uv_layer[loop_index].uv[0],
-                    v=1.0 - uv_layer[loop_index].uv[1]
-                ))
-        else:
-            for loop_index, loop in enumerate(mesh_data.loops):
-                wedges.append(Psk.Wedge(point_index=loop.vertex_index + vertex_offset, u=0.0, v=0.0))
-
-        # Assign material indices to the wedges.
-        for triangle in mesh_data.loop_triangles:
-            for loop_index in triangle.loops:
-                wedges[loop_index].material_index = material_indices[triangle.material_index]
-
-        # Populate the list of wedges with unique wedges & build a look-up table of loop indices to wedge indices.
-        wedge_indices = dict()
-        loop_wedge_indices = np.full(len(mesh_data.loops), -1)
-        for loop_index, wedge in enumerate(wedges):
-            wedge_hash = hash(wedge)
-            if wedge_hash in wedge_indices:
-                loop_wedge_indices[loop_index] = wedge_indices[wedge_hash]
-            else:
-                wedge_index = len(psk.wedges)
-                wedge_indices[wedge_hash] = wedge_index
-                psk.wedges.append(wedge)
-                loop_wedge_indices[loop_index] = wedge_index
+        wedge_index_offset = len(psk.wedges)
+        unique_wedges, loop_wedge_indices = _build_wedges_numpy(
+            mesh_data, vertex_offset, material_indices
+        )
+        psk.wedges.extend(unique_wedges)
 
         # Faces
         poly_groups, groups = mesh_data.calc_smooth_groups(use_bitflags=True)
