@@ -25,7 +25,7 @@ class BoneMapping:
         self.should_ignore_trailing_whitespace = should_ignore_trailing_whitespace
 
 
-class PsaImportOptions(object):
+class PsaImportOptions:
     def __init__(self,
                  action_name_prefix: str = '',
                  bone_mapping: BoneMapping = BoneMapping(),
@@ -60,7 +60,7 @@ class PsaImportOptions(object):
         self.translation_scale = translation_scale
 
 
-class ImportBone(object):
+class ImportBone:
     def __init__(self, psa_bone: PsxBone):
         self.psa_bone: PsxBone = psa_bone
         self.parent: ImportBone | None = None

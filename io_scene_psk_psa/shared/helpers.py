@@ -632,7 +632,7 @@ from typing import Set
 from bpy.types import Depsgraph
 
 
-class PskInputObjects(object):
+class PskInputObjects:
     def __init__(self):
         self.mesh_dfs_objects: list[DfsObject] = []
         self.armature_objects: list[Object] = []

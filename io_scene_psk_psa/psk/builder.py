@@ -21,7 +21,7 @@ from ..shared.helpers import (
 )
 
 
-class PskBuildOptions(object):
+class PskBuildOptions:
     def __init__(self):
         self.bone_filter_mode = 'ALL'
         self.bone_collection_indices: list[PsxBoneCollection] = []
@@ -34,7 +34,11 @@ class PskBuildOptions(object):
         self.up_axis = 'Z'
 
 
-class PskBuildResult(object):
+class PskExport:
+    
+
+
+class PskBuildResult:
     def __init__(self, psk: Psk, warnings: list[str]):
         self.psk: Psk = psk
         self.warnings: list[str] = warnings
