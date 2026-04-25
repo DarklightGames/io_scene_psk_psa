@@ -34,10 +34,6 @@ class PskBuildOptions:
         self.up_axis = 'Z'
 
 
-class PskExport:
-    
-
-
 class PskBuildResult:
     def __init__(self, psk: Psk, warnings: list[str]):
         self.psk: Psk = psk
