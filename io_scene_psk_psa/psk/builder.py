@@ -335,7 +335,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
                 face.wedge_indices = (face.wedge_indices[2], face.wedge_indices[1], face.wedge_indices[0])
 
         # Weights
-        if armature_object is not None:
+        if armature_object is not None and len(psx_bone_create_result.bones) > 0:
             armature_data = typing_cast(Armature, armature_object.data)
             bone_index_offset = psx_bone_create_result.armature_object_root_bone_indices[armature_object]
             # Because the vertex groups may contain entries for which there is no matching bone in the armature,
