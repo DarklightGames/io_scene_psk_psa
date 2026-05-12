@@ -198,6 +198,13 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
 
         bm.to_mesh(mesh_data)
 
+        # Smoothing Groups
+        if options.should_import_smoothing_groups:
+            smoothing_groups = [face.smoothing_groups for face in psk_faces]
+            smoothing_groups_attribute = mesh_data.attributes.new('smoothing_groups', 'INT', 'FACE')
+            smoothing_groups_attribute = typing_cast(IntAttribute, smoothing_groups_attribute)
+            smoothing_groups_attribute.data.foreach_set('value', smoothing_groups)
+
         # Texture Coordinates
         uv_layer_data_index = 0
         uv_layer_data = np.zeros((face_count * 3, 2), dtype=np.float32)
