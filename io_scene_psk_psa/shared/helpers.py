@@ -603,6 +603,7 @@ def get_armatures_for_mesh_objects(mesh_objects: Iterable[Object]):
         armature_modifiers = [typing_cast(ArmatureModifier, x) for x in mesh_object.modifiers if x.type == 'ARMATURE']
         for armature_object in map(lambda x: x.object, armature_modifiers):
             if armature_object is not None:
+                print(f'Found armature object \'{armature_object.name}\' for mesh object \'{mesh_object.name}\'')
                 armature_objects.add(armature_object)
     yield from armature_objects
 
@@ -627,7 +628,7 @@ def get_collection_export_operator_from_context(context: Context) -> PropertyGro
     return exporter.export_properties
 
 
-from ..shared.dfs import DfsObject, dfs_collection_objects, dfs_view_layer_objects
+from ..shared.dfs import DfsObject, dfs_collection_objects, dfs_selected_objects_with_type
 from typing import Set
 from bpy.types import Depsgraph
 
@@ -664,18 +665,6 @@ def get_materials_for_mesh_objects(depsgraph: Depsgraph, mesh_objects: Iterable[
         yield None
 
 
-def get_mesh_objects_for_collection(collection: Collection) -> Iterable[DfsObject]:
-    return filter(lambda x: x.obj.type == 'MESH', dfs_collection_objects(collection))
-
-
-def get_mesh_objects_for_context(context: Context) -> Iterable[DfsObject]:
-    if context.view_layer is None:
-        return
-    for dfs_object in dfs_view_layer_objects(context.view_layer):
-        if dfs_object.obj.type == 'MESH' and dfs_object.is_selected:
-            yield dfs_object
-
-
 def get_armature_for_mesh_object(mesh_object: Object) -> Object | None:
     if mesh_object.type != 'MESH':
         return None
@@ -687,24 +676,30 @@ def get_armature_for_mesh_object(mesh_object: Object) -> Object | None:
     return None
 
 
-def _get_psk_input_objects(mesh_dfs_objects: Iterable[DfsObject]) -> PskInputObjects:
-    mesh_dfs_objects = list(mesh_dfs_objects)
-    if len(mesh_dfs_objects) == 0:
-        raise RuntimeError('No mesh objects were found to export.')
+def get_psk_input_objects_for_context(context: Context) -> PskInputObjects:
     input_objects = PskInputObjects()
-    input_objects.mesh_dfs_objects = mesh_dfs_objects
+    input_objects.mesh_dfs_objects = list(dfs_selected_objects_with_type(context, {'MESH'}))
+
     # Get the armature objects used on all the meshes being exported.
-    armature_objects = get_armatures_for_mesh_objects(map(lambda x: x.obj, mesh_dfs_objects))
+    armature_objects = set(get_armatures_for_mesh_objects(map(lambda x: x.obj, input_objects.mesh_dfs_objects)))
+
+    # Also include any armature objects that are selected but not used by the meshes, since the user may want to export them as well.
+    armature_objects |= set(map(lambda x: x.obj, dfs_selected_objects_with_type(context, {'ARMATURE'})))
+
     # Sort them in hierarchy order.
     input_objects.armature_objects = list(ObjectTree(armature_objects).objects_iterator())
+
     return input_objects
 
 
-def get_psk_input_objects_for_context(context: Context) -> PskInputObjects:
-    mesh_objects = list(get_mesh_objects_for_context(context))
-    return _get_psk_input_objects(mesh_objects)
-
-
 def get_psk_input_objects_for_collection(collection: Collection) -> PskInputObjects:
-    mesh_objects = get_mesh_objects_for_collection(collection)
-    return _get_psk_input_objects(mesh_objects)
+    mesh_dfs_objects = list(filter(lambda x: x.obj.type == 'MESH', dfs_collection_objects(collection)))
+    print([x.obj.name for x in mesh_dfs_objects])
+    armature_objects = set(get_armatures_for_mesh_objects(map(lambda x: x.obj, mesh_dfs_objects)))
+    armature_objects |= set(map(lambda x: x.obj, filter(lambda x: x.obj.type == 'ARMATURE', dfs_collection_objects(collection))))
+
+    input_objects = PskInputObjects()
+    input_objects.mesh_dfs_objects = mesh_dfs_objects
+    input_objects.armature_objects = list(ObjectTree(armature_objects).objects_iterator())
+
+    return input_objects

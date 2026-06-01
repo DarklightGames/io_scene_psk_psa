@@ -377,6 +377,10 @@ class PSK_OT_export(Operator, ExportHelper):
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
+    
+        if len(input_objects.mesh_dfs_objects) == 0:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'No mesh objects found in selection')
+            return {'CANCELLED'}
 
         pg = typing_cast(PSK_PG_export, getattr(context.scene, 'psk_export'))
 

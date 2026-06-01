@@ -87,8 +87,11 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
     assert context.window_manager
 
+    if len(input_objects.mesh_dfs_objects) == 0:
+        raise RuntimeError('No mesh objects found in input objects')
+
     armature_objects = list(input_objects.armature_objects)
-    armature_object_tree = ObjectTree(input_objects.armature_objects)    
+    armature_object_tree = ObjectTree(input_objects.armature_objects)
 
     warnings: list[str] = []
     psk = Psk()

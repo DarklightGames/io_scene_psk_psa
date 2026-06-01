@@ -7,7 +7,7 @@ instances. This is useful for exporters that need to traverse the object hierarc
 
 from typing import Iterable
 
-from bpy.types import Collection, Object, ViewLayer, LayerCollection
+from bpy.types import Collection, Context, Object, ViewLayer, LayerCollection
 from mathutils import Matrix
 
 
@@ -87,7 +87,7 @@ def _dfs_collection_objects_recursive(
         collection: Collection,
         instance_objects: list[Object] | None = None,
         matrix_world: Matrix = Matrix.Identity(4),
-        visited: set[Object] | None = None
+        visited: set[tuple[Object, Object | None]] | None = None
 ) -> Iterable[DfsObject]:
     """
     Depth-first search of objects in a collection, including recursing into instances.
@@ -146,3 +146,47 @@ def dfs_view_layer_objects(view_layer: ViewLayer) -> Iterable[DfsObject]:
         yield from _dfs_collection_objects_recursive(layer_collection.collection, visited=visited)
 
     yield from layer_collection_objects_recursive(view_layer.layer_collection)
+
+
+def dfs_objects_recursive(objects: Iterable[Object]) -> Iterable[DfsObject]:
+    """
+    Depth-first iterator over the provided objects, including recusing into instances.
+    """
+    visited: set[tuple[Object, Object | None]] = set()
+    for obj in objects:
+        visited_pair = (obj, None)
+        if visited_pair in visited:
+            continue
+        # If this an instance, we need to recurse into it.
+        if obj.instance_collection is not None:
+            # Calculate the instance transform.
+            instance_offset_matrix = Matrix.Translation(-obj.instance_collection.instance_offset)
+            # Recurse into the instance collection.
+            yield from _dfs_collection_objects_recursive(
+                obj.instance_collection,
+                [obj],
+                obj.matrix_world @ instance_offset_matrix,
+                visited
+                )
+        else:
+            # Object is not an instance, yield it.
+            yield DfsObject(obj, [], obj.matrix_world)
+            visited.add(visited_pair)
+    return visited
+
+
+def dfs_selected_objects(context: Context) -> Iterable[DfsObject]:
+    '''
+    Depth-first iterator over all selected objects in the view layer, including recursing into instances.
+    '''
+    if context.selected_objects is not None:
+        yield from dfs_objects_recursive(context.selected_objects)
+
+
+def dfs_selected_objects_with_type(context: Context, types: Iterable[str]) -> Iterable[DfsObject]:
+    '''
+    Depth-first iterator over all selected objects of a given type
+    '''
+    for dfs_object in dfs_selected_objects(context):
+        if dfs_object.obj.type in types:
+            yield dfs_object
