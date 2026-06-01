@@ -203,15 +203,20 @@ def create_psx_bones_from_blender_bones(
             parent_head = inverse_parent_rotation @ bone.parent.head
             parent_tail = inverse_parent_rotation @ bone.parent.tail
             location = (parent_tail - parent_head) + bone.head
+            apply_armature_scale = True
         else:
             location = armature_object_matrix_world @ bone.head
             bone_rotation = bone.matrix.to_quaternion().conjugated()
             rotation = bone_rotation @ armature_object_matrix_world.to_3x3().to_quaternion()
             rotation.conjugate()
+            # Root bone location is already in world-space via matrix_world; do not apply
+            # the armature object scale again.
+            apply_armature_scale = False
 
-        location.x *= armature_object_scale.x
-        location.y *= armature_object_scale.y
-        location.z *= armature_object_scale.z
+        if apply_armature_scale:
+            location.x *= armature_object_scale.x
+            location.y *= armature_object_scale.y
+            location.z *= armature_object_scale.z
 
         # Copy the calculated location and rotation to the bone.
         psx_bone.location = convert_vector_to_vector3(location)
