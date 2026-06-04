@@ -55,9 +55,11 @@ It is highly recommended to use the provided [Collection Exporters](https://docs
 # FAQ
 
 ## Why can't I see the animations imported from my PSA?
-Simply importing an animation into the scene will not automatically apply the action to the armature. This is in part because a PSA can have multiple sequences imported from it, and also that it's generally bad form for importers to modify the scene in ways that the user may not expect.
+Simply importing an animation into the scene will not automatically apply the action to the armature.
 
 The PSA importer creates [Actions](https://docs.blender.org/manual/en/latest/animation/actions.html) for each of the selected sequences in the PSA. These actions can be applied to your armature via the [Action Editor](https://docs.blender.org/manual/en/latest/editors/dope_sheet/action.html) or [NLA Editor](https://docs.blender.org/manual/en/latest/editors/nla/index.html).
+
+The reason for this behavior is in part because a PSA can have multiple sequences imported from it, and also that it's generally bad form for importers to modify the scene in ways that the user may not expect.
 
 ## Why are imported PSKs too big/too small?
 The PSK format, unlike other more modern formats, has no explicit or implicit unit system. Each game has its own convention as to what the base distance unit will represent. As such, this addon makes no assumptions as to the unit scale of the imported PSKs. If you think that your models are being imported into Blender either too big or too small, there are a couple ways to remedy this.
