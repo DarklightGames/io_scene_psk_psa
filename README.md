@@ -7,6 +7,14 @@ This Blender addon allows you to import and export meshes and animations to and 
 
 This software is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html) license.
 
+# Important Notice
+
+**This add-on is looking for a new maintainer!**
+
+Please contact me at github.com.catty550@passmail.net if you want to take over maintenance of this add-on.
+
+In the meantime, I will not be adding any new features beyond simple compatibility fixes to ensure it works with the latest Blender versions.
+
 # Installation
 For Blender 4.2 and higher, download the latest version from the [Blender Extensions](https://extensions.blender.org/add-ons/io-scene-psk-psa/) platform.
 
