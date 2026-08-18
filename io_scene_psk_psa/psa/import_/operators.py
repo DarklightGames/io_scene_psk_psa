@@ -262,6 +262,7 @@ class PSA_OT_import_all(Operator, PsaImportMixin):
             should_use_fake_user=self.should_use_fake_user,
             should_write_keyframes=self.should_write_keyframes,
             should_write_metadata=self.should_write_metadata,
+            should_write_scale_keys=self.should_write_scale_keys,
             translation_scale=self.translation_scale
         )
 
