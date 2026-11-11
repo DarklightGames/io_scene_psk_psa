@@ -1,9 +1,36 @@
 [project]
 name = "io_scene_psk_psa"
+version = "9.1.3"
+description = "Import and export PSK and PSA files used in Unreal Engine"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["COPYING"]
+# Blender 5.0 (the minimum supported version) bundles Python 3.11.
+requires-python = ">=3.11"
+# These are provided at runtime by Blender (numpy) and the bundled wheel in
+# `io_scene_psk_psa/wheels/` (psk-psa-py). Keep the psk-psa-py pin in sync
+# with `blender_manifest.toml`.
+dependencies = [
+    "numpy",
+    "psk-psa-py==0.0.4",
+]
 
-[pytest]
-blender-addons-dirs = "io_scene_psk_psa"
-testpaths = "../tests"
+[dependency-groups]
+dev = [
+    "fake-bpy-module-5.2",
+    "pytest",
+    "pytest-cov",
+    "pytest-blender",
+    "blender-downloader",
+]
+
+[tool.uv]
+# This is a Blender extension, not an installable Python package; it is built
+# with `blender --command extension build`.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true
@@ -12,5 +39,7 @@ branch = true
 ignore_errors = true
 
 [tool.pyright]
+venvPath = "."
+venv = ".venv"
 reportInvalidTypeForm = false
 reportMissingModuleSource = false

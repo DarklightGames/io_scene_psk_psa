@@ -86,6 +86,13 @@ Below is a table of the latest addon versions that are compatible with older ver
 | [3.4 - 3.6](https://www.blender.org/download/lts/3-6/)       | [5.0.6](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/5.0.6) |
 | [2.93 - 3.3](https://www.blender.org/download/releases/3-3/) | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) |
 
+# Development
+This project uses [uv](https://docs.astral.sh/uv/). To set up a development environment with type stubs for Blender's API ([fake-bpy-module](https://github.com/nutti/fake-bpy-module)) and the test tooling, run:
+
+```bash
+uv sync
+```
+
 # Testing
 To execute the automated tests, run:
 

@@ -36,24 +36,16 @@ jobs:
           sudo apt-get install libgl1 -y
           sudo apt-get install libglx-mesa0 -y
           sudo apt-get install python3 -y
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
       - name: Install Requirements
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install virtualenv
-          python3 -m virtualenv venv
-          source venv/bin/activate
-          pip install pytest-blender
-          pip install blender-downloader
+        run: uv sync --locked
       - name: Install Blender
         run: |
-          source venv/bin/activate
-          blender_executable="$(blender-downloader ${{ matrix.blender-version }} --extract --print-blender-executable)"
+          blender_executable="$(uv run blender-downloader ${{ matrix.blender-version }} --extract --print-blender-executable)"
           echo "BLENDER_EXECUTABLE=${blender_executable}" >> $GITHUB_ENV
-          blender_python="$(pytest-blender --blender-executable "$blender_executable")"
+          blender_python="$(uv run pytest-blender --blender-executable "$blender_executable")"
           echo "BLENDER_PYTHON=${blender_python}" >> $GITHUB_ENV
-          # Write the BLENDER_PYTHON path to the console for debugging
-          # Deactivate the virtualenv to avoid conflicts with the system python
-          deactivate
           $blender_python -m ensurepip
           $blender_python -m pip install -r tests/requirements.txt
       - name: Build extension
@@ -66,8 +58,7 @@ jobs:
           popd
       - name: Run tests
         run: |
-          source venv/bin/activate
-          pytest -svv tests --blender-addons-dirs .
+          uv run pytest -svv tests --blender-addons-dirs .
       - name: Archive addon
         uses: actions/upload-artifact@v4
         with:
