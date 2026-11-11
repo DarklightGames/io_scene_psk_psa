@@ -87,19 +87,22 @@ Below is a table of the latest addon versions that are compatible with older ver
 | [2.93 - 3.3](https://www.blender.org/download/releases/3-3/) | [4.3.0](https://github.com/DarklightGames/io_scene_psk_psa/releases/tag/4.3.0) |
 
 # Development
-This project uses [uv](https://docs.astral.sh/uv/). To set up a development environment with type stubs for Blender's API ([fake-bpy-module](https://github.com/nutti/fake-bpy-module)) and the test tooling, run:
+This project uses [uv](https://docs.astral.sh/uv/); no separate Blender installation is needed.
 
 ```bash
-uv sync
+uv run test               # Test against the newest supported Blender version
+uv run test 5.0 5.2       # Test against specific versions
+uv run test all           # Test against all supported versions
+uv run test -- -k psa     # Pass extra arguments to pytest
 ```
 
-# Testing
-To execute the automated tests, run:
+To build the extension archive:
 
+```bash
+mkdir -p dist
+uv run tools/blender_extension.py build --source-dir io_scene_psk_psa --output-dir dist
 ```
-./test.sh
-````
 
-This will create a [Docker](https://www.docker.com/) container with and run the tests inside it. The tests are executed using [pytest](https://docs.pytest.org/en/stable/) and the results will be displayed in the terminal.
+The supported Blender versions are defined by the `blender-*` dependency groups in [`pyproject.toml`](pyproject.toml).
 
 For now, the tests are not exhaustive and primarily focus on sanity checking the most common use cases (PSK & PSA import). New tests will likely be made to cover new features and prevent further regressions of reported issues.

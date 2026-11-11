@@ -5,32 +5,58 @@ description = "Import and export PSK and PSA files used in Unreal Engine"
 readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["COPYING"]
-# Blender 5.0 (the minimum supported version) bundles Python 3.11.
-requires-python = ">=3.11"
-# These are provided at runtime by Blender (numpy) and the bundled wheel in
-# `io_scene_psk_psa/wheels/` (psk-psa-py). Keep the psk-psa-py pin in sync
-# with `blender_manifest.toml`.
+# Must cover the Python required by each `blender-*` group below.
+requires-python = ">=3.11,<3.14"
+# Keep the psk-psa-py pin in sync with the wheel in `blender_manifest.toml`.
 dependencies = [
     "numpy",
     "psk-psa-py==0.0.4",
 ]
 
+[project.scripts]
+test = "tools.test:main"
+
+[build-system]
+requires = ["uv_build>=0.11.6,<0.12"]
+build-backend = "uv_build"
+
 [dependency-groups]
 dev = [
-    "fake-bpy-module-5.2",
+    # Type stubs for the oldest supported Blender, to flag use of newer APIs.
+    "fake-bpy-module-5.0",
     "pytest",
     "pytest-cov",
-    "pytest-blender",
-    "blender-downloader",
 ]
 
+# Supported Blender versions. When changing these, also update `[tool.uv]`,
+# `.python-version` and `blender_version_min` in the manifest, then run
+# `uv lock`. `tests/project_config_test.py` checks that they agree.
+blender-5-0 = ["bpy==5.0.*; python_version == '3.11'"]
+blender-5-1 = ["bpy==5.1.*; python_version == '3.13'"]
+blender-5-2 = ["bpy==5.2.*; python_version == '3.13'"]
+blender-5-3 = ["bpy==5.3.*; python_version == '3.13'"]
+
 [tool.uv]
-# This is a Blender extension, not an installable Python package; it is built
-# with `blender --command extension build`.
-package = false
+# Use the newest supported Blender version by default.
+default-groups = ["dev", "blender-5-3"]
+conflicts = [
+    [
+        { group = "blender-5-0" },
+        { group = "blender-5-1" },
+        { group = "blender-5-2" },
+        { group = "blender-5-3" },
+    ],
+]
+
+# Only `tools/` is packaged (for `[project.scripts]`); the add-on is built
+# with `tools/blender_extension.py`.
+[tool.uv.build-backend]
+module-name = "tools"
+module-root = ""
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = ["-vv", "-ra"]
 
 [tool.coverage.run]
 branch = true

@@ -1,3 +1,0 @@
-pytest
-pytest-cov
-psk-psa-py == 0.0.4
