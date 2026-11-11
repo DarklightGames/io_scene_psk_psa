@@ -1,35 +1,34 @@
 FROM ubuntu:22.04
 
 RUN apt-get update -y && \
-    apt-get install -y libxxf86vm-dev libxfixes3 libxi-dev libxkbcommon-x11-0 libgl1 libglx-mesa0 python3 python3-pip \
-    libxrender1 libsm6
+    apt-get install -y libxxf86vm-dev libxfixes3 libxi-dev libxkbcommon-x11-0 libgl1 libglx-mesa0 \
+    libxrender1 libsm6 ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN pip install --upgrade pip
-RUN pip install pytest-blender
-RUN pip install blender-downloader
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-ARG BLENDER_VERSION=5.1
+# Keep the project environment outside of the source tree, since the source
+# tree is mounted over /io_scene_psk_psa at runtime.
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_LINK_MODE=copy
 
-# Set BLENDER_EXECUTABLE and BLENDER_PYTHON as environment variables
-RUN BLENDER_EXECUTABLE=$(blender-downloader $BLENDER_VERSION --extract --remove-compressed --print-blender-executable) && \
-    BLENDER_PYTHON=$(pytest-blender --blender-executable "${BLENDER_EXECUTABLE}") && \
-    echo "export BLENDER_EXECUTABLE=${BLENDER_EXECUTABLE}" >> /etc/environment && \
-    echo "export BLENDER_PYTHON=${BLENDER_PYTHON}" >> /etc/environment && \
-    echo $BLENDER_EXECUTABLE > /blender_executable_path
+WORKDIR /io_scene_psk_psa
 
-RUN pip install pytest-cov
+# Install the host-side tooling (pytest, pytest-blender, blender-downloader, etc.).
+COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --locked
 
-# Source the environment variables and install Python dependencies
-# TODO: would be nice to have these installed in the bash script below.
-RUN . /etc/environment && \
-    $BLENDER_PYTHON -m ensurepip && \
-    $BLENDER_PYTHON -m pip install pytest pytest-cov psk-psa-py==0.0.4
+ARG BLENDER_VERSION=5.2
 
-# Persist BLENDER_EXECUTABLE as an environment variable
-RUN echo $(cat /blender_executable_path) > /tmp/blender_executable_path_env && \
-    export BLENDER_EXECUTABLE=$(cat /tmp/blender_executable_path_env)
-ENV BLENDER_EXECUTABLE /tmp/blender_executable_path_env
+# Download Blender and record the paths to its executable and bundled Python.
+RUN BLENDER_EXECUTABLE=$(uv run --no-sync blender-downloader $BLENDER_VERSION --output-directory /opt --extract --remove-compressed --print-blender-executable) && \
+    BLENDER_PYTHON=$(uv run --no-sync pytest-blender --blender-executable "${BLENDER_EXECUTABLE}") && \
+    echo "${BLENDER_EXECUTABLE}" > /blender_executable_path && \
+    echo "${BLENDER_PYTHON}" > /blender_python_path
+
+# Install the test dependencies into Blender's bundled Python.
+COPY tests/requirements.txt /tmp/requirements.txt
+RUN uv pip install --python "$(cat /blender_python_path)" --break-system-packages -r /tmp/requirements.txt
 
 ENTRYPOINT [ "/bin/bash", "-c" ]
-WORKDIR /io_scene_psk_psa
 CMD ["source tests/test.sh"]
