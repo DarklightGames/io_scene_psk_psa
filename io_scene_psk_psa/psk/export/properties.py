@@ -15,13 +15,17 @@ object_eval_state_items = (
 )
 
 material_order_mode_items = (
-    ('AUTOMATIC', 'Automatic', 'Automatically order the materials'),
-    ('MANUAL', 'Manual', 'Manually arrange the materials'),
+    ('AUTOMATIC', 'Automatic', 'Automatically order materials'),
+    ('MANUAL', 'Manual', 'Manually arrange and rename materials'),
 )
 
 
 class PSK_PG_material_name_list_item(PropertyGroup):
     material_name: StringProperty()
+    export_name: StringProperty(
+        name='Export Name',
+        description='The name of the material in the exported file. If empty, the material name is used'
+    )
     index: IntProperty()
 
 

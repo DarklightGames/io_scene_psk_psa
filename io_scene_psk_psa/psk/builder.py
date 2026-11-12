@@ -27,7 +27,8 @@ class PskBuildOptions:
         self.bone_collection_indices: list[PsxBoneCollection] = []
         self.object_eval_state = 'EVALUATED'
         self.material_order_mode = 'AUTOMATIC'
-        self.material_name_list: list[str] = []
+        # (material name, export name) pairs, in export order (used in `MANUAL` mode only).
+        self.material_name_list: list[tuple[str, str]] = []
         self.scale = 1.0
         self.export_space = 'WORLD'
         self.forward_axis = 'X'
@@ -342,7 +343,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             # The material name list may contain materials that are not on the mesh objects.
             # Therefore, we can take the material_name_list as gospel and simply use it as a lookup table.
             # If a look-up fails, replace it with an empty material.
-            materials = [bpy.data.materials.get(x, None) for x in options.material_name_list]
+            materials = [bpy.data.materials.get(x, None) for x, _ in options.material_name_list]
 
             # Check if any mesh needs a None material (has no slots or empty slots)
             needs_none_material = False
@@ -364,9 +365,19 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         case _:
             assert False, f'Invalid material order mode: {options.material_order_mode}'
 
+    # Map material names to the names to write to the file. Empty export names fall back to the material name.
+    material_export_names: dict[str, str] = {}
+    if options.material_order_mode == 'MANUAL':
+        material_export_names = {
+            name: export_name
+            for name, export_name in options.material_name_list
+            if export_name
+        }
+
     for material in materials:
         psk_material = Psk.Material()
-        psk_material.name = convert_string_to_cp1252_bytes(material.name if material else 'None')
+        material_name = material.name if material else 'None'
+        psk_material.name = convert_string_to_cp1252_bytes(material_export_names.get(material_name, material_name))
         psk_material.texture_index = len(psk.materials)
         if material is not None:
             psk_material.poly_flags = triangle_type_and_bit_flags_to_poly_flags(material.psk.mesh_triangle_type,

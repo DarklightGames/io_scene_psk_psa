@@ -26,10 +26,14 @@ def populate_material_name_list(depsgraph: Depsgraph, mesh_objects: Iterable[Obj
     material_names = [x.material_name for x in material_list]
     materials = get_sorted_materials_by_names(materials, material_names)
 
+    # Likewise, keep any export names that the user has already set.
+    export_names = {x.material_name: x.export_name for x in material_list if x.export_name}
+
     material_list.clear()
     for index, material in enumerate(materials):
         m = material_list.add()
         m.material_name = material.name if material is not None else 'None'
+        m.export_name = export_names.get(m.material_name, m.material_name)
         m.index = index
 
 
@@ -82,7 +86,33 @@ class PSK_OT_material_list_name_add(Operator):
         export_operator = typing_cast(PskExportMixin, export_operator)
         m = export_operator.material_name_list.add()
         m.material_name = self.name
+        m.export_name = self.name
         m.index = len(export_operator.material_name_list) - 1
+        return {'FINISHED'}
+
+
+class PSK_OT_material_list_name_remove(Operator):
+    bl_idname = 'psk.export_material_name_list_item_remove'
+    bl_label = 'Remove Material'
+    bl_description = 'Remove the selected material from the material name list'
+    bl_options = {'INTERNAL'}
+
+    @classmethod
+    def poll(cls, context):
+        export_operator = get_collection_export_operator_from_context(context)
+        if export_operator is None:
+            return False
+        export_operator = typing_cast(PskExportMixin, export_operator)
+        return 0 <= export_operator.material_name_list_index < len(export_operator.material_name_list)
+
+    def execute(self, context):
+        export_operator = get_collection_export_operator_from_context(context)
+        if export_operator is None:
+            self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
+            return {'CANCELLED'}
+        export_operator = typing_cast(PskExportMixin, export_operator)
+        export_operator.material_name_list.remove(export_operator.material_name_list_index)
+        export_operator.material_name_list_index = min(export_operator.material_name_list_index, max(len(export_operator.material_name_list) - 1, 0))
         return {'FINISHED'}
 
 
@@ -208,7 +238,7 @@ def get_psk_build_options_from_property_group(scene: Scene, pg: PskExportMixin) 
     options.bone_filter_mode = pg.bone_filter_mode
     options.bone_collection_indices = [PsxBoneCollection(x.armature_object_name, x.armature_data_name, x.index) for x in pg.bone_collection_list if x.is_selected]
     options.material_order_mode = pg.material_order_mode
-    options.material_name_list = [x.material_name for x in pg.material_name_list]
+    options.material_name_list = [(x.material_name, x.export_name) for x in pg.material_name_list]
     
     match pg.transform_source:
         case 'SCENE':
@@ -329,6 +359,7 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
                 col.operator(PSK_OT_material_list_name_move_down.bl_idname, text='', icon='TRIA_DOWN')
                 col.separator()
                 col.operator(PSK_OT_material_list_name_add.bl_idname, text='', icon='ADD')
+                col.operator(PSK_OT_material_list_name_remove.bl_idname, text='', icon='REMOVE')
 
         # Transform
         transform_header, transform_panel = layout.panel('Transform', default_closed=False)
@@ -510,6 +541,7 @@ _classes = (
     PSK_OT_material_list_name_move_up,
     PSK_OT_material_list_name_move_down,
     PSK_OT_material_list_name_add,
+    PSK_OT_material_list_name_remove,
 )
 
 from bpy.utils import register_classes_factory

@@ -3,6 +3,7 @@ from ...shared.types import BpyCollectionProperty, ExportSpaceMixin, TransformMi
 
 class PSK_PG_material_name_list_item:
     material_name: str
+    export_name: str
     index: int
 
 

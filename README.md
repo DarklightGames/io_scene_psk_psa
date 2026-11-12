@@ -16,7 +16,7 @@ For Blender 4.1 and lower, see [Legacy Compatibility](#legacy-compatibility).
 * [Bone collections](https://docs.blender.org/manual/en/latest/animation/armatures/bones/bone_collections.html#bone-collections) can be excluded from PSK/PSA export (useful for excluding non-contributing bones such as IK controllers).
 * [Collection Exporters](https://docs.blender.org/manual/en/latest/scene_layout/collections/collections.html#exporters) for reliable, repeatable export workflow.
 * Non-standard model data (.pskx) is supported for import only (vertex normals, extra UV channels, vertex colors, shape keys).
-* Manual re-ordering of material slots on export.
+* Manual re-ordering and renaming of materials on export.
 * Non-standard animation data is supported for import only (scale keys).
 * Fine-grained PSA sequence importing for efficient workflow when working with large PSA files.
 * PSA sequence metadata (e.g., frame rate) is preserved on import, allowing this data to be reused on export.
