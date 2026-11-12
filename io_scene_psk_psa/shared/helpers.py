@@ -684,7 +684,6 @@ def get_collection_export_operator_from_context(context: Context) -> PropertyGro
     return exporter.export_properties
 
 
-
 from bpy.types import Depsgraph
 
 from ..shared.dfs import DfsObject, dfs_collection_objects, dfs_view_layer_objects

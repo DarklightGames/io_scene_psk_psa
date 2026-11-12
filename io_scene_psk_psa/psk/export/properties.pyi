@@ -18,5 +18,4 @@ class PskExportMixin(ExportSpaceMixin, TransformMixin, PsxBoneExportMixin, Trans
     material_name_list_index: int
     should_export_vertex_normals: bool
 
-class PSK_PG_export(PskExportMixin):
-    ...
+class PSK_PG_export(PskExportMixin): ...

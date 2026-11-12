@@ -371,11 +371,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
     # Map material names to the names to write to the file. Empty export names fall back to the material name.
     material_export_names: dict[str, str] = {}
     if options.material_order_mode == 'MANUAL':
-        material_export_names = {
-            name: export_name
-            for name, export_name in options.material_name_list
-            if export_name
-        }
+        material_export_names = {name: export_name for name, export_name in options.material_name_list if export_name}
 
     for material in materials:
         psk_material = Psk.Material()
