@@ -49,4 +49,5 @@ _classes = (
 )
 
 from bpy.utils import register_classes_factory
+
 register, unregister = register_classes_factory(_classes)

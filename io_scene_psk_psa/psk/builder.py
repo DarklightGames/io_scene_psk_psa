@@ -1,12 +1,14 @@
+from collections.abc import Iterable
+from typing import cast as typing_cast
+
 import bmesh
 import bpy
 import numpy as np
-from bpy.types import Armature, Context, Object, Mesh
+from bpy.types import Armature, Context, Mesh, Object
 from mathutils import Matrix, Quaternion
-from typing import Iterable, cast as typing_cast
-from psk_psa_py.shared.data import PsxBone, Vector3
 from psk_psa_py.psk.data import Psk
-from .properties import triangle_type_and_bit_flags_to_poly_flags
+from psk_psa_py.shared.data import PsxBone, Vector3
+
 from ..shared.helpers import (
     ObjectNode,
     ObjectTree,
@@ -19,6 +21,7 @@ from ..shared.helpers import (
     get_coordinate_system_transform,
     get_materials_for_mesh_objects,
 )
+from .properties import triangle_type_and_bit_flags_to_poly_flags
 
 
 class PskBuildOptions:
@@ -96,9 +99,9 @@ def _transform_vertices_numpy(co_flat: np.ndarray, matrix_np: np.ndarray) -> np.
     """
     V = len(co_flat) // 3
     ones = np.ones(V, dtype=np.float32)
-    coords_h = np.column_stack([co_flat.reshape(V, 3), ones])   # (V, 4)
-    transformed = coords_h @ matrix_np.T                         # (V, 4)
-    return transformed[:, :3]                                    # (V, 3)
+    coords_h = np.column_stack([co_flat.reshape(V, 3), ones])  # (V, 4)
+    transformed = coords_h @ matrix_np.T  # (V, 4)
+    return transformed[:, :3]  # (V, 3)
 
 
 def _build_wedges_numpy(
@@ -119,11 +122,11 @@ def _build_wedges_numpy(
     T = len(mesh_data.loop_triangles)
 
     loop_verts = np.empty(L, dtype=np.int32)
-    mesh_data.loops.foreach_get("vertex_index", loop_verts)
+    mesh_data.loops.foreach_get('vertex_index', loop_verts)
 
     if mesh_data.uv_layers.active:
         uv_flat = np.empty(L * 2, dtype=np.float32)
-        mesh_data.uv_layers.active.data.foreach_get("uv", uv_flat)
+        mesh_data.uv_layers.active.data.foreach_get('uv', uv_flat)
         uv_flat = uv_flat.reshape(L, 2)
         us = uv_flat[:, 0]
         vs = 1.0 - uv_flat[:, 1]
@@ -134,9 +137,9 @@ def _build_wedges_numpy(
     # Each loop belongs to exactly one triangle. We need a (L,) array of
     # resolved material indices. Build a loop -> triangle map via foreach_get.
     tri_loops_flat = np.empty(T * 3, dtype=np.int32)
-    tri_mat_flat   = np.empty(T,     dtype=np.int32)
-    mesh_data.loop_triangles.foreach_get("loops",          tri_loops_flat)
-    mesh_data.loop_triangles.foreach_get("material_index", tri_mat_flat)
+    tri_mat_flat = np.empty(T, dtype=np.int32)
+    mesh_data.loop_triangles.foreach_get('loops', tri_loops_flat)
+    mesh_data.loop_triangles.foreach_get('material_index', tri_mat_flat)
 
     # Map each triangle's raw material index through the slot remapping table.
     resolved_tri_mat = np.array(material_indices, dtype=np.int32)[tri_mat_flat]  # (T,)
@@ -165,8 +168,8 @@ def _build_wedges_numpy(
     loop_wedge_indices = inv_idx.astype(np.int32)  # (L,)
 
     unique_keys = keys[uniq_idx]  # (W, 4)
-    u_unique    = unique_keys[:, 1].view(np.float32)
-    v_unique    = unique_keys[:, 2].view(np.float32)
+    u_unique = unique_keys[:, 1].view(np.float32)
+    v_unique = unique_keys[:, 2].view(np.float32)
 
     unique_wedges = []
     for i in range(len(unique_keys)):
@@ -192,13 +195,13 @@ def _build_faces_numpy(
     """
     T = len(mesh_data.loop_triangles)
 
-    tri_loops_flat   = np.empty(T * 3, dtype=np.int32)
-    tri_mat_flat     = np.empty(T,     dtype=np.int32)
-    tri_poly_indices = np.empty(T,     dtype=np.int32)
+    tri_loops_flat = np.empty(T * 3, dtype=np.int32)
+    tri_mat_flat = np.empty(T, dtype=np.int32)
+    tri_poly_indices = np.empty(T, dtype=np.int32)
 
-    mesh_data.loop_triangles.foreach_get("loops",          tri_loops_flat)
-    mesh_data.loop_triangles.foreach_get("material_index", tri_mat_flat)
-    mesh_data.loop_triangles.foreach_get("polygon_index",  tri_poly_indices)
+    mesh_data.loop_triangles.foreach_get('loops', tri_loops_flat)
+    mesh_data.loop_triangles.foreach_get('material_index', tri_mat_flat)
+    mesh_data.loop_triangles.foreach_get('polygon_index', tri_poly_indices)
 
     tri_loops = tri_loops_flat.reshape(T, 3)  # (T, 3)
 
@@ -236,9 +239,9 @@ def _build_weights_numpy(
     V = len(mesh_data.vertices)
 
     # Single O(V) pass: collect all raw influence records.
-    v_indices_list  = []
+    v_indices_list = []
     vg_indices_list = []
-    weights_list    = []
+    weights_list = []
 
     for vertex_index, vertex in enumerate(mesh_data.vertices):
         for group_element in vertex.groups:
@@ -258,9 +261,9 @@ def _build_weights_numpy(
             weights.append(w)
         return weights
 
-    v_indices  = np.array(v_indices_list,  dtype=np.int32)
+    v_indices = np.array(v_indices_list, dtype=np.int32)
     vg_indices = np.array(vg_indices_list, dtype=np.int32)
-    raw_weights = np.array(weights_list,   dtype=np.float32)
+    raw_weights = np.array(weights_list, dtype=np.float32)
 
     # Because the vertex groups may contain entries for which there is no matching bone in the armature,
     # we must filter them out and not export any weights for these vertex groups.
@@ -271,10 +274,10 @@ def _build_weights_numpy(
             vg_to_bone_map[vg_idx] = bone_idx
 
     bone_indices = vg_to_bone_map[vg_indices]  # (N,)
-    valid_mask   = bone_indices >= 0
-    v_indices    = v_indices[valid_mask]
+    valid_mask = bone_indices >= 0
+    v_indices = v_indices[valid_mask]
     bone_indices = bone_indices[valid_mask]
-    raw_weights  = raw_weights[valid_mask]
+    raw_weights = raw_weights[valid_mask]
 
     # Keep track of which vertices have been assigned weights.
     # The ones that have not been assigned weights will be assigned to the root bone.
@@ -286,18 +289,18 @@ def _build_weights_numpy(
     weights = []
     for i in range(len(v_indices)):
         w = Psk.Weight()
-        w.bone_index  = int(bone_indices[i])
+        w.bone_index = int(bone_indices[i])
         w.point_index = vertex_offset + int(v_indices[i])
-        w.weight      = float(raw_weights[i])
+        w.weight = float(raw_weights[i])
         weights.append(w)
 
     # Assign vertices that have not been assigned weights to the root bone of the armature.
     unweighted = np.where(~has_weight)[0]
     for vertex_index in unweighted:
         w = Psk.Weight()
-        w.bone_index  = fallback_weight_bone_index
+        w.bone_index = fallback_weight_bone_index
         w.point_index = vertex_offset + int(vertex_index)
-        w.weight      = 1.0
+        w.weight = 1.0
         weights.append(w)
 
     return weights
@@ -320,7 +323,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         up_axis=options.up_axis,
         scale=options.scale,
         bone_filter_mode=options.bone_filter_mode,
-        bone_collection_indices=options.bone_collection_indices
+        bone_collection_indices=options.bone_collection_indices,
     )
 
     psk.bones = [bone.psx_bone for bone in psx_bone_create_result.bones]
@@ -380,8 +383,9 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         psk_material.name = convert_string_to_cp1252_bytes(material_export_names.get(material_name, material_name))
         psk_material.texture_index = len(psk.materials)
         if material is not None:
-            psk_material.poly_flags = triangle_type_and_bit_flags_to_poly_flags(material.psk.mesh_triangle_type,
-                                                                                material.psk.mesh_triangle_bit_flags)
+            psk_material.poly_flags = triangle_type_and_bit_flags_to_poly_flags(
+                material.psk.mesh_triangle_type, material.psk.mesh_triangle_bit_flags
+            )
         psk.materials.append(psk_material)
 
     # Ensure at least one material exists
@@ -401,11 +405,15 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
 
     if options.export_space == 'ARMATURE':
         # For meshes without an armature modifier, we need to set the export space to the first armature object.
-        armature_mesh_export_space_matrices[None] = _get_mesh_export_space_matrix(root_armature_object, options.export_space)
+        armature_mesh_export_space_matrices[None] = _get_mesh_export_space_matrix(
+            root_armature_object, options.export_space
+        )
 
     # TODO: also handle the case of multiple roots; dont' just assume we have one!
     for armature_node in iter(armature_object_tree):
-        armature_mesh_export_space_matrices[armature_node.object] = _get_mesh_export_space_matrix(armature_node, options.export_space)
+        armature_mesh_export_space_matrices[armature_node.object] = _get_mesh_export_space_matrix(
+            armature_node, options.export_space
+        )
 
     # Temporarily force the armature into the rest position.
     # The original pose position setting will be restored at the end.
@@ -452,8 +460,10 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
                     bm.from_object(obj, depsgraph)
                 except ValueError as e:
                     del bm
-                    raise RuntimeError(f'Object "{obj.name}" is not evaluated.\n'
-                    'This is likely because the object is in a collection that has been excluded from the view layer.') from e
+                    raise RuntimeError(
+                        f'Object "{obj.name}" is not evaluated.\n'
+                        'This is likely because the object is in a collection that has been excluded from the view layer.'
+                    ) from e
 
                 evaluated_mesh_data = bpy.data.meshes.new('')
                 mesh_data = evaluated_mesh_data
@@ -500,7 +510,7 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
         V = len(mesh_data.vertices)
 
         co_flat = np.empty(V * 3, dtype=np.float32)
-        mesh_data.vertices.foreach_get("co", co_flat)
+        mesh_data.vertices.foreach_get('co', co_flat)
 
         point_transform_np = _matrix_to_numpy(point_transform_matrix)
         transformed = _transform_vertices_numpy(co_flat, point_transform_np)  # (V, 3)
@@ -519,16 +529,12 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             warnings.append(f'"{mesh_object.name}" has no active UV Map')
 
         wedge_index_offset = len(psk.wedges)
-        unique_wedges, loop_wedge_indices = _build_wedges_numpy(
-            mesh_data, vertex_offset, material_indices
-        )
+        unique_wedges, loop_wedge_indices = _build_wedges_numpy(mesh_data, vertex_offset, material_indices)
         psk.wedges.extend(unique_wedges)
 
         # Faces
         psk_face_start_index = len(psk.faces)
-        new_faces = _build_faces_numpy(
-            mesh_data, loop_wedge_indices, wedge_index_offset, material_indices
-        )
+        new_faces = _build_faces_numpy(mesh_data, loop_wedge_indices, wedge_index_offset, material_indices)
         psk.faces.extend(new_faces)
 
         if should_flip_normals:
@@ -548,7 +554,9 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
             vertex_group_bone_indices: dict[int, int] = dict()
             for vertex_group_index, vertex_group_name in enumerate(vertex_group_names):
                 try:
-                    vertex_group_bone_indices[vertex_group_index] = bone_names.index(vertex_group_name) + bone_index_offset
+                    vertex_group_bone_indices[vertex_group_index] = (
+                        bone_names.index(vertex_group_name) + bone_index_offset
+                    )
                 except ValueError:
                     # The vertex group does not have a matching bone in the list of bones to be exported.
                     # Check to see if there is an associated bone for this vertex group that exists in the armature.
@@ -558,7 +566,9 @@ def build_psk(context: Context, input_objects: PskInputObjects, options: PskBuil
                         bone = armature_data.bones[vertex_group_name]
                         while bone is not None:
                             try:
-                                vertex_group_bone_indices[vertex_group_index] = bone_names.index(bone.name) + bone_index_offset
+                                vertex_group_bone_indices[vertex_group_index] = (
+                                    bone_names.index(bone.name) + bone_index_offset
+                                )
                                 break
                             except ValueError:
                                 bone = bone.parent

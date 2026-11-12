@@ -1,8 +1,8 @@
+from typing import cast as typing_cast
+
 import bpy
 import pytest
-
-from typing import cast as typing_cast
-from bpy.types import Mesh, Armature
+from bpy.types import Armature, Mesh
 
 SUZANNE_FILEPATH = 'tests/data/Suzanne.psk'
 SARGE_FILEPATH = 'tests/data/CS_Sarge_S0_Skelmesh.pskx'
@@ -24,21 +24,21 @@ def test_psk_import_all():
     assert bpy.ops.psk.import_file(
         filepath=SUZANNE_FILEPATH,
         components='ALL',
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     armature_object = bpy.data.objects.get('Suzanne', None)
 
-    assert armature_object is not None, "Armature object not found in the scene"
-    assert armature_object.type == 'ARMATURE', "Armature object type should be ARMATURE"
-    assert armature_object is not None, "Armature object not found in the scene"
-    assert len(armature_object.children) == 1, "Armature object should have one child"
+    assert armature_object is not None, 'Armature object not found in the scene'
+    assert armature_object.type == 'ARMATURE', 'Armature object type should be ARMATURE'
+    assert armature_object is not None, 'Armature object not found in the scene'
+    assert len(armature_object.children) == 1, 'Armature object should have one child'
 
     armature_data = typing_cast(Armature, armature_object.data)
 
-    assert len(armature_data.bones) == 1, "Armature should have one bone"
+    assert len(armature_data.bones) == 1, 'Armature should have one bone'
 
     mesh_object = bpy.data.objects.get('Suzanne.001', None)
-    assert mesh_object is not None, "Mesh object not found in the scene"
+    assert mesh_object is not None, 'Mesh object not found in the scene'
 
     mesh_data = typing_cast(Mesh, mesh_object.data)
 
@@ -50,28 +50,28 @@ def test_psk_import_armature_only():
     assert bpy.ops.psk.import_file(
         filepath=SUZANNE_FILEPATH,
         components='ARMATURE',
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     armature_object = bpy.data.objects.get('Suzanne', None)
 
-    assert armature_object is not None, "Armature object not found in the scene"
-    assert armature_object.type == 'ARMATURE', "Armature object type should be ARMATURE"
-    assert len(armature_object.children) == 0, "Armature object should have no children"
+    assert armature_object is not None, 'Armature object not found in the scene'
+    assert armature_object.type == 'ARMATURE', 'Armature object type should be ARMATURE'
+    assert len(armature_object.children) == 0, 'Armature object should have no children'
 
     armature_data = typing_cast(Armature, armature_object.data)
 
-    assert len(armature_data.bones) == 1, "Armature should have one bone"
+    assert len(armature_data.bones) == 1, 'Armature should have one bone'
 
 
 def test_psk_import_mesh_only():
     assert bpy.ops.psk.import_file(
         filepath=SUZANNE_FILEPATH,
         components='MESH',
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     mesh_object = bpy.data.objects.get('Suzanne', None)
-    assert mesh_object is not None, "Mesh object not found in the scene"
-    assert mesh_object.type == 'MESH', "Mesh object type should be MESH"
+    assert mesh_object is not None, 'Mesh object not found in the scene'
+    assert mesh_object.type == 'MESH', 'Mesh object type should be MESH'
 
     mesh_data = typing_cast(Mesh, mesh_object.data)
 
@@ -88,12 +88,12 @@ def test_psk_import_scale():
         filepath=SUZANNE_FILEPATH,
         components='ALL',
         scale=2.0,
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     armature_object = bpy.data.objects.get('Suzanne', None)
-    assert armature_object is not None, "Armature object not found in the scene"
-    assert armature_object.type == 'ARMATURE', "Armature object type should be ARMATURE"
-    assert tuple(armature_object.scale) == (2.0, 2.0, 2.0), "Armature object scale should be (2.0, 2.0, 2.0)"
+    assert armature_object is not None, 'Armature object not found in the scene'
+    assert armature_object.type == 'ARMATURE', 'Armature object type should be ARMATURE'
+    assert tuple(armature_object.scale) == (2.0, 2.0, 2.0), 'Armature object scale should be (2.0, 2.0, 2.0)'
 
 
 def test_psk_import_bone_length():
@@ -103,20 +103,20 @@ def test_psk_import_bone_length():
         filepath=SUZANNE_FILEPATH,
         components='ARMATURE',
         bone_length=bone_length,
-        ) == {'FINISHED'}
-    
+    ) == {'FINISHED'}
+
     armature_object = bpy.data.objects.get('Suzanne', None)
-    assert armature_object is not None, "Armature object not found in the scene"
-    assert armature_object.type == 'ARMATURE', "Armature object type should be ARMATURE"
+    assert armature_object is not None, 'Armature object not found in the scene'
+    assert armature_object.type == 'ARMATURE', 'Armature object type should be ARMATURE'
 
     armature_data = typing_cast(Armature, armature_object.data)
-    assert armature_data is not None, "Armature data not found in the scene"
-    assert len(armature_data.bones) == 1, "Armature should have one bone"
+    assert armature_data is not None, 'Armature data not found in the scene'
+    assert len(armature_data.bones) == 1, 'Armature should have one bone'
     assert 'ROOT' in armature_data.bones, "Armature should have a bone named 'ROOT'"
 
     root_bone = armature_data.bones['ROOT']
-    assert tuple(root_bone.head) == (0.0, 0.0, 0.0), "Bone head should be (0.0, 0.0, 0.0)"
-    assert tuple(root_bone.tail) == (0.0, bone_length, 0.0), f"Bone tail should be (0.0, {bone_length}, 0.0)"
+    assert tuple(root_bone.head) == (0.0, 0.0, 0.0), 'Bone head should be (0.0, 0.0, 0.0)'
+    assert tuple(root_bone.tail) == (0.0, bone_length, 0.0), f'Bone tail should be (0.0, {bone_length}, 0.0)'
 
 
 def test_psk_import_with_vertex_normals():
@@ -124,15 +124,15 @@ def test_psk_import_with_vertex_normals():
         filepath=SARGE_FILEPATH,
         components='MESH',
         should_import_vertex_normals=True,
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     mesh_object = bpy.data.objects.get('CS_Sarge_S0_Skelmesh', None)
-    assert mesh_object is not None, "Mesh object not found in the scene"
-    assert mesh_object.type == 'MESH', "Mesh object type should be MESH"
+    assert mesh_object is not None, 'Mesh object not found in the scene'
+    assert mesh_object.type == 'MESH', 'Mesh object type should be MESH'
 
     mesh_data = typing_cast(Mesh, mesh_object.data)
-    assert mesh_data is not None, "Mesh data not found in the scene"
-    assert mesh_data.has_custom_normals, "Mesh should have custom normals"
+    assert mesh_data is not None, 'Mesh data not found in the scene'
+    assert mesh_data.has_custom_normals, 'Mesh should have custom normals'
 
 
 def test_psk_import_without_vertex_normals():
@@ -140,15 +140,15 @@ def test_psk_import_without_vertex_normals():
         filepath=SARGE_FILEPATH,
         components='MESH',
         should_import_vertex_normals=False,
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     mesh_object = bpy.data.objects.get('CS_Sarge_S0_Skelmesh', None)
-    assert mesh_object is not None, "Mesh object not found in the scene"
-    assert mesh_object.type == 'MESH', "Mesh object type should be MESH"
+    assert mesh_object is not None, 'Mesh object not found in the scene'
+    assert mesh_object.type == 'MESH', 'Mesh object type should be MESH'
 
     mesh_data = typing_cast(Mesh, mesh_object.data)
-    assert mesh_data is not None, "Mesh data not found in the scene"
-    assert not mesh_data.has_custom_normals, "Mesh should not have custom normals"
+    assert mesh_data is not None, 'Mesh data not found in the scene'
+    assert not mesh_data.has_custom_normals, 'Mesh should not have custom normals'
 
 
 def test_psk_import_with_vertex_colors_srgba():
@@ -157,17 +157,19 @@ def test_psk_import_with_vertex_colors_srgba():
         components='MESH',
         should_import_vertex_colors=True,
         vertex_color_space='SRGBA',
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     mesh_object = bpy.data.objects.get('CS_Sarge_S0_Skelmesh', None)
-    assert mesh_object is not None, "Mesh object not found in the scene"
-    assert mesh_object.type == 'MESH', "Mesh object type should be MESH"
+    assert mesh_object is not None, 'Mesh object not found in the scene'
+    assert mesh_object.type == 'MESH', 'Mesh object type should be MESH'
 
     mesh_data = typing_cast(Mesh, mesh_object.data)
-    assert mesh_data is not None, "Mesh data not found in the scene"
-    assert len(mesh_data.color_attributes) == 1, "Mesh should have one vertex color layer"
+    assert mesh_data is not None, 'Mesh data not found in the scene'
+    assert len(mesh_data.color_attributes) == 1, 'Mesh should have one vertex color layer'
     assert mesh_data.color_attributes[0].name == 'VERTEXCOLOR', "Vertex color layer should be named 'VERTEXCOLOR'"
-    assert tuple(mesh_data.color_attributes[0].data[3303].color) == (0.34586891531944275, 0.0, 0.0, 1.0), "Unexpected vertex color value"
+    assert tuple(mesh_data.color_attributes[0].data[3303].color) == (0.34586891531944275, 0.0, 0.0, 1.0), (
+        'Unexpected vertex color value'
+    )
 
 
 def test_psk_import_vertex_colors_linear():
@@ -176,17 +178,19 @@ def test_psk_import_vertex_colors_linear():
         components='MESH',
         should_import_vertex_colors=True,
         vertex_color_space='LINEAR',
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     mesh_object = bpy.data.objects.get('CS_Sarge_S0_Skelmesh', None)
-    assert mesh_object is not None, "Mesh object not found in the scene"
-    assert mesh_object.type == 'MESH', "Mesh object type should be MESH"
+    assert mesh_object is not None, 'Mesh object not found in the scene'
+    assert mesh_object.type == 'MESH', 'Mesh object type should be MESH'
 
     mesh_data = typing_cast(Mesh, mesh_object.data)
-    assert mesh_data is not None, "Mesh data not found in the scene"
-    assert len(mesh_data.color_attributes) == 1, "Mesh should have one vertex color layer"
+    assert mesh_data is not None, 'Mesh data not found in the scene'
+    assert len(mesh_data.color_attributes) == 1, 'Mesh should have one vertex color layer'
     assert mesh_data.color_attributes[0].name == 'VERTEXCOLOR', "Vertex color layer should be named 'VERTEXCOLOR'"
-    assert tuple(mesh_data.color_attributes[0].data[3303].color) == (0.09803921729326248, 0.0, 0.0, 1.0), "Unexpected vertex color value"
+    assert tuple(mesh_data.color_attributes[0].data[3303].color) == (0.09803921729326248, 0.0, 0.0, 1.0), (
+        'Unexpected vertex color value'
+    )
 
 
 def test_psk_import_without_vertex_colors():
@@ -194,15 +198,15 @@ def test_psk_import_without_vertex_colors():
         filepath=SARGE_FILEPATH,
         components='MESH',
         should_import_vertex_colors=False,
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     mesh_object = bpy.data.objects.get('CS_Sarge_S0_Skelmesh', None)
-    assert mesh_object is not None, "Mesh object not found in the scene"
-    assert mesh_object.type == 'MESH', "Mesh object type should be MESH"
+    assert mesh_object is not None, 'Mesh object not found in the scene'
+    assert mesh_object.type == 'MESH', 'Mesh object type should be MESH'
 
     mesh_data = typing_cast(Mesh, mesh_object.data)
-    assert mesh_data is not None, "Mesh data not found in the scene"
-    assert len(mesh_data.color_attributes) == 0, "Mesh should not have any vertex color layers"
+    assert mesh_data is not None, 'Mesh data not found in the scene'
+    assert len(mesh_data.color_attributes) == 0, 'Mesh should not have any vertex color layers'
 
 
 def test_psk_import_extra_uvs():
@@ -211,15 +215,15 @@ def test_psk_import_extra_uvs():
         components='MESH',
         should_import_vertex_colors=True,
         vertex_color_space='LINEAR',
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     mesh_object = bpy.data.objects.get('CS_Sarge_S0_Skelmesh', None)
-    assert mesh_object is not None, "Mesh object not found in the scene"
-    assert mesh_object.type == 'MESH', "Mesh object type should be MESH"
+    assert mesh_object is not None, 'Mesh object not found in the scene'
+    assert mesh_object.type == 'MESH', 'Mesh object type should be MESH'
 
     mesh_data = typing_cast(Mesh, mesh_object.data)
-    assert mesh_data is not None, "Mesh data not found in the scene"
-    assert len(mesh_data.uv_layers) == 2, "Mesh should have two UV layers"
+    assert mesh_data is not None, 'Mesh data not found in the scene'
+    assert len(mesh_data.uv_layers) == 2, 'Mesh should have two UV layers'
 
     assert mesh_data.uv_layers[0].name == 'UVMap', "First UV layer should be named 'UVMap'"
     assert mesh_data.uv_layers[1].name == 'EXTRAUV0', "Second UV layer should be named 'EXTRAUV0'"
@@ -238,15 +242,15 @@ def test_psk_import_many_extra_uvs():
         should_import_vertex_colors=False,
         should_import_vertex_normals=False,
         should_import_shape_keys=False,
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     mesh_object = bpy.data.objects.get('SK_1033_1033001', None)
-    assert mesh_object is not None, "Mesh object not found in the scene"
-    assert mesh_object.type == 'MESH', "Mesh object type should be MESH"
+    assert mesh_object is not None, 'Mesh object not found in the scene'
+    assert mesh_object.type == 'MESH', 'Mesh object type should be MESH'
 
     mesh_data = typing_cast(Mesh, mesh_object.data)
-    assert mesh_data is not None, "Mesh data not found in the scene"
-    assert len(mesh_data.uv_layers) == 4, "Mesh should have two UV layers"
+    assert mesh_data is not None, 'Mesh data not found in the scene'
+    assert len(mesh_data.uv_layers) == 4, 'Mesh should have two UV layers'
 
     assert mesh_data.uv_layers[0].name == 'UVMap', "First UV layer should be named 'UVMap'"
     assert mesh_data.uv_layers[1].name == 'EXTRAUV0', "Second UV layer should be named 'EXTRAUV0'"
@@ -260,46 +264,41 @@ def test_psk_import_multiple_extra_uvs():
         components='MESH',
         should_import_vertex_colors=True,
         vertex_color_space='LINEAR',
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
 
 def test_psk_import_materials():
     assert bpy.ops.psk.import_file(
         filepath=SARGE_FILEPATH,
         components='MESH',
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     mesh_object = bpy.data.objects.get('CS_Sarge_S0_Skelmesh', None)
-    assert mesh_object is not None, "Mesh object not found in the scene"
-    assert mesh_object.type == 'MESH', "Mesh object type should be MESH"
+    assert mesh_object is not None, 'Mesh object not found in the scene'
+    assert mesh_object.type == 'MESH', 'Mesh object type should be MESH'
 
     mesh_data = typing_cast(Mesh, mesh_object.data)
 
-    assert mesh_data is not None, "Mesh data not found in the scene"
-    assert len(mesh_data.materials) == 4, "Mesh should have four materials"
-    material_names = (
-        'CS_Sarge_S0_MI',
-        'TP_Core_Eye_MI',
-        'AB_Sarge_S0_E_StimPack_MI1',
-        'CS_Sarge_S0_MI'
-    )
+    assert mesh_data is not None, 'Mesh data not found in the scene'
+    assert len(mesh_data.materials) == 4, 'Mesh should have four materials'
+    material_names = ('CS_Sarge_S0_MI', 'TP_Core_Eye_MI', 'AB_Sarge_S0_E_StimPack_MI1', 'CS_Sarge_S0_MI')
     for i, material in enumerate(mesh_data.materials):
-        assert material is not None, f"Material {i} should not be None"
-        assert material.name == material_names[i], f"Material {i} name should be {material_names[i]}"
+        assert material is not None, f'Material {i} should not be None'
+        assert material.name == material_names[i], f'Material {i} name should be {material_names[i]}'
 
 
 def test_psk_import_shape_keys():
     assert bpy.ops.psk.import_file(
         filepath=SLURP_MONSTER_AXE_FILEPATH,
         components='MESH',
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     mesh_object = bpy.data.objects.get('Slurp_Monster_Axe_LOD0', None)
-    assert mesh_object is not None, "Mesh object not found in the scene"
-    assert mesh_object.type == 'MESH', "Mesh object type should be MESH"
+    assert mesh_object is not None, 'Mesh object not found in the scene'
+    assert mesh_object.type == 'MESH', 'Mesh object type should be MESH'
     mesh_data = typing_cast(Mesh, mesh_object.data)
-    assert mesh_data is not None, "Mesh data should not be None"
-    assert mesh_data.shape_keys is not None, "Mesh object should have shape keys"
+    assert mesh_data is not None, 'Mesh data should not be None'
+    assert mesh_data.shape_keys is not None, 'Mesh object should have shape keys'
 
     shape_key_names = (
         'MORPH_BASE',
@@ -310,11 +309,13 @@ def test_psk_import_shape_keys():
         'Blob01',
     )
     shape_keys = mesh_data.shape_keys.key_blocks
-    assert len(shape_keys) == 6, "Mesh object should have 6 shape keys"
+    assert len(shape_keys) == 6, 'Mesh object should have 6 shape keys'
     for i, shape_key in enumerate(shape_keys):
         expected_value = 1.0 if i == 0 else 0.0
-        assert shape_key.value == expected_value, f"Shape key {shape_key.name} should have a value of {expected_value} (found {shape_key.value})"
-        assert shape_key.name == shape_key_names[i], f"Shape key {i} name should be named {shape_key_names[i]}"
+        assert shape_key.value == expected_value, (
+            f'Shape key {shape_key.name} should have a value of {expected_value} (found {shape_key.value})'
+        )
+        assert shape_key.name == shape_key_names[i], f'Shape key {i} name should be named {shape_key_names[i]}'
 
 
 def test_psk_import_without_shape_keys():
@@ -322,19 +323,16 @@ def test_psk_import_without_shape_keys():
         filepath=SLURP_MONSTER_AXE_FILEPATH,
         components='MESH',
         should_import_shape_keys=False,
-        ) == {'FINISHED'}
+    ) == {'FINISHED'}
 
     mesh_object = bpy.data.objects.get('Slurp_Monster_Axe_LOD0', None)
-    assert mesh_object is not None, "Mesh object not found in the scene"
-    assert mesh_object.type == 'MESH', "Mesh object type should be MESH"
+    assert mesh_object is not None, 'Mesh object not found in the scene'
+    assert mesh_object.type == 'MESH', 'Mesh object type should be MESH'
 
     mesh_data = typing_cast(Mesh, mesh_object.data)
-    assert mesh_data is not None, "Mesh data should not be None"
-    assert mesh_data.shape_keys is None, "Mesh object should not have shape keys"
+    assert mesh_data is not None, 'Mesh data should not be None'
+    assert mesh_data.shape_keys is None, 'Mesh object should not have shape keys'
 
 
 def test_psk_import_with_invalid_faces():
-    assert bpy.ops.psk.import_file(
-        filepath=BAT_FILEPATH,
-        components='MESH'
-        ) == {'FINISHED'}
+    assert bpy.ops.psk.import_file(filepath=BAT_FILEPATH, components='MESH') == {'FINISHED'}

@@ -2,20 +2,21 @@ import re
 import sys
 from fnmatch import fnmatch
 from typing import Sequence
+
 import bpy
 from bpy.props import (
     BoolProperty,
+    CollectionProperty,
     EnumProperty,
     FloatProperty,
-    CollectionProperty,
     IntProperty,
     StringProperty,
 )
-from bpy.types import PropertyGroup, Object, Action, AnimData, Context
+from bpy.types import Action, AnimData, Context, Object, PropertyGroup
 
 from ...shared.dfs import dfs_view_layer_objects
 from ...shared.helpers import populate_bone_collection_list
-from ...shared.types import TransformMixin, ExportSpaceMixin, PsxBoneExportMixin, TransformSourceMixin
+from ...shared.types import ExportSpaceMixin, PsxBoneExportMixin, TransformMixin, TransformSourceMixin
 
 
 def psa_export_property_group_animation_data_override_poll(_context, obj):
@@ -28,10 +29,10 @@ class PsaExportSequenceMixin(PropertyGroup):
     frame_start: IntProperty(name='Start Frame', options={'HIDDEN'})
     frame_end: IntProperty(name='End Frame', options={'HIDDEN'})
     group: StringProperty(name='Group')
-    action_name: StringProperty(name='Action Name',default='', options={'HIDDEN'})
-    armature_object_name: StringProperty(name='Armature Object Name',default='', options={'HIDDEN'})
-    marker_index: IntProperty(name='Marker Index',default=-1, options={'HIDDEN'})
-    is_pose_marker: BoolProperty(name='Is Pose Marker',default=False, options={'HIDDEN'})
+    action_name: StringProperty(name='Action Name', default='', options={'HIDDEN'})
+    armature_object_name: StringProperty(name='Armature Object Name', default='', options={'HIDDEN'})
+    marker_index: IntProperty(name='Marker Index', default=-1, options={'HIDDEN'})
+    is_pose_marker: BoolProperty(name='Is Pose Marker', default=False, options={'HIDDEN'})
 
     @property
     def action(self) -> Action | None:
@@ -42,7 +43,7 @@ class PsaExportSequenceMixin(PropertyGroup):
     def armature_object(self) -> Object | None:
         """Get the armature object associated with this sequence (if any)."""
         return bpy.data.objects.get(self.armature_object_name) if self.armature_object_name else None
-    
+
     @property
     def is_reversed(self) -> bool:
         """Check if the sequence is reversed (end frame before start frame)."""
@@ -77,7 +78,7 @@ def get_sequences_from_name_and_frame_range(name: str, frame_start: int, frame_e
         # If not, just treat it as a single animation, but parse for the reverse pattern as well.
         anims.append((name, frame_start, frame_end))
 
-    for (name, frame_start, frame_end) in anims:
+    for name, frame_start, frame_end in anims:
         reversed_pattern = r'(.+)/(.+)'
         reversed_match = re.match(reversed_pattern, name)
         if reversed_match:
@@ -99,7 +100,9 @@ def nla_track_update_cb(self: 'PSA_PG_export', context: Context) -> None:
             return
         nla_track = animation_data.nla_tracks[self.nla_track_index]
         for nla_strip in nla_track.strips:
-            for sequence_name, frame_start, frame_end in get_sequences_from_name_and_frame_range(nla_strip.name, nla_strip.frame_start, nla_strip.frame_end):
+            for sequence_name, frame_start, frame_end in get_sequences_from_name_and_frame_range(
+                nla_strip.name, nla_strip.frame_start, nla_strip.frame_end
+            ):
                 strip: PSA_PG_export_sequence = self.nla_strip_list.add()
                 strip.action_name = nla_strip.action
                 strip.name = sequence_name
@@ -128,24 +131,54 @@ def animation_data_override_update_cb(self: 'PSA_PG_export', context: Context):
 sequence_source_items = (
     ('ACTIONS', 'Actions', 'Sequences will be exported using actions', 'ACTION', 0),
     ('TIMELINE_MARKERS', 'Timeline Markers', 'Sequences are delineated by scene timeline markers', 'MARKER_HLT', 1),
-    ('NLA_TRACK_STRIPS', 'NLA Track Strips', 'Sequences are delineated by the start & end times of strips on the selected NLA track', 'NLA', 2),
+    (
+        'NLA_TRACK_STRIPS',
+        'NLA Track Strips',
+        'Sequences are delineated by the start & end times of strips on the selected NLA track',
+        'NLA',
+        2,
+    ),
     ('ACTIVE_ACTION', 'Active Action', 'The active action will be exported for each selected armature', 'ACTION', 3),
 )
 
 fps_source_items = (
     ('SCENE', 'Scene', '', 'SCENE_DATA', 0),
-    ('ACTION_METADATA', 'Action Metadata', 'The frame rate will be determined by action\'s FPS property found in the PSA Export panel.\n\nIf the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used', 'ACTION', 1),
-    ('CUSTOM', 'Custom', '', 2)
+    (
+        'ACTION_METADATA',
+        'Action Metadata',
+        "The frame rate will be determined by action's FPS property found in the PSA Export panel.\n\nIf the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used",
+        'ACTION',
+        1,
+    ),
+    ('CUSTOM', 'Custom', '', 2),
 )
 
 compression_ratio_source_items = (
-    ('ACTION_METADATA', 'Action Metadata', 'The compression ratio will be determined by action\'s Compression Ratio property found in the PSA Export panel.\n\nIf the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used', 'ACTION', 1),
-    ('CUSTOM', 'Custom', '', 2)
+    (
+        'ACTION_METADATA',
+        'Action Metadata',
+        "The compression ratio will be determined by action's Compression Ratio property found in the PSA Export panel.\n\nIf the Sequence Source is Timeline Markers, the lowest value of all contributing actions will be used",
+        'ACTION',
+        1,
+    ),
+    ('CUSTOM', 'Custom', '', 2),
 )
 
 sampling_mode_items = (
-    ('INTERPOLATED', 'Interpolated', 'Sampling is performed by interpolating the evaluated bone poses from the adjacent whole frames.', 'INTERPOLATED', 0),
-    ('SUBFRAME', 'Subframe', 'Sampling is performed by evaluating the bone poses at the subframe time.\n\nNot recommended unless you are also animating with subframes enabled.', 'SUBFRAME', 1),
+    (
+        'INTERPOLATED',
+        'Interpolated',
+        'Sampling is performed by interpolating the evaluated bone poses from the adjacent whole frames.',
+        'INTERPOLATED',
+        0,
+    ),
+    (
+        'SUBFRAME',
+        'Subframe',
+        'Sampling is performed by evaluating the bone poses at the subframe time.\n\nNot recommended unless you are also animating with subframes enabled.',
+        'SUBFRAME',
+        1,
+    ),
 )
 
 group_source_items = (
@@ -164,7 +197,8 @@ def sequence_source_update_cb(self: 'PSA_PG_export', context: Context) -> None:
     populate_bone_collection_list(
         self.bone_collection_list,
         armature_objects,
-        primary_key='DATA' if self.sequence_source == 'ACTIVE_ACTION' else 'OBJECT')
+        primary_key='DATA' if self.sequence_source == 'ACTIVE_ACTION' else 'OBJECT',
+    )
 
 
 class PsaExportMixin(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExportMixin, TransformSourceMixin):
@@ -176,11 +210,7 @@ class PsaExportMixin(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExp
         update=sequence_source_update_cb,
     )
     nla_track: StringProperty(
-        name='NLA Track',
-        options=set(),
-        description='',
-        search=nla_track_search_cb,
-        update=nla_track_update_cb
+        name='NLA Track', options=set(), description='', search=nla_track_search_cb, update=nla_track_update_cb
     )
     nla_track_index: IntProperty(name='NLA Track Index', default=-1)
     fps_source: EnumProperty(
@@ -189,14 +219,22 @@ class PsaExportMixin(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExp
         description='',
         items=fps_source_items,
     )
-    fps_custom: FloatProperty(default=30.0, min=sys.float_info.epsilon, soft_min=1.0, options=set(), step=100, soft_max=60.0)
+    fps_custom: FloatProperty(
+        default=30.0, min=sys.float_info.epsilon, soft_min=1.0, options=set(), step=100, soft_max=60.0
+    )
     compression_ratio_source: EnumProperty(
         name='Compression Ratio Source',
         options=set(),
         description='',
         items=compression_ratio_source_items,
     )
-    compression_ratio_custom: FloatProperty(default=1.0, min=0.0, max=1.0, subtype='FACTOR', description='The key sampling ratio of the exported sequence.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames')
+    compression_ratio_custom: FloatProperty(
+        default=1.0,
+        min=0.0,
+        max=1.0,
+        subtype='FACTOR',
+        description='The key sampling ratio of the exported sequence.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames',
+    )
 
     action_list: CollectionProperty(type=PSA_PG_export_sequence)
     action_list_index: IntProperty(default=0)
@@ -213,47 +251,39 @@ class PsaExportMixin(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExp
         default='',
         name='Filter by Name',
         options={'TEXTEDIT_UPDATE'},
-        description='Only show items matching this name (use \'*\' as wildcard)')
+        description="Only show items matching this name (use '*' as wildcard)",
+    )
     sequence_use_filter_invert: BoolProperty(
-        default=False,
-        name='Invert',
-        options=set(),
-        description='Invert filtering (show hidden items, and vice versa)')
+        default=False, name='Invert', options=set(), description='Invert filtering (show hidden items, and vice versa)'
+    )
     sequence_filter_asset: BoolProperty(
-        default=False,
-        name='Show assets',
-        options=set(),
-        description='Show actions that belong to an asset library')
-    sequence_filter_pose_marker: BoolProperty(
-        default=True,
-        name='Show pose markers',
-        options=set())
+        default=False, name='Show assets', options=set(), description='Show actions that belong to an asset library'
+    )
+    sequence_filter_pose_marker: BoolProperty(default=True, name='Show pose markers', options=set())
     sequence_use_filter_sort_reverse: BoolProperty(default=True, options=set())
     sequence_filter_reversed: BoolProperty(
-        default=True,
-        options=set(),
-        name='Show Reversed',
-        description='Show reversed sequences'
+        default=True, options=set(), name='Show Reversed', description='Show reversed sequences'
     )
     sampling_mode: EnumProperty(
         name='Sampling Mode',
         options=set(),
         description='The method by which frames are sampled',
         items=sampling_mode_items,
-        default='INTERPOLATED'
+        default='INTERPOLATED',
     )
     group_source: EnumProperty(
         name='Group Source',
         options=set(),
-        description='The source of the exported sequence\'s group property',
+        description="The source of the exported sequence's group property",
         items=group_source_items,
-        default='ACTIONS'
+        default='ACTIONS',
     )
     group_custom: StringProperty(
         name='Group',
         options=set(),
-        description='The group to apply to all exported sequences. Only applicable when Group Source is Custom.'
+        description='The group to apply to all exported sequences. Only applicable when Group Source is Custom.',
     )
+
 
 class PSA_PG_export(PsaExportMixin):
     pass
@@ -298,5 +328,5 @@ _classes = (
 )
 
 from bpy.utils import register_classes_factory
-register, unregister = register_classes_factory(_classes)
 
+register, unregister = register_classes_factory(_classes)

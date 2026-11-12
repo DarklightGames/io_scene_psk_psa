@@ -11,6 +11,7 @@ Usage:
     uv run test all              # Test all supported versions.
     uv run test 5.0 -- -k psa    # Pass extra arguments to pytest.
 """
+
 import argparse
 import os
 import subprocess
@@ -33,10 +34,18 @@ def run_tests(version: BlenderVersion, is_default: bool, pytest_args: list[str])
     environment['EXPECTED_BLENDER_VERSION'] = version.name
     environment.pop('VIRTUAL_ENV', None)
     command = [
-        'uv', 'run', '--locked',
-        '--python', version.python,
-        '--no-default-groups', '--group', 'dev', '--group', version.group,
-        'pytest', *pytest_args,
+        'uv',
+        'run',
+        '--locked',
+        '--python',
+        version.python,
+        '--no-default-groups',
+        '--group',
+        'dev',
+        '--group',
+        version.group,
+        'pytest',
+        *pytest_args,
     ]
     print(f'\n=== Blender {version.name} (Python {version.python}) ===', flush=True)
     return subprocess.run(command, cwd=REPOSITORY_ROOT, env=environment).returncode == 0
@@ -50,12 +59,14 @@ def main() -> int:
         epilog='Arguments after `--` are passed to pytest.',
     )
     parser.add_argument(
-        'versions', nargs='*', metavar='VERSION',
+        'versions',
+        nargs='*',
+        metavar='VERSION',
         help='Blender versions to test, or `all` (default: the newest supported version).',
     )
     argv = sys.argv[1:]
     if '--' in argv:
-        argv, pytest_args = argv[:argv.index('--')], argv[argv.index('--') + 1:]
+        argv, pytest_args = argv[: argv.index('--')], argv[argv.index('--') + 1 :]
     else:
         pytest_args = []
     args = parser.parse_args(argv)

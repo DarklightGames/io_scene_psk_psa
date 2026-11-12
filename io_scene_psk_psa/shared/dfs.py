@@ -7,7 +7,7 @@ instances. This is useful for exporters that need to traverse the object hierarc
 
 from typing import Iterable
 
-from bpy.types import Collection, Object, ViewLayer, LayerCollection
+from bpy.types import Collection, LayerCollection, Object, ViewLayer
 from mathutils import Matrix
 
 
@@ -15,6 +15,7 @@ class DfsObject:
     """
     Represents an object in a depth-first search.
     """
+
     def __init__(self, obj: Object, instance_objects: list[Object], matrix_world: Matrix):
         self.obj = obj
         self.instance_objects = instance_objects
@@ -84,10 +85,10 @@ def dfs_collection_objects(collection: Collection) -> Iterable[DfsObject]:
 
 
 def _dfs_collection_objects_recursive(
-        collection: Collection,
-        instance_objects: list[Object] | None = None,
-        matrix_world: Matrix = Matrix.Identity(4),
-        visited: set[Object] | None = None
+    collection: Collection,
+    instance_objects: list[Object] | None = None,
+    matrix_world: Matrix = Matrix.Identity(4),
+    visited: set[Object] | None = None,
 ) -> Iterable[DfsObject]:
     """
     Depth-first search of objects in a collection, including recursing into instances.
@@ -121,10 +122,12 @@ def _dfs_collection_objects_recursive(
             # Calculate the instance transform.
             instance_offset_matrix = Matrix.Translation(-obj.instance_collection.instance_offset)
             # Recurse into the instance collection.
-            yield from _dfs_collection_objects_recursive(obj.instance_collection,
-                                                         instance_objects + [obj],
-                                                         matrix_world @ (obj.matrix_world @ instance_offset_matrix),
-                                                         visited)
+            yield from _dfs_collection_objects_recursive(
+                obj.instance_collection,
+                instance_objects + [obj],
+                matrix_world @ (obj.matrix_world @ instance_offset_matrix),
+                visited,
+            )
         else:
             # Object is not an instance, yield it.
             yield DfsObject(obj, instance_objects, matrix_world @ obj.matrix_world)
@@ -139,6 +142,7 @@ def dfs_view_layer_objects(view_layer: ViewLayer) -> Iterable[DfsObject]:
     @return: An iterable of tuples containing the object, the instance objects, and the world matrix.
     """
     visited = set()
+
     def layer_collection_objects_recursive(layer_collection: LayerCollection):
         for child in layer_collection.children:
             yield from layer_collection_objects_recursive(child)

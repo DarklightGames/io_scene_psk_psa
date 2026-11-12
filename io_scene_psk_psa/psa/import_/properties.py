@@ -29,7 +29,13 @@ class PSA_PG_data(PropertyGroup):
 
 bone_mapping_items = (
     ('EXACT', 'Exact', 'Bone names must match exactly.', 'EXACT', 0),
-    ('CASE_INSENSITIVE', 'Case Insensitive', 'Bones names must match, ignoring case (e.g., the bone PSA bone \'root\' can be mapped to the armature bone \'Root\')', 'CASE_INSENSITIVE', 1),
+    (
+        'CASE_INSENSITIVE',
+        'Case Insensitive',
+        "Bones names must match, ignoring case (e.g., the bone PSA bone 'root' can be mapped to the armature bone 'Root')",
+        'CASE_INSENSITIVE',
+        1,
+    ),
 )
 
 fps_source_items = (
@@ -43,51 +49,63 @@ compression_ratio_source_items = (
     ('CUSTOM', 'Custom', 'The compression ratio is set to a custom value', 1),
 )
 
+
 class PsaImportMixin:
-    should_use_fake_user: BoolProperty(default=True, name='Fake User',
-                                       description='Assign each imported action a fake user so that the data block is '
-                                                   'saved even it has no users',
-                                       options=set())
-    should_use_config_file: BoolProperty(default=True, name='Use Config File',
-                                         description='Use the .config file that is sometimes generated when the PSA '
-                                                     'file is exported from UEViewer. This file contains '
-                                                     'options that can be used to filter out certain bones tracks '
-                                                     'from the imported actions',
-                                         options=set())
-    should_stash: BoolProperty(default=False, name='Stash',
-                               description='Stash each imported action as a strip on a new non-contributing NLA track',
-                               options=set())
+    should_use_fake_user: BoolProperty(
+        default=True,
+        name='Fake User',
+        description='Assign each imported action a fake user so that the data block is saved even it has no users',
+        options=set(),
+    )
+    should_use_config_file: BoolProperty(
+        default=True,
+        name='Use Config File',
+        description='Use the .config file that is sometimes generated when the PSA '
+        'file is exported from UEViewer. This file contains '
+        'options that can be used to filter out certain bones tracks '
+        'from the imported actions',
+        options=set(),
+    )
+    should_stash: BoolProperty(
+        default=False,
+        name='Stash',
+        description='Stash each imported action as a strip on a new non-contributing NLA track',
+        options=set(),
+    )
     should_use_action_name_prefix: BoolProperty(default=False, name='Prefix Action Name', options=set())
     action_name_prefix: StringProperty(default='', name='Prefix', options=set())
-    should_overwrite: BoolProperty(default=False, name='Overwrite', options=set(),
-                                   description='If an action with a matching name already exists, the existing action '
-                                               'will have it\'s data overwritten instead of a new action being created')
+    should_overwrite: BoolProperty(
+        default=False,
+        name='Overwrite',
+        options=set(),
+        description='If an action with a matching name already exists, the existing action '
+        "will have it's data overwritten instead of a new action being created",
+    )
     should_write_keyframes: BoolProperty(default=True, name='Keyframes', options=set())
-    should_write_metadata: BoolProperty(default=True, name='Metadata', options=set(),
-                                        description='Additional data will be written to the custom properties of the '
-                                                    'Action (e.g., frame rate)')
+    should_write_metadata: BoolProperty(
+        default=True,
+        name='Metadata',
+        options=set(),
+        description='Additional data will be written to the custom properties of the Action (e.g., frame rate)',
+    )
     should_write_scale_keys: BoolProperty(default=True, name='Scale Keys', options=set())
     sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
-    sequence_filter_is_selected: BoolProperty(default=False, options=set(), name='Only Show Selected',
-                                              description='Only show selected sequences')
+    sequence_filter_is_selected: BoolProperty(
+        default=False, options=set(), name='Only Show Selected', description='Only show selected sequences'
+    )
     sequence_use_filter_invert: BoolProperty(default=False, options=set())
-    sequence_use_filter_regex: BoolProperty(default=False, name='Regular Expression',
-                                            description='Filter using regular expressions', options=set())
+    sequence_use_filter_regex: BoolProperty(
+        default=False, name='Regular Expression', description='Filter using regular expressions', options=set()
+    )
 
     should_convert_to_samples: BoolProperty(
         default=False,
         name='Convert to Samples',
         description='Convert keyframes to read-only samples. '
-                    'Recommended if you do not plan on editing the actions directly'
+        'Recommended if you do not plan on editing the actions directly',
     )
-    bone_mapping_is_case_sensitive: BoolProperty(
-        default=False,
-        name='Case Sensitive'
-        )
-    bone_mapping_should_ignore_trailing_whitespace: BoolProperty(
-        default=True,
-        name='Ignore Trailing Whitespace'
-    )
+    bone_mapping_is_case_sensitive: BoolProperty(default=False, name='Case Sensitive')
+    bone_mapping_should_ignore_trailing_whitespace: BoolProperty(default=True, name='Ignore Trailing Whitespace')
     fps_source: EnumProperty(name='FPS Source', items=fps_source_items)
     fps_custom: FloatProperty(
         default=30.0,
@@ -99,7 +117,9 @@ class PsaImportMixin:
         soft_max=60.0,
         step=100,
     )
-    compression_ratio_source: EnumProperty(name='Compression Ratio Source', items=compression_ratio_source_items, default='ACTION')
+    compression_ratio_source: EnumProperty(
+        name='Compression Ratio Source', items=compression_ratio_source_items, default='ACTION'
+    )
     compression_ratio_custom: FloatProperty(
         default=1.0,
         name='Custom Compression Ratio',
@@ -113,7 +133,7 @@ class PsaImportMixin:
     translation_scale: FloatProperty(
         name='Translation Scale',
         default=1.0,
-        description='Scale factor for bone translation values. Use this when the scale of the armature does not match the PSA file'
+        description='Scale factor for bone translation values. Use this when the scale of the armature does not match the PSA file',
     )
 
 
@@ -125,11 +145,13 @@ class PSA_PG_import(PropertyGroup):
     sequence_list: CollectionProperty(type=PSA_PG_import_action_list_item)
     sequence_list_index: IntProperty(name='', default=0)
     sequence_filter_name: StringProperty(default='', options={'TEXTEDIT_UPDATE'})
-    sequence_filter_is_selected: BoolProperty(default=False, options=set(), name='Only Show Selected',
-                                              description='Only show selected sequences')
+    sequence_filter_is_selected: BoolProperty(
+        default=False, options=set(), name='Only Show Selected', description='Only show selected sequences'
+    )
     sequence_use_filter_invert: BoolProperty(default=False, options=set())
-    sequence_use_filter_regex: BoolProperty(default=False, name='Regular Expression',
-                                            description='Filter using regular expressions', options=set())
+    sequence_use_filter_regex: BoolProperty(
+        default=False, name='Regular Expression', description='Filter using regular expressions', options=set()
+    )
     select_text: PointerProperty(type=Text)
 
 
@@ -184,4 +206,5 @@ _classes = (
 )
 
 from bpy.utils import register_classes_factory
+
 register, unregister = register_classes_factory(_classes)

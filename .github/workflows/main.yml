@@ -13,6 +13,15 @@ env:
   BPY_SYSTEM_DEPENDENCIES: libxxf86vm-dev libxfixes3 libxi-dev libxkbcommon-x11-0 libgl1 libglx-mesa0 libxrender1 libsm6
 
 jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+      - name: Check formatting
+        run: uv run --locked --only-group dev ruff format --check --diff .
+
   blender-versions:
     runs-on: ubuntu-latest
     outputs:

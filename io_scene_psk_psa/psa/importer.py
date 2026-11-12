@@ -1,23 +1,21 @@
-from typing import Sequence, Iterable, cast as typing_cast
+import re
+from typing import Iterable, Sequence
+from typing import cast as typing_cast
 
 import bpy
 import numpy as np
-import re
-from bpy.types import Armature, Context, FCurve, Object, Bone, PoseBone
-from mathutils import Vector, Quaternion
+from bpy.types import Armature, Bone, Context, FCurve, Object, PoseBone
 from bpy_extras import anim_utils
-
-from ..shared.types import PSX_PG_action_export
-
-from .config import PsaConfig, REMOVE_TRACK_LOCATION, REMOVE_TRACK_ROTATION
+from mathutils import Quaternion, Vector
 from psk_psa_py.psa.reader import PsaReader
 from psk_psa_py.shared.data import PsxBone
 
+from ..shared.types import PSX_PG_action_export
+from .config import REMOVE_TRACK_LOCATION, REMOVE_TRACK_ROTATION, PsaConfig
+
+
 class BoneMapping:
-    def __init__(self,
-                 is_case_sensitive: bool = False,
-                 should_ignore_trailing_whitespace: bool = True
-                 ):
+    def __init__(self, is_case_sensitive: bool = False, should_ignore_trailing_whitespace: bool = True):
         self.is_case_sensitive = is_case_sensitive
         # Ancient PSK and PSA exporters would, for some reason, pad the bone names with spaces
         # instead of just writing null bytes, probably because the programmers were lazy.
@@ -26,23 +24,24 @@ class BoneMapping:
 
 
 class PsaImportOptions:
-    def __init__(self,
-                 action_name_prefix: str = '',
-                 bone_mapping: BoneMapping = BoneMapping(),
-                 fps_custom: float = 30.0,
-                 fps_source: str = 'SEQUENCE',
-                 psa_config: PsaConfig = PsaConfig(),
-                 sequence_names: list[str] | None = None,
-                 should_convert_to_samples: bool = False,
-                 should_overwrite: bool = False,
-                 should_stash: bool = False,
-                 should_use_config_file: bool = True,
-                 should_use_fake_user: bool = False,
-                 should_write_keyframes: bool = True,
-                 should_write_metadata: bool = True,
-                 should_write_scale_keys: bool = True,
-                 translation_scale: float = 1.0
-                 ):
+    def __init__(
+        self,
+        action_name_prefix: str = '',
+        bone_mapping: BoneMapping = BoneMapping(),
+        fps_custom: float = 30.0,
+        fps_source: str = 'SEQUENCE',
+        psa_config: PsaConfig = PsaConfig(),
+        sequence_names: list[str] | None = None,
+        should_convert_to_samples: bool = False,
+        should_overwrite: bool = False,
+        should_stash: bool = False,
+        should_use_config_file: bool = True,
+        should_use_fake_user: bool = False,
+        should_write_keyframes: bool = True,
+        should_write_metadata: bool = True,
+        should_write_scale_keys: bool = True,
+        translation_scale: float = 1.0,
+    ):
         self.action_name_prefix = action_name_prefix
         self.bone_mapping = bone_mapping
         self.fps_custom = fps_custom
@@ -96,7 +95,9 @@ class PsaImportResult:
         self.warnings: list[str] = []
 
 
-def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_names: list[str], bone_mapping: BoneMapping) -> int | None:
+def _get_armature_bone_index_for_psa_bone(
+    psa_bone_name: str, armature_bone_names: list[str], bone_mapping: BoneMapping
+) -> int | None:
     """
     @param psa_bone_name: The name of the PSA bone.
     @param armature_bone_names: The names of the bones in the armature.
@@ -110,10 +111,10 @@ def _get_armature_bone_index_for_psa_bone(psa_bone_name: str, armature_bone_name
     if bone_mapping.should_ignore_trailing_whitespace:
         psa_bone_name = psa_bone_name.rstrip()
         pattern += r'\s*'
-    
+
     if not bone_mapping.is_case_sensitive:
         flags = re.IGNORECASE
-    
+
     pattern = re.compile(pattern, flags)
 
     for armature_bone_index, armature_bone_name in enumerate(armature_bone_names):
@@ -168,7 +169,18 @@ def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, frame_step:
                 q.normalize()
                 l = Vector(source_frame_1_data[4:7]).lerp(Vector(source_frame_2_data[4:7]), factor)
                 s = Vector(source_frame_1_data[7:]).lerp(Vector(source_frame_2_data[4:7]), factor)
-                resampled_sequence_data_matrix[sample_frame_index, bone_index, :] = q.w, q.x, q.y, q.z, l.x, l.y, l.z, s.x, s.y, s.z
+                resampled_sequence_data_matrix[sample_frame_index, bone_index, :] = (
+                    q.w,
+                    q.x,
+                    q.y,
+                    q.z,
+                    l.x,
+                    l.y,
+                    l.z,
+                    s.x,
+                    s.y,
+                    s.z,
+                )
 
     return resampled_sequence_data_matrix
 
@@ -177,7 +189,7 @@ def _read_sequence_data_matrix(psa_reader: PsaReader, sequence_name: str) -> np.
     """
     Reads and returns the data matrix for the given sequence.
     The order of the data in the third axis is Qw, Qx, Qy, Qz, Lx, Ly, Lz, Sx, Sy, Sz
-    
+
     @param sequence_name: The name of the sequence.
     @return: An FxBx10 matrix where F is the number of frames, B is the number of bones.
     """
@@ -201,7 +213,9 @@ def _read_sequence_data_matrix(psa_reader: PsaReader, sequence_name: str) -> np.
     return matrix
 
 
-def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object, options: PsaImportOptions) -> PsaImportResult:
+def import_psa(
+    context: Context, psa_reader: PsaReader, armature_object: Object, options: PsaImportOptions
+) -> PsaImportResult:
 
     assert context.window_manager
 
@@ -218,7 +232,9 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
     for psa_bone_index, psa_bone in enumerate(psa_reader.bones):
         psa_bone_name: str = psa_bone.name.decode('windows-1252')
-        armature_bone_index = _get_armature_bone_index_for_psa_bone(psa_bone_name, armature_bone_names, options.bone_mapping)
+        armature_bone_index = _get_armature_bone_index_for_psa_bone(
+            psa_bone_name, armature_bone_names, options.bone_mapping
+        )
         if armature_bone_index is not None:
             # Ensure that no other PSA bone has been mapped to this armature bone yet.
             if armature_bone_index not in armature_to_psa_bone_indices:
@@ -226,26 +242,29 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
                 armature_to_psa_bone_indices[armature_bone_index] = psa_bone_index
             else:
                 # This armature bone has already been mapped to a PSA bone.
-                duplicate_mappings.append((psa_bone_index, armature_bone_index, armature_to_psa_bone_indices[armature_bone_index]))
+                duplicate_mappings.append(
+                    (psa_bone_index, armature_bone_index, armature_to_psa_bone_indices[armature_bone_index])
+                )
             psa_bone_names.append(armature_bone_names[armature_bone_index])
         else:
             psa_bone_names.append(psa_bone_name)
 
     # Warn about duplicate bone mappings.
     if len(duplicate_mappings) > 0:
-        for (psa_bone_index, armature_bone_index, mapped_psa_bone_index) in duplicate_mappings:
+        for psa_bone_index, armature_bone_index, mapped_psa_bone_index in duplicate_mappings:
             psa_bone_name = psa_bone_names[psa_bone_index]
             armature_bone_name = armature_bone_names[armature_bone_index]
             mapped_psa_bone_name = psa_bone_names[mapped_psa_bone_index]
-            result.warnings.append(f'PSA bone {psa_bone_index} ({psa_bone_name}) could not be mapped to armature bone {armature_bone_index} ({armature_bone_name}) because the armature bone is already mapped to PSA bone {mapped_psa_bone_index} ({mapped_psa_bone_name})')
+            result.warnings.append(
+                f'PSA bone {psa_bone_index} ({psa_bone_name}) could not be mapped to armature bone {armature_bone_index} ({armature_bone_name}) because the armature bone is already mapped to PSA bone {mapped_psa_bone_index} ({mapped_psa_bone_name})'
+            )
 
     # Report if there are missing bones in the target armature.
     missing_bone_names = set(psa_bone_names).difference(set(armature_bone_names))
     if len(missing_bone_names) > 0:
         result.warnings.append(
-            f'The armature \'{armature_object.name}\' is missing {len(missing_bone_names)} bones that exist in '
-            'the PSA:\n' +
-            str(list(sorted(missing_bone_names)))
+            f"The armature '{armature_object.name}' is missing {len(missing_bone_names)} bones that exist in "
+            'the PSA:\n' + str(list(sorted(missing_bone_names)))
         )
     del armature_bone_names
 
@@ -279,7 +298,9 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
                 bones_with_missing_parents.append(armature_bone)
         # Calculate the original location & rotation of each bone (in world-space maybe?)
         if has_parent:
-            import_bone.original_location = armature_bone.matrix_local.translation - armature_bone.parent.matrix_local.translation
+            import_bone.original_location = (
+                armature_bone.matrix_local.translation - armature_bone.parent.matrix_local.translation
+            )
             import_bone.original_location.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
             import_bone.original_rotation = armature_bone.matrix_local.to_quaternion()
             import_bone.original_rotation.rotate(armature_bone.parent.matrix_local.to_quaternion().conjugated())
@@ -293,7 +314,9 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
     # Warn about bones with missing parents.
     if len(bones_with_missing_parents) > 0:
         count = len(bones_with_missing_parents)
-        message = f'{count} bone(s) have parents that are not present in the PSA:\n' + str([x.name for x in bones_with_missing_parents])
+        message = f'{count} bone(s) have parents that are not present in the PSA:\n' + str(
+            [x.name for x in bones_with_missing_parents]
+        )
         result.warnings.append(message)
 
     context.window_manager.progress_begin(0, len(sequences))
@@ -333,7 +356,7 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
             case _:
                 assert False, f'Invalid FPS source: {options.fps_source}'
 
-        if options.should_write_keyframes:            
+        if options.should_write_keyframes:
             channelbag = anim_utils.action_ensure_channelbag_for_slot(action, action_slot)
 
             # Create f-curves for the rotation and location of each bone.
@@ -348,16 +371,36 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
                 add_location_fcurves = (bone_track_flags & REMOVE_TRACK_LOCATION) == 0
                 add_scale_fcurves = psa_reader.has_scale_keys and options.should_write_scale_keys
                 import_bone.fcurves = [
-                    channelbag.fcurves.ensure(rotation_data_path, index=0, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qw
-                    channelbag.fcurves.ensure(rotation_data_path, index=1, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qx
-                    channelbag.fcurves.ensure(rotation_data_path, index=2, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qy
-                    channelbag.fcurves.ensure(rotation_data_path, index=3, group_name=pose_bone.name) if add_rotation_fcurves else None,  # Qz
-                    channelbag.fcurves.ensure(location_data_path, index=0, group_name=pose_bone.name) if add_location_fcurves else None,  # Lx
-                    channelbag.fcurves.ensure(location_data_path, index=1, group_name=pose_bone.name) if add_location_fcurves else None,  # Ly
-                    channelbag.fcurves.ensure(location_data_path, index=2, group_name=pose_bone.name) if add_location_fcurves else None,  # Lz
-                    channelbag.fcurves.ensure(scale_data_path,    index=0, group_name=pose_bone.name) if add_scale_fcurves    else None,  # Sx
-                    channelbag.fcurves.ensure(scale_data_path,    index=1, group_name=pose_bone.name) if add_scale_fcurves    else None,  # Sy
-                    channelbag.fcurves.ensure(scale_data_path,    index=2, group_name=pose_bone.name) if add_scale_fcurves    else None,  # Sz
+                    channelbag.fcurves.ensure(rotation_data_path, index=0, group_name=pose_bone.name)
+                    if add_rotation_fcurves
+                    else None,  # Qw
+                    channelbag.fcurves.ensure(rotation_data_path, index=1, group_name=pose_bone.name)
+                    if add_rotation_fcurves
+                    else None,  # Qx
+                    channelbag.fcurves.ensure(rotation_data_path, index=2, group_name=pose_bone.name)
+                    if add_rotation_fcurves
+                    else None,  # Qy
+                    channelbag.fcurves.ensure(rotation_data_path, index=3, group_name=pose_bone.name)
+                    if add_rotation_fcurves
+                    else None,  # Qz
+                    channelbag.fcurves.ensure(location_data_path, index=0, group_name=pose_bone.name)
+                    if add_location_fcurves
+                    else None,  # Lx
+                    channelbag.fcurves.ensure(location_data_path, index=1, group_name=pose_bone.name)
+                    if add_location_fcurves
+                    else None,  # Ly
+                    channelbag.fcurves.ensure(location_data_path, index=2, group_name=pose_bone.name)
+                    if add_location_fcurves
+                    else None,  # Lz
+                    channelbag.fcurves.ensure(scale_data_path, index=0, group_name=pose_bone.name)
+                    if add_scale_fcurves
+                    else None,  # Sx
+                    channelbag.fcurves.ensure(scale_data_path, index=1, group_name=pose_bone.name)
+                    if add_scale_fcurves
+                    else None,  # Sy
+                    channelbag.fcurves.ensure(scale_data_path, index=2, group_name=pose_bone.name)
+                    if add_scale_fcurves
+                    else None,  # Sz
                 ]
 
             # Read the sequence data matrix from the PSA.
@@ -379,8 +422,9 @@ def import_psa(context: Context, psa_reader: PsaReader, armature_object: Object,
 
             # Resample the sequence data to the target FPS.
             # If the target frame count is the same as the source frame count, this will be a no-op.
-            resampled_sequence_data_matrix = _resample_sequence_data_matrix(sequence_data_matrix,
-                                                                            frame_step=sequence.fps / target_fps)
+            resampled_sequence_data_matrix = _resample_sequence_data_matrix(
+                sequence_data_matrix, frame_step=sequence.fps / target_fps
+            )
 
             # Write the keyframes out.
             # Note that the f-curve data consists of alternating time and value data.

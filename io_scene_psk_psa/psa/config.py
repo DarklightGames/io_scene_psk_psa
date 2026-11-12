@@ -1,8 +1,8 @@
 import re
 from configparser import ConfigParser
 
-REMOVE_TRACK_LOCATION = (1 << 0)
-REMOVE_TRACK_ROTATION = (1 << 1)
+REMOVE_TRACK_LOCATION = 1 << 0
+REMOVE_TRACK_ROTATION = 1 << 1
 
 
 class PsaConfig:

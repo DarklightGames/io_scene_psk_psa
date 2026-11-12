@@ -1,21 +1,28 @@
 from pathlib import Path
-from typing import Iterable, cast as typing_cast
+from typing import Iterable
+from typing import cast as typing_cast
 
 import bpy
 from bpy.props import StringProperty
 from bpy.types import Context, Depsgraph, Material, Object, Operator, Scene
 from bpy_extras.io_utils import ExportHelper
+from psk_psa_py.psk.writer import write_psk_to_path
 
-from .properties import PSK_PG_export, PskExportMixin
+from ...shared.helpers import (
+    PsxBoneCollection,
+    get_collection_export_operator_from_context,
+    get_psk_input_objects_for_collection,
+    get_psk_input_objects_for_context,
+    populate_bone_collection_list,
+)
+from ...shared.operators import PSK_OT_bone_collection_list_populate, PSK_OT_bone_collection_list_select_all
+from ...shared.ui import draw_bone_filter_mode
 from ..builder import (
     PskBuildOptions,
     build_psk,
     get_materials_for_mesh_objects,
 )
-from psk_psa_py.psk.writer import write_psk_to_path
-from ...shared.helpers import PsxBoneCollection, get_collection_export_operator_from_context, get_psk_input_objects_for_collection, populate_bone_collection_list, get_psk_input_objects_for_context
-from ...shared.ui import draw_bone_filter_mode
-from ...shared.operators import PSK_OT_bone_collection_list_populate, PSK_OT_bone_collection_list_select_all
+from .properties import PSK_PG_export, PskExportMixin
 
 
 def populate_material_name_list(depsgraph: Depsgraph, mesh_objects: Iterable[Object], material_list):
@@ -53,12 +60,13 @@ class PSK_OT_populate_material_name_list(Operator):
         assert context.collection
         input_objects = get_psk_input_objects_for_collection(context.collection)
         try:
-            populate_material_name_list(depsgraph, [x.obj for x in input_objects.mesh_dfs_objects], export_operator.material_name_list)
+            populate_material_name_list(
+                depsgraph, [x.obj for x in input_objects.mesh_dfs_objects], export_operator.material_name_list
+            )
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
         return {'FINISHED'}
-
 
 
 def material_list_names_search_cb(self, context: Context, edit_text: str):
@@ -112,9 +120,10 @@ class PSK_OT_material_list_name_remove(Operator):
             return {'CANCELLED'}
         export_operator = typing_cast(PskExportMixin, export_operator)
         export_operator.material_name_list.remove(export_operator.material_name_list_index)
-        export_operator.material_name_list_index = min(export_operator.material_name_list_index, max(len(export_operator.material_name_list) - 1, 0))
+        export_operator.material_name_list_index = min(
+            export_operator.material_name_list_index, max(len(export_operator.material_name_list) - 1, 0)
+        )
         return {'FINISHED'}
-
 
 
 class PSK_OT_material_list_move_up(Operator):
@@ -173,7 +182,9 @@ class PSK_OT_material_list_name_move_up(Operator):
             self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
             return {'CANCELLED'}
         export_operator = typing_cast(PskExportMixin, export_operator)
-        export_operator.material_name_list.move(export_operator.material_name_list_index, export_operator.material_name_list_index - 1)
+        export_operator.material_name_list.move(
+            export_operator.material_name_list_index, export_operator.material_name_list_index - 1
+        )
         export_operator.material_name_list_index -= 1
         return {'FINISHED'}
 
@@ -198,12 +209,16 @@ class PSK_OT_material_list_name_move_down(Operator):
             self.report({'ERROR_INVALID_CONTEXT'}, 'No valid export operator found in context')
             return {'CANCELLED'}
         export_operator = typing_cast(PskExportMixin, export_operator)
-        export_operator.material_name_list.move(export_operator.material_name_list_index, export_operator.material_name_list_index + 1)
+        export_operator.material_name_list.move(
+            export_operator.material_name_list_index, export_operator.material_name_list_index + 1
+        )
         export_operator.material_name_list_index += 1
         return {'FINISHED'}
 
 
-def get_sorted_materials_by_names(materials: Iterable[Material | None], material_names: list[str]) -> list[Material | None]:
+def get_sorted_materials_by_names(
+    materials: Iterable[Material | None], material_names: list[str]
+) -> list[Material | None]:
     """
     Sorts the materials by the order of the material names list. Any materials not in the list will be appended to the
     end of the list in the order they are found. None materials (representing empty material slots) are always
@@ -216,18 +231,18 @@ def get_sorted_materials_by_names(materials: Iterable[Material | None], material
     materials = list(materials)
     has_none = None in materials
     materials = [m for m in materials if m is not None]
-    
+
     materials_in_collection = [m for m in materials if m.name in material_names]
     materials_not_in_collection = [m for m in materials if m.name not in material_names]
     materials_in_collection = sorted(materials_in_collection, key=lambda x: material_names.index(x.name))
-    
+
     result: list[Material | None] = []
     result.extend(materials_in_collection)
     result.extend(materials_not_in_collection)
-    
+
     if has_none:
         result.append(None)
-    
+
     return result
 
 
@@ -236,10 +251,14 @@ def get_psk_build_options_from_property_group(scene: Scene, pg: PskExportMixin) 
     options.object_eval_state = pg.object_eval_state
     options.export_space = pg.export_space
     options.bone_filter_mode = pg.bone_filter_mode
-    options.bone_collection_indices = [PsxBoneCollection(x.armature_object_name, x.armature_data_name, x.index) for x in pg.bone_collection_list if x.is_selected]
+    options.bone_collection_indices = [
+        PsxBoneCollection(x.armature_object_name, x.armature_data_name, x.index)
+        for x in pg.bone_collection_list
+        if x.is_selected
+    ]
     options.material_order_mode = pg.material_order_mode
     options.material_name_list = [(x.material_name, x.export_name) for x in pg.material_name_list]
-    
+
     match pg.transform_source:
         case 'SCENE':
             transform_source = getattr(scene, 'psx_export')
@@ -247,7 +266,7 @@ def get_psk_build_options_from_property_group(scene: Scene, pg: PskExportMixin) 
             transform_source = pg
         case _:
             assert False, f'Invalid transform source: {pg.transform_source}'
-    
+
     options.scale = transform_source.scale
     options.forward_axis = transform_source.forward_axis
     options.up_axis = transform_source.up_axis
@@ -266,7 +285,8 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
         description='File path used for exporting the PSK file',
         maxlen=1024,
         default='',
-        subtype='FILE_PATH')
+        subtype='FILE_PATH',
+    )
     collection: StringProperty(options={'HIDDEN'})
 
     def execute(self, context):
@@ -329,7 +349,15 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
             if self.bone_filter_mode == 'BONE_COLLECTIONS':
                 row = bones_panel.row()
                 rows = max(3, min(len(self.bone_collection_list), 10))
-                row.template_list('PSX_UL_bone_collection_list', '', self, 'bone_collection_list', self, 'bone_collection_list_index', rows=rows)
+                row.template_list(
+                    'PSX_UL_bone_collection_list',
+                    '',
+                    self,
+                    'bone_collection_list',
+                    self,
+                    'bone_collection_list_index',
+                    rows=rows,
+                )
                 col = row.column(align=True)
                 col.operator(PSK_OT_bone_collection_list_populate.bl_idname, text='', icon='FILE_REFRESH')
                 col.separator()
@@ -351,7 +379,9 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
             if self.material_order_mode == 'MANUAL':
                 rows = max(3, min(len(self.material_name_list), 10))
                 row = materials_panel.row()
-                row.template_list('PSK_UL_material_names', '', self, 'material_name_list', self, 'material_name_list_index', rows=rows)
+                row.template_list(
+                    'PSK_UL_material_names', '', self, 'material_name_list', self, 'material_name_list_index', rows=rows
+                )
                 col = row.column(align=True)
                 col.operator(PSK_OT_populate_material_name_list.bl_idname, text='', icon='FILE_REFRESH')
                 col.separator()
@@ -363,7 +393,7 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
 
         # Transform
         transform_header, transform_panel = layout.panel('Transform', default_closed=False)
-        transform_header.label(text='Transform')
+        transform_header.label(text='Transform', icon='DRIVER_TRANSFORM')
         if transform_panel:
             flow = transform_panel.grid_flow(row_major=True)
             flow.use_property_split = True
@@ -383,7 +413,7 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
                     transform_source = self
                 case _:
                     assert False, f'Invalid transform source: {self.transform_source}'
-        
+
             flow.prop(transform_source, 'scale')
             flow.prop(transform_source, 'forward_axis')
             flow.prop(transform_source, 'up_axis')
@@ -397,10 +427,8 @@ class PSK_OT_export(Operator, ExportHelper):
     filename_ext = '.psk'
     filter_glob: StringProperty(default='*.psk', options={'HIDDEN'})
     filepath: StringProperty(
-        name='File Path',
-        description='File path used for exporting the PSK file',
-        maxlen=1024,
-        default='')
+        name='File Path', description='File path used for exporting the PSK file', maxlen=1024, default=''
+    )
 
     def invoke(self, context, event):
         try:
@@ -416,7 +444,9 @@ class PSK_OT_export(Operator, ExportHelper):
         depsgraph = context.evaluated_depsgraph_get()
 
         try:
-            populate_material_name_list(depsgraph, [x.obj for x in input_objects.mesh_dfs_objects], pg.material_name_list)
+            populate_material_name_list(
+                depsgraph, [x.obj for x in input_objects.mesh_dfs_objects], pg.material_name_list
+            )
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
@@ -450,7 +480,15 @@ class PSK_OT_export(Operator, ExportHelper):
             if pg.bone_filter_mode == 'BONE_COLLECTIONS':
                 row = bones_panel.row()
                 rows = max(3, min(len(pg.bone_collection_list), 10))
-                row.template_list('PSX_UL_bone_collection_list', '', pg, 'bone_collection_list', pg, 'bone_collection_list_index', rows=rows)
+                row.template_list(
+                    'PSX_UL_bone_collection_list',
+                    '',
+                    pg,
+                    'bone_collection_list',
+                    pg,
+                    'bone_collection_list_index',
+                    rows=rows,
+                )
 
         # Materials
         materials_header, materials_panel = layout.panel('Materials', default_closed=False)
@@ -464,7 +502,9 @@ class PSK_OT_export(Operator, ExportHelper):
             if pg.material_order_mode == 'MANUAL':
                 row = materials_panel.row()
                 rows = max(3, min(len(pg.bone_collection_list), 10))
-                row.template_list('PSK_UL_material_names', '', pg, 'material_name_list', pg, 'material_name_list_index', rows=rows)
+                row.template_list(
+                    'PSK_UL_material_names', '', pg, 'material_name_list', pg, 'material_name_list_index', rows=rows
+                )
                 col = row.column(align=True)
                 col.operator(PSK_OT_material_list_move_up.bl_idname, text='', icon='TRIA_UP')
                 col.operator(PSK_OT_material_list_move_down.bl_idname, text='', icon='TRIA_DOWN')
@@ -491,11 +531,11 @@ class PSK_OT_export(Operator, ExportHelper):
                     transform_source = pg
                 case _:
                     assert False, f'Invalid transform source: {pg.transform_source}'
-        
+
             flow.prop(transform_source, 'scale')
             flow.prop(transform_source, 'forward_axis')
             flow.prop(transform_source, 'up_axis')
-        
+
         # Extended Format
         extended_format_header, extended_format_panel = layout.panel('Extended Format', default_closed=False)
         extended_format_header.label(text='Extended Format')
@@ -545,4 +585,5 @@ _classes = (
 )
 
 from bpy.utils import register_classes_factory
+
 register, unregister = register_classes_factory(_classes)

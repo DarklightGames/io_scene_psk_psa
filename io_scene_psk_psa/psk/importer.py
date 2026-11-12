@@ -1,15 +1,21 @@
+from typing import cast as typing_cast
+
 import bmesh
 import bpy
 import numpy as np
-
-from bpy.types import Context, Object, VertexGroup, ArmatureModifier, FloatColorAttribute, IntAttribute
+from bpy.types import (
+    ArmatureModifier,
+    Context,
+    FloatColorAttribute,
+    Object,
+    VertexGroup,
+)
 from mathutils import Matrix, Quaternion, Vector
-from typing import cast as typing_cast
-
 from psk_psa_py.psk.data import Psk
 from psk_psa_py.shared.data import PsxBone
-from .properties import poly_flags_to_triangle_type_and_bit_flags
+
 from ..shared.helpers import is_bdk_addon_loaded, rgb_to_srgb
+from .properties import poly_flags_to_triangle_type_and_bit_flags
 
 
 class PskImportOptions:
@@ -33,6 +39,7 @@ class ImportBone:
     """
     Intermediate bone type for the purpose of construction.
     """
+
     def __init__(self, index: int, psk_bone: PsxBone):
         self.index: int = index
         self.psk_bone: PsxBone = psk_bone
@@ -148,16 +155,20 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
                     # Attempt to load it using BDK addon's operator.
                     material_reference = psk.material_references[material_index]
                     repository_id = options.bdk_repository_id if options.bdk_repository_id is not None else ''
-                    if material_reference and bpy.ops.bdk.link_material(reference=material_reference, repository_id=repository_id) == {'FINISHED'}:
+                    if material_reference and bpy.ops.bdk.link_material(
+                        reference=material_reference, repository_id=repository_id
+                    ) == {'FINISHED'}:
                         material = bpy.data.materials[material_name]
-                
+
                 if material is None:
                     # Material was unable to be loaded, so just create a blank material.
                     material = bpy.data.materials.new(material_name)
-                    mesh_triangle_type, mesh_triangle_bit_flags = poly_flags_to_triangle_type_and_bit_flags(psk_material.poly_flags)
+                    mesh_triangle_type, mesh_triangle_bit_flags = poly_flags_to_triangle_type_and_bit_flags(
+                        psk_material.poly_flags
+                    )
                     material.psk.mesh_triangle_type = mesh_triangle_type
                     material.psk.mesh_triangle_bit_flags = mesh_triangle_bit_flags
-                
+
                 mesh_data.materials.append(material)
 
         bm = bmesh.new()
@@ -187,7 +198,7 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
                 # 2. The face is a duplicate of another face. (i.e., point indices of [0, 1, 2] and [0, 1, 2])
                 # TODO: if we can pre-prune this list, that would be much cheaper.
                 continue
-            
+
             bm_face.material_index = face.material_index
             psk_faces.append(face)
 
@@ -242,7 +253,9 @@ def import_psk(psk: Psk, context: Context, name: str, options: PskImportOptions)
                     face_corner_color_index += 1
 
             # Create the vertex color attribute.
-            face_corner_color_attribute = mesh_data.attributes.new(name='VERTEXCOLOR', type='FLOAT_COLOR', domain='CORNER')
+            face_corner_color_attribute = mesh_data.attributes.new(
+                name='VERTEXCOLOR', type='FLOAT_COLOR', domain='CORNER'
+            )
             face_corner_color_attribute = typing_cast(FloatColorAttribute, face_corner_color_attribute)
             face_corner_color_attribute.data.foreach_set('color', face_corner_colors.ravel())
 

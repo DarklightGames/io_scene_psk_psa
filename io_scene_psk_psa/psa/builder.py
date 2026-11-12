@@ -1,10 +1,14 @@
 from bpy.types import Action, AnimData, Context, Object, PoseBone
-
-from psk_psa_py.psa.data import Psa
-from typing import Tuple
 from mathutils import Matrix, Quaternion, Vector
+from psk_psa_py.psa.data import Psa
 
-from ..shared.helpers import PsxBoneCollection, convert_bpy_quaternion_to_psx_quaternion, convert_vector_to_vector3, create_psx_bones, get_coordinate_system_transform
+from ..shared.helpers import (
+    PsxBoneCollection,
+    convert_bpy_quaternion_to_psx_quaternion,
+    convert_vector_to_vector3,
+    create_psx_bones,
+    get_coordinate_system_transform,
+)
 
 
 class PsaBuildSequence:
@@ -40,29 +44,26 @@ class PsaBuildOptions:
         self.forward_axis = 'X'
         self.up_axis = 'Z'
         self.sequence_source = 'ACTIONS'  # One of ('ACTIONS', 'TIMELINE_MARKERS', 'NLA_STRIPS')
-    
+
     @property
     def bone_collection_primary_key(self) -> str:
         return 'DATA' if self.sequence_source == 'ACTIVE_ACTION' else 'OBJECT'
 
 
 class PsaExportBone:
-    def __init__(self,
-                    pose_bone: PoseBone | None,
-                    armature_object: Object | None,
-                    scale: Vector):
+    def __init__(self, pose_bone: PoseBone | None, armature_object: Object | None, scale: Vector):
         self.pose_bone = pose_bone
         self.armature_object = armature_object
         self.scale = scale
-    
+
     @property
     def is_armature_root_bone(self) -> bool:
         return self.pose_bone is not None and self.pose_bone.parent is None
-    
+
     @property
     def is_attached_to_armature(self) -> bool:
         return self.get_attached_armature() is not None
-    
+
     def get_attached_armature(self) -> tuple[Object, PoseBone] | None:
         if not self.is_armature_root_bone:
             return None
@@ -79,7 +80,7 @@ class PsaExportBone:
                 return (parent_armature_object, parent_pose_bone)
             case _:
                 return None
-    
+
     def get_attached_armature_transform(self) -> Matrix:
         attached_armature, attached_pose_bone = self.get_attached_armature() or (None, None)
         if attached_armature is None or attached_pose_bone is None:
@@ -90,6 +91,7 @@ class PsaExportBone:
             attached_bone_matrix = attached_armature.matrix_world @ attached_pose_bone.matrix
         return attached_bone_matrix
 
+
 def _get_pose_bone_location_and_rotation(
     pose_bone: PoseBone,
     armature_object: Object,
@@ -97,7 +99,7 @@ def _get_pose_bone_location_and_rotation(
     export_space: str,
     scale: Vector,
     coordinate_system_transform: Matrix,
-) -> Tuple[Vector, Quaternion]:
+) -> tuple[Vector, Quaternion]:
     if pose_bone.parent is not None:
         pose_bone_matrix = pose_bone.parent.matrix.inverted() @ pose_bone.matrix
     else:
@@ -155,7 +157,9 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
     if options.sequence_source == 'ACTIVE_ACTION' and len(options.armature_objects) >= 2:
         # Make sure that the data-block for all the selected armature objects is the same.
         if any(map(lambda o: o.data != options.armature_objects[0].data, options.armature_objects[1:])):
-            raise RuntimeError('All armature objects must share the same data-block when exporting from the active action')
+            raise RuntimeError(
+                'All armature objects must share the same data-block when exporting from the active action'
+            )
         armature_objects_for_bones = [options.armature_objects[0]]
 
     psx_bone_create_result = create_psx_bones(
@@ -184,7 +188,9 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         export_sequence.name = export_sequence.name.strip()
 
     # Save each armature object's current action and frame so that we can restore the state once we are done.
-    saved_armature_object_actions = {o: (o.animation_data.action if o.animation_data else None) for o in options.armature_objects}
+    saved_armature_object_actions = {
+        o: (o.animation_data.action if o.animation_data else None) for o in options.armature_objects
+    }
     saved_frame_current = context.scene.frame_current
 
     # Now build the PSA sequences.
@@ -212,20 +218,22 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
         sequence_duration = frame_count_raw / export_sequence.fps
 
         psa_sequence = Psa.Sequence()
-        
+
         try:
             psa_sequence.name = bytes(export_sequence.name, encoding='windows-1252')
         except UnicodeEncodeError:
             raise RuntimeError(
-                f'Sequence name "{export_sequence.name}" contains characters that cannot be encoded in the Windows-1252 codepage')
-        
+                f'Sequence name "{export_sequence.name}" contains characters that cannot be encoded in the Windows-1252 codepage'
+            )
+
         try:
             if export_sequence.group is not None:
                 psa_sequence.group = bytes(export_sequence.group, encoding='windows-1252')
         except UnicodeDecodeError:
             raise RuntimeError(
-                f'Group name "{export_sequence.group} contains characters that cannot be encoded in the Windows-1252 codepage')
-        
+                f'Group name "{export_sequence.group} contains characters that cannot be encoded in the Windows-1252 codepage'
+            )
+
         psa_sequence.frame_count = frame_count
         psa_sequence.frame_start_index = frame_start_index
         psa_sequence.fps = frame_count / sequence_duration
@@ -304,7 +312,7 @@ def build_psa(context: Context, options: PsaBuildOptions) -> Psa:
                                     export_bone,
                                     options.export_space,
                                     export_bone.scale,
-                                    coordinate_system_transform=coordinate_system_transform
+                                    coordinate_system_transform=coordinate_system_transform,
                                 )
                                 last_frame_bone_poses.append((location, rotation))
 

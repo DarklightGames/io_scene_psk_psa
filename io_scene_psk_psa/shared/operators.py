@@ -1,11 +1,14 @@
-from bpy.types import Operator
-from bpy.props import BoolProperty
-
-from .types import PsxBoneExportMixin
 from typing import cast as typing_cast
 
-from .helpers import get_collection_export_operator_from_context, get_psk_input_objects_for_collection, populate_bone_collection_list
+from bpy.props import BoolProperty
+from bpy.types import Operator
 
+from .helpers import (
+    get_collection_export_operator_from_context,
+    get_psk_input_objects_for_collection,
+    populate_bone_collection_list,
+)
+from .types import PsxBoneExportMixin
 
 
 class PSK_OT_bone_collection_list_populate(Operator):
@@ -69,4 +72,5 @@ _classes = (
     PSK_OT_bone_collection_list_select_all,
 )
 from bpy.utils import register_classes_factory
+
 register, unregister = register_classes_factory(_classes)

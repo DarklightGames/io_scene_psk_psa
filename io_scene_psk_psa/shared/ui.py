@@ -1,5 +1,5 @@
 import bpy
-from bpy.types import Context, UILayout, Panel
+from bpy.types import Context, Panel, UILayout
 
 from .types import bone_filter_mode_items
 
@@ -30,14 +30,14 @@ class PSX_PT_scene(Panel):
     @classmethod
     def poll(cls, context):
         return context.scene is not None
-    
+
     def draw(self, context: Context):
         layout = self.layout
         scene = bpy.context.scene
         psx_export = getattr(scene, 'psx_export', None)
         if psx_export is None:
             return
-        
+
         # Transform
         transform_header, transform_panel = layout.panel('Transform', default_closed=False)
         transform_header.label(text='Transform')
@@ -50,10 +50,8 @@ class PSX_PT_scene(Panel):
             flow.prop(psx_export, 'up_axis')
 
 
-_classes = (
-    PSX_PT_scene,
-)
+_classes = (PSX_PT_scene,)
 
 from bpy.utils import register_classes_factory
-register, unregister = register_classes_factory(_classes)
 
+register, unregister = register_classes_factory(_classes)

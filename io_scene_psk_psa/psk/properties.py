@@ -14,21 +14,18 @@ mesh_triangle_types_items = (
 
 mesh_triangle_bit_flags_items = (
     ('UNLIT', 'Unlit', 'Full brightness, no lighting', 16),
-    ('FLAT', 'Flat', 'Flat surface, don\'t do bMeshCurvy thing', 32),
+    ('FLAT', 'Flat', "Flat surface, don't do bMeshCurvy thing", 32),
     ('ENVIRONMENT', 'Environment', 'Environment mapped', 64),
-    ('NO_SMOOTH', 'No Smooth', 'No bilinear filtering on this poly\'s texture', 128),
+    ('NO_SMOOTH', 'No Smooth', "No bilinear filtering on this poly's texture", 128),
 )
 
+
 class PSX_PG_material(PropertyGroup):
-    mesh_triangle_type: EnumProperty(
-        name='Triangle Type',
-        items=mesh_triangle_types_items
-        )
+    mesh_triangle_type: EnumProperty(name='Triangle Type', items=mesh_triangle_types_items)
     mesh_triangle_bit_flags: EnumProperty(
-        name='Triangle Bit Flags',
-        items=mesh_triangle_bit_flags_items,
-        options={'ENUM_FLAG'}
-        )
+        name='Triangle Bit Flags', items=mesh_triangle_bit_flags_items, options={'ENUM_FLAG'}
+    )
+
 
 mesh_triangle_types_items_dict = {item[0]: item[3] for item in mesh_triangle_types_items}
 mesh_triangle_bit_flags_items_dict = {item[0]: item[3] for item in mesh_triangle_bit_flags_items}
@@ -70,38 +67,33 @@ psk_import_components_items = (
     ('ARMATURE', 'Armature Only', 'Import armature only'),
 )
 
+
 class PskImportMixin:
     should_import_vertex_colors: BoolProperty(
-        default=True,
-        options=set(),
-        name='Import Vertex Colors',
-        description='Import vertex colors, if available'
+        default=True, options=set(), name='Import Vertex Colors', description='Import vertex colors, if available'
     )
     vertex_color_space: EnumProperty(
         name='Vertex Color Space',
         options=set(),
         description='The source vertex color space',
         default='SRGBA',
-        items=vertex_color_space_items
+        items=vertex_color_space_items,
     )
     should_import_vertex_normals: BoolProperty(
         default=True,
         name='Import Vertex Normals',
         options=set(),
-        description='Import vertex normals, if available.\n\nThis is only supported for PSKX files'
+        description='Import vertex normals, if available.\n\nThis is only supported for PSKX files',
     )
     should_import_extra_uvs: BoolProperty(
-        default=True,
-        name='Import Extra UVs',
-        options=set(),
-        description='Import extra UV maps, if available'
+        default=True, name='Import Extra UVs', options=set(), description='Import extra UV maps, if available'
     )
     components: EnumProperty(
         name='Components',
         options=set(),
         description='Which components to import',
         items=psk_import_components_items,
-        default='ALL'
+        default='ALL',
     )
     should_import_mesh: BoolProperty(
         name='Import Mesh',
@@ -124,13 +116,13 @@ class PskImportMixin:
         name='Bone Length',
         options=set(),
         subtype='DISTANCE',
-        description='Length of the bones'
+        description='Length of the bones',
     )
     should_import_shape_keys: BoolProperty(
         default=True,
         name='Import Shape Keys',
         options=set(),
-        description='Import shape keys, if available.\n\nThis is only supported for PSKX files'
+        description='Import shape keys, if available.\n\nThis is only supported for PSKX files',
     )
     scale: FloatProperty(
         name='Scale',
@@ -141,14 +133,12 @@ class PskImportMixin:
         name='BDK Repository ID',
         default='',
         options=set(),
-        description='The ID of the BDK repository to use for loading materials'
+        description='The ID of the BDK repository to use for loading materials',
     )
 
 
-_classes = (
-    PSX_PG_material,
-)
+_classes = (PSX_PG_material,)
 
 from bpy.utils import register_classes_factory
-register, unregister = register_classes_factory(_classes)
 
+register, unregister = register_classes_factory(_classes)

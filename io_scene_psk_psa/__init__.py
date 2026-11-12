@@ -1,39 +1,71 @@
-from .shared import (
-    types as shared_types,
-    helpers as shared_helpers,
-    dfs as shared_dfs,
-    ui as shared_ui,
-    operators as shared_operators,
+from .psa import (
+    builder as psa_builder,
+)
+from .psa import (
+    config as psa_config,
+)
+from .psa import (
+    file_handlers as psa_file_handlers,
+)
+from .psa import (
+    importer as psa_importer,
+)
+from .psa.export import (
+    operators as psa_export_operators,
+)
+from .psa.export import (
+    properties as psa_export_properties,
+)
+from .psa.export import (
+    ui as psa_export_ui,
+)
+from .psa.import_ import (
+    operators as psa_import_operators,
+)
+from .psa.import_ import (
+    properties as psa_import_properties,
+)
+from .psa.import_ import (
+    ui as psa_import_ui,
 )
 from .psk import (
     builder as psk_builder,
+)
+from .psk import (
     importer as psk_importer,
+)
+from .psk import (
     properties as psk_properties,
+)
+from .psk import (
     ui as psk_ui,
-) 
+)
 from .psk.export import (
     operators as psk_export_operators,
+)
+from .psk.export import (
     properties as psk_export_properties,
+)
+from .psk.export import (
     ui as psk_export_ui,
 )
 from .psk.import_ import (
     operators as psk_import_operators,
 )
-from .psa import (
-    config as psa_config,
-    builder as psa_builder,
-    importer as psa_importer,
-    file_handlers as psa_file_handlers,
+from .shared import (
+    dfs as shared_dfs,
 )
-from .psa.export import (
-    properties as psa_export_properties,
-    ui as psa_export_ui,
-    operators as psa_export_operators,
+from .shared import (
+    helpers as shared_helpers,
 )
-from .psa.import_ import (
-    operators as psa_import_operators,
-    ui as psa_import_ui,
-    properties as psa_import_properties,
+from .shared import (
+    operators as shared_operators,
+)
+from .shared import (
+    types as shared_types,
+)
+from .shared import (
+    ui as shared_ui,
 )
 
 _needs_reload = 'bpy' in locals()
@@ -106,6 +138,7 @@ _modules = (
     psa_file_handlers,
 )
 
+
 def register():
     for module in _modules:
         module.register()
@@ -115,9 +148,15 @@ def register():
     bpy.types.TOPBAR_MT_file_import.append(psa_import_menu_func)
     setattr(bpy.types.Material, 'psk', PointerProperty(type=psk_properties.PSX_PG_material, options={'HIDDEN'}))
     setattr(bpy.types.Scene, 'psx_export', PointerProperty(type=shared_types.PSX_PG_scene_export, options={'HIDDEN'}))
-    setattr(bpy.types.Scene, 'psa_import', PointerProperty(type=psa_import_properties.PSA_PG_import, options={'HIDDEN'}))
-    setattr(bpy.types.Scene, 'psa_export', PointerProperty(type=psa_export_properties.PSA_PG_export, options={'HIDDEN'}))
-    setattr(bpy.types.Scene, 'psk_export', PointerProperty(type=psk_export_properties.PSK_PG_export, options={'HIDDEN'}))
+    setattr(
+        bpy.types.Scene, 'psa_import', PointerProperty(type=psa_import_properties.PSA_PG_import, options={'HIDDEN'})
+    )
+    setattr(
+        bpy.types.Scene, 'psa_export', PointerProperty(type=psa_export_properties.PSA_PG_export, options={'HIDDEN'})
+    )
+    setattr(
+        bpy.types.Scene, 'psk_export', PointerProperty(type=psk_export_properties.PSK_PG_export, options={'HIDDEN'})
+    )
     setattr(bpy.types.Action, 'psa_export', PointerProperty(type=shared_types.PSX_PG_action_export, options={'HIDDEN'}))
 
 

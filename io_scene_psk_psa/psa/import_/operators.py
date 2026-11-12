@@ -5,11 +5,11 @@ from typing import Iterable
 from bpy.props import CollectionProperty, StringProperty
 from bpy.types import Context, Event, Object, Operator, OperatorFileListElement
 from bpy_extras.io_utils import ImportHelper
+from psk_psa_py.psa.reader import PsaReader
 
-from .properties import PsaImportMixin, get_visible_sequences
 from ..config import read_psa_config
 from ..importer import BoneMapping, PsaImportOptions, import_psa
-from psk_psa_py.psa.reader import PsaReader
+from .properties import PsaImportMixin, get_visible_sequences
 
 
 def psa_import_poll(cls, context: Context):
@@ -152,7 +152,9 @@ class PSA_OT_import_drag_and_drop(Operator, PsaImportMixin):
             warnings.extend(result.warnings)
 
         if len(warnings) > 0:
-            message = f'Imported {sequences_count} action(s) from {len(self.files)} file(s) with {len(warnings)} warning(s)\n'
+            message = (
+                f'Imported {sequences_count} action(s) from {len(self.files)} file(s) with {len(warnings)} warning(s)\n'
+            )
             self.report({'INFO'}, message)
             for warning in warnings:
                 self.report({'WARNING'}, warning)
@@ -192,7 +194,7 @@ def psa_import_options_from_property_group(pg: PsaImportMixin, sequence_names: I
     options.should_convert_to_samples = pg.should_convert_to_samples
     options.bone_mapping = BoneMapping(
         is_case_sensitive=pg.bone_mapping_is_case_sensitive,
-        should_ignore_trailing_whitespace=pg.bone_mapping_should_ignore_trailing_whitespace
+        should_ignore_trailing_whitespace=pg.bone_mapping_should_ignore_trailing_whitespace,
     )
     options.fps_source = pg.fps_source
     options.fps_custom = pg.fps_custom
@@ -200,11 +202,7 @@ def psa_import_options_from_property_group(pg: PsaImportMixin, sequence_names: I
     return options
 
 
-def _import_psa(context,
-                options: PsaImportOptions,
-                filepath: str,
-                armature_object: Object
-                ):
+def _import_psa(context, options: PsaImportOptions, filepath: str, armature_object: Object):
     warnings = []
 
     if options.should_use_config_file:
@@ -235,7 +233,8 @@ class PSA_OT_import_all(Operator, PsaImportMixin):
         description='File path used for importing the PSA file',
         maxlen=1024,
         default='',
-        update=on_psa_file_path_updated)
+        update=on_psa_file_path_updated,
+    )
 
     @classmethod
     def poll(cls, context):
@@ -250,7 +249,7 @@ class PSA_OT_import_all(Operator, PsaImportMixin):
             action_name_prefix=self.action_name_prefix,
             bone_mapping=BoneMapping(
                 is_case_sensitive=self.bone_mapping_is_case_sensitive,
-                should_ignore_trailing_whitespace=self.bone_mapping_should_ignore_trailing_whitespace
+                should_ignore_trailing_whitespace=self.bone_mapping_should_ignore_trailing_whitespace,
             ),
             fps_custom=self.fps_custom,
             fps_source=self.fps_source,
@@ -263,7 +262,7 @@ class PSA_OT_import_all(Operator, PsaImportMixin):
             should_write_keyframes=self.should_write_keyframes,
             should_write_metadata=self.should_write_metadata,
             should_write_scale_keys=self.should_write_scale_keys,
-            translation_scale=self.translation_scale
+            translation_scale=self.translation_scale,
         )
 
         assert context.view_layer
@@ -297,7 +296,8 @@ class PSA_OT_import(Operator, ImportHelper, PsaImportMixin):
         description='File path used for importing the PSA file',
         maxlen=1024,
         default='',
-        update=on_psa_file_path_updated)
+        update=on_psa_file_path_updated,
+    )
 
     @classmethod
     def poll(cls, context):
@@ -305,7 +305,9 @@ class PSA_OT_import(Operator, ImportHelper, PsaImportMixin):
 
     def execute(self, context):
         pg = getattr(context.scene, 'psa_import')
-        options = psa_import_options_from_property_group(self, [x.action_name for x in pg.sequence_list if x.is_selected])
+        options = psa_import_options_from_property_group(
+            self, [x.action_name for x in pg.sequence_list if x.is_selected]
+        )
 
         if len(options.sequence_names) == 0:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No sequences selected')
@@ -356,7 +358,9 @@ class PSA_OT_import(Operator, ImportHelper, PsaImportMixin):
                 row2.operator(PSA_OT_import_sequences_deselect_all.bl_idname, text='None', icon='CHECKBOX_DEHLT')
 
                 col = col.row()
-                col.template_list('PSA_UL_import_sequences', '', pg, 'sequence_list', pg, 'sequence_list_index', rows=rows)
+                col.template_list(
+                    'PSA_UL_import_sequences', '', pg, 'sequence_list', pg, 'sequence_list_index', rows=rows
+                )
 
             col = sequences_panel.column(heading='')
             col.use_property_split = True
@@ -466,4 +470,5 @@ _classes = (
 )
 
 from bpy.utils import register_classes_factory
+
 register, unregister = register_classes_factory(_classes)

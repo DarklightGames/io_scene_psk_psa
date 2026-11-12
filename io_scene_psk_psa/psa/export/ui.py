@@ -24,7 +24,9 @@ class PSA_UL_export_sequences(UIList):
         row = layout.row(align=True)
         row.alignment = 'RIGHT'
 
-        row.label(text=str(abs(item.frame_end - item.frame_start) + 1), icon='FRAME_PREV' if item.is_reversed else 'KEYFRAME')
+        row.label(
+            text=str(abs(item.frame_end - item.frame_start) + 1), icon='FRAME_PREV' if item.is_reversed else 'KEYFRAME'
+        )
 
         if item.armature_object is not None:
             row.label(text=item.armature_object.name, icon='ARMATURE_DATA')
@@ -52,10 +54,8 @@ class PSA_UL_export_sequences(UIList):
         return flt_flags, flt_neworder
 
 
-_classes = (
-    PSA_UL_export_sequences,
-)
+_classes = (PSA_UL_export_sequences,)
 
 from bpy.utils import register_classes_factory
-register, unregister = register_classes_factory(_classes)
 
+register, unregister = register_classes_factory(_classes)

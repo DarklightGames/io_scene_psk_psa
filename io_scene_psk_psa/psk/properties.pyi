@@ -2,7 +2,6 @@ class PSX_PG_material:
     mesh_triangle_type: str
     mesh_triangle_bit_flags: set[str]
 
-
 class PskImportMixin:
     should_import_vertex_colors: bool
     vertex_color_space: str
@@ -17,7 +16,5 @@ class PskImportMixin:
     scale: float
     bdk_repository_id: str
 
-
 def triangle_type_and_bit_flags_to_poly_flags(mesh_triangle_type: str, mesh_triangle_bit_flags: set[str]) -> int: ...
-
 def poly_flags_to_triangle_type_and_bit_flags(poly_flags: int) -> tuple[str, set[str]]: ...

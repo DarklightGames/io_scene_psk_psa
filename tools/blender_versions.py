@@ -3,6 +3,7 @@ Reads the supported Blender versions from the `blender-*` dependency groups in
 `pyproject.toml`. Run directly to print them as JSON (used by CI); this only
 needs the standard library.
 """
+
 import json
 import re
 import tomllib
@@ -52,7 +53,7 @@ def get_supported_blender_versions() -> list[BlenderVersion]:
         if requirement_match is None:
             raise ValueError(
                 f'Dependency group "{group}" has an unexpected requirement: {requirements[0]!r} '
-                "(expected the form \"bpy==X.Y.*; python_version == 'A.B'\")"
+                '(expected the form "bpy==X.Y.*; python_version == \'A.B\'")'
             )
         major, minor, python = requirement_match.groups()
         if (major, minor) != group_match.groups():
@@ -79,10 +80,7 @@ def check_project_configuration() -> list[str]:
     uv_config = _load_pyproject().get('tool', {}).get('uv', {})
 
     # Every version group must be mutually exclusive, in a single conflict set.
-    conflict_sets = [
-        {item.get('group') for item in conflict_set}
-        for conflict_set in uv_config.get('conflicts', [])
-    ]
+    conflict_sets = [{item.get('group') for item in conflict_set} for conflict_set in uv_config.get('conflicts', [])]
     expected_groups = {v.group for v in versions}
     if expected_groups not in conflict_sets:
         problems.append(

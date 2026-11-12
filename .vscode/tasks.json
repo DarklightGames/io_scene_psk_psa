@@ -4,13 +4,38 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "io_scene_psk_psa: test",
+            // Creates/updates `.venv/` for the newest supported Blender version.
+            // Runs automatically on folder open once automatic tasks are allowed
+            // ("Tasks: Manage Automatic Tasks" > "Allow Automatic Tasks").
+            "label": "io_scene_psk_psa: uv sync",
+            "type": "shell",
+            "command": "uv sync --locked",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "dedicated"
+            },
+            "runOptions": {
+                "runOn": "folderOpen"
+            }
+        },
+        {
+            "label": "io_scene_psk_psa: test against latest Blender version",
             "type": "shell",
             "command": "uv run test",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
                 "isDefault": true
+            }
+        },
+        {
+            "label": "io_scene_psk_psa: test all supported Blender versions",
+            "type": "shell",
+            "command": "uv run test all",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build"
             }
         }
     ]

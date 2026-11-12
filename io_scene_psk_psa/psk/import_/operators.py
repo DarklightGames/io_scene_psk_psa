@@ -4,10 +4,10 @@ from pathlib import Path
 from bpy.props import CollectionProperty, StringProperty
 from bpy.types import Context, FileHandler, Operator, OperatorFileListElement, UILayout
 from bpy_extras.io_utils import ImportHelper
+from psk_psa_py.psk.reader import read_psk_from_file
 
 from ..importer import PskImportOptions, import_psk
 from ..properties import PskImportMixin
-from psk_psa_py.psk.reader import read_psk_from_file
 
 
 def get_psk_import_options_from_properties(property_group: PskImportMixin):
@@ -84,16 +84,16 @@ class PSK_OT_import(Operator, ImportHelper, PskImportMixin):
     filename_ext = '.psk'
     filter_glob: StringProperty(default='*.psk;*.pskx', options={'HIDDEN'})
     filepath: StringProperty(
-        name='File Path',
-        description='File path used for exporting the PSK file',
-        maxlen=1024,
-        default='')
+        name='File Path', description='File path used for exporting the PSK file', maxlen=1024, default=''
+    )
 
     def execute(self, context):
         try:
             psk = read_psk_from_file(self.filepath)
         except OSError as e:
-            self.report({'ERROR'}, f'Failed to read "{self.filepath}". The file may be corrupted or not a valid PSK file: {e}')
+            self.report(
+                {'ERROR'}, f'Failed to read "{self.filepath}". The file may be corrupted or not a valid PSK file: {e}'
+            )
             return {'CANCELLED'}
 
         name = os.path.splitext(os.path.basename(self.filepath))[0]
@@ -146,7 +146,9 @@ class PSK_OT_import_drag_and_drop(Operator, PskImportMixin):
             try:
                 psk = read_psk_from_file(filepath)
             except OSError as e:
-                self.report({'ERROR'}, f'Failed to read "{filepath}". The file may be corrupted or not a valid PSK file: {e}')
+                self.report(
+                    {'ERROR'}, f'Failed to read "{filepath}". The file may be corrupted or not a valid PSK file: {e}'
+                )
                 return {'CANCELLED'}
 
             name = os.path.splitext(file.name)[0]
@@ -182,4 +184,5 @@ _classes = (
 )
 
 from bpy.utils import register_classes_factory
+
 register, unregister = register_classes_factory(_classes)

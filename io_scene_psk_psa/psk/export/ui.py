@@ -1,6 +1,7 @@
+from typing import cast as typing_cast
+
 import bpy
 from bpy.types import UIList
-from typing import cast as typing_cast
 
 from .properties import PSK_PG_material_name_list_item
 
@@ -41,9 +42,9 @@ class PSK_UL_material_names(UIList):
         arrow_row.label(icon='TRIA_RIGHT' if has_export_name else 'RIGHTARROW', text='')
         export_row.prop(item, 'export_name', text='', emboss=False)
 
-_classes = (
-    PSK_UL_material_names,
-)
+
+_classes = (PSK_UL_material_names,)
 
 from bpy.utils import register_classes_factory
+
 register, unregister = register_classes_factory(_classes)

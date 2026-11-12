@@ -24,10 +24,8 @@ class PSK_PT_material(Panel):
         col.prop(material.psk, 'mesh_triangle_bit_flags', expand=True, text='Flags')
 
 
-_classes = (
-    PSK_PT_material,
-)
+_classes = (PSK_PT_material,)
 
 from bpy.utils import register_classes_factory
-register, unregister = register_classes_factory(_classes)
 
+register, unregister = register_classes_factory(_classes)

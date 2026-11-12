@@ -26,6 +26,7 @@ dev = [
     "fake-bpy-module-5.0",
     "pytest",
     "pytest-cov",
+    "ruff>=0.17.4",
 ]
 
 # Supported Blender versions. When changing these, also update `[tool.uv]`,
@@ -63,6 +64,13 @@ branch = true
 
 [tool.coverage.report]
 ignore_errors = true
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["io_scene_psk_psa/wheels"]
+
+[tool.ruff.format]
+quote-style = "single"
 
 [tool.pyright]
 venvPath = "."

@@ -1,8 +1,8 @@
-from bpy.types import Context
-from bpy.types import FileHandler
+from bpy.types import Context, FileHandler
 
-from .import_.operators import PSA_OT_import_drag_and_drop
 from .export.operators import PSA_OT_export_collection
+from .import_.operators import PSA_OT_import_drag_and_drop
+
 
 class PSA_FH_file_handler(FileHandler):
     bl_idname = 'PSA_FH_file_handler'
@@ -16,9 +16,8 @@ class PSA_FH_file_handler(FileHandler):
         return context.area is not None and context.area.type == 'VIEW_3D'
 
 
-_classes = (
-    PSA_FH_file_handler,
-)
+_classes = (PSA_FH_file_handler,)
 
 from bpy.utils import register_classes_factory
+
 register, unregister = register_classes_factory(_classes)

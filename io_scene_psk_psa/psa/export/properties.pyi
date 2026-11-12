@@ -1,6 +1,12 @@
-from bpy.types import PropertyGroup, Object, Action
+from bpy.types import Action, Object, PropertyGroup
 
-from ...shared.types import BpyCollectionProperty, TransformMixin, ExportSpaceMixin, PsxBoneExportMixin, TransformSourceMixin
+from ...shared.types import (
+    BpyCollectionProperty,
+    ExportSpaceMixin,
+    PsxBoneExportMixin,
+    TransformMixin,
+    TransformSourceMixin,
+)
 
 class PsaExportSequenceMixin(PropertyGroup):
     name: str
@@ -15,18 +21,15 @@ class PsaExportSequenceMixin(PropertyGroup):
 
     @property
     def action(self) -> Action | None: ...
-
     @property
     def armature_object(self) -> Object | None: ...
-
     @property
     def is_reversed(self) -> bool: ...
 
-
 class PSA_PG_export_sequence(PsaExportSequenceMixin):
     """Concrete type for PSA export sequences."""
-    pass
 
+    pass
 
 class PsaExportMixin(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExportMixin, TransformSourceMixin):
     sequence_source: str
@@ -56,10 +59,8 @@ class PsaExportMixin(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExp
     group_source: str
     group_custom: str
 
-
 class PSA_PG_export(PsaExportMixin):
     pass
-
 
 def get_sequences_from_name_and_frame_range(name: str, frame_start: int, frame_end: int):
     pass

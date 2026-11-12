@@ -1,14 +1,16 @@
 from typing import Generic, Iterable, Sized, TypeVar
+
 import bpy
-from bpy.props import CollectionProperty, EnumProperty, StringProperty, IntProperty, BoolProperty, FloatProperty
-from bpy.types import PropertyGroup, UIList, UILayout, Context, AnyType, Panel
+from bpy.props import BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
+from bpy.types import AnyType, Context, Panel, PropertyGroup, UILayout, UIList
 
 T = TypeVar('T')
+
 
 # Don't actually use this, this is just for typing.
 class BpyCollectionProperty(Generic[T], Iterable[T], Sized):
     def add(self) -> T:
-        return T() # type: ignore
+        return T()  # type: ignore
 
     def clear(self) -> None:
         pass
@@ -21,9 +23,18 @@ class BpyCollectionProperty(Generic[T], Iterable[T], Sized):
 
 
 class PSX_UL_bone_collection_list(UIList):
-
-    def draw_item(self, context: Context, layout: UILayout, data: AnyType, item: AnyType, icon: int,
-                  active_data: AnyType, active_property: str, index: int = 0, flt_flag: int = 0):
+    def draw_item(
+        self,
+        context: Context,
+        layout: UILayout,
+        data: AnyType,
+        item: AnyType,
+        icon: int,
+        active_data: AnyType,
+        active_property: str,
+        index: int = 0,
+        flt_flag: int = 0,
+    ):
         row = layout.row()
 
         row.prop(item, 'is_selected', text=getattr(item, 'name'))
@@ -50,8 +61,17 @@ class PSX_PG_bone_collection_list_item(PropertyGroup):
 
 class PSX_PG_action_export(PropertyGroup):
     group: StringProperty(name='Group', description='The group of the sequence', maxlen=64)
-    compression_ratio: FloatProperty(name='Compression Ratio', default=1.0, min=0.0, max=1.0, subtype='FACTOR', description='The key sampling ratio of the exported sequence.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames')
-    key_quota: IntProperty(name='Key Quota', default=0, min=1, description='The minimum number of frames to be exported')
+    compression_ratio: FloatProperty(
+        name='Compression Ratio',
+        default=1.0,
+        min=0.0,
+        max=1.0,
+        subtype='FACTOR',
+        description='The key sampling ratio of the exported sequence.\n\nA compression ratio of 1.0 will export all frames, while a compression ratio of 0.5 will export half of the frames',
+    )
+    key_quota: IntProperty(
+        name='Key Quota', default=0, min=1, description='The minimum number of frames to be exported'
+    )
     fps: FloatProperty(name='FPS', default=30.0, min=0.0, description='The frame rate of the exported sequence')
 
 
@@ -65,7 +85,11 @@ class PSX_PT_action(Panel):
 
     @classmethod
     def poll(cls, context: 'Context'):
-        return context.active_object is not None and context.active_object.type == 'ARMATURE' and context.active_action is not None
+        return (
+            context.active_object is not None
+            and context.active_object.type == 'ARMATURE'
+            and context.active_action is not None
+        )
 
     def draw(self, context: 'Context'):
         action = context.active_action
@@ -84,7 +108,11 @@ class PSX_PT_action(Panel):
 
 bone_filter_mode_items = (
     ('ALL', 'All', 'All bones will be exported'),
-    ('BONE_COLLECTIONS', 'Bone Collections', 'Only bones belonging to the selected bone collections and their ancestors will be exported')
+    (
+        'BONE_COLLECTIONS',
+        'Bone Collections',
+        'Only bones belonging to the selected bone collections and their ancestors will be exported',
+    ),
 )
 
 axis_identifiers = ('X', 'Y', 'Z', '-X', '-Y', '-Z')
@@ -120,18 +148,8 @@ def up_axis_update(self, context):
 
 
 class AxisMixin:
-    forward_axis: EnumProperty(
-        name='Forward',
-        items=forward_items,
-        default='X',
-        update=forward_axis_update
-    )
-    up_axis: EnumProperty(
-        name='Up',
-        items=up_items,
-        default='Z',
-        update=up_axis_update
-    )
+    forward_axis: EnumProperty(name='Forward', items=forward_items, default='X', update=forward_axis_update)
+    up_axis: EnumProperty(name='Up', items=up_items, default='Z', update=up_axis_update)
 
 
 class TransformMixin(AxisMixin):
@@ -140,36 +158,31 @@ class TransformMixin(AxisMixin):
         default=1.0,
         description='Scale factor to apply to all location data',
         soft_min=0.0,
-        soft_max=100.0
+        soft_max=100.0,
     )
 
 
 export_space_items = [
     ('WORLD', 'World', 'Export in world space'),
     ('ARMATURE', 'Armature', 'Export the local space of the armature object'),
-    ('ROOT', 'Root', 'Export in the space of the root bone')
+    ('ROOT', 'Root', 'Export in the space of the root bone'),
 ]
 
 
 class ExportSpaceMixin:
-    export_space: EnumProperty(
-        name='Export Space',
-        items=export_space_items,
-        default='WORLD'
-    )
- 
+    export_space: EnumProperty(name='Export Space', items=export_space_items, default='WORLD')
+
+
 transform_source_items = (
     ('SCENE', 'Scene', 'Use the scene transform settings'),
     ('CUSTOM', 'Custom', 'Use custom transform settings'),
 )
 
+
 class TransformSourceMixin:
-    transform_source: EnumProperty(
-        items=transform_source_items,
-        name='Transform Source',
-        default='SCENE'
-    )
- 
+    transform_source: EnumProperty(items=transform_source_items, name='Transform Source', default='SCENE')
+
+
 class PsxBoneExportMixin:
     bone_filter_mode: EnumProperty(
         name='Bone Filter',
@@ -194,4 +207,5 @@ _classes = (
 )
 
 from bpy.utils import register_classes_factory
+
 register, unregister = register_classes_factory(_classes)
