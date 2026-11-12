@@ -1,6 +1,6 @@
 import os
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from bpy.props import CollectionProperty, StringProperty
 from bpy.types import Context, Event, Object, Operator, OperatorFileListElement
@@ -30,7 +30,7 @@ class PSA_OT_import_sequences_select_from_text(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = getattr(context.scene, 'psa_import')
+        pg = context.scene.psa_import
         return len(pg.sequence_list) > 0
 
     def invoke(self, context, event):
@@ -40,12 +40,12 @@ class PSA_OT_import_sequences_select_from_text(Operator):
     def draw(self, context):
         layout = self.layout
         assert layout
-        pg = getattr(context.scene, 'psa_import')
+        pg = context.scene.psa_import
         layout.label(icon='INFO', text='Each sequence name should be on a new line.')
         layout.prop(pg, 'select_text', text='')
 
     def execute(self, context):
-        pg = getattr(context.scene, 'psa_import')
+        pg = context.scene.psa_import
         if pg.select_text is None:
             self.report({'ERROR_INVALID_CONTEXT'}, 'No text block selected')
             return {'CANCELLED'}
@@ -68,13 +68,13 @@ class PSA_OT_import_sequences_select_all(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = getattr(context.scene, 'psa_import')
+        pg = context.scene.psa_import
         visible_sequences = get_visible_sequences(pg, pg.sequence_list)
         has_unselected_actions = any(map(lambda action: not action.is_selected, visible_sequences))
         return len(visible_sequences) > 0 and has_unselected_actions
 
     def execute(self, context):
-        pg = getattr(context.scene, 'psa_import')
+        pg = context.scene.psa_import
         visible_sequences = get_visible_sequences(pg, pg.sequence_list)
         for sequence in visible_sequences:
             sequence.is_selected = True
@@ -89,13 +89,13 @@ class PSA_OT_import_sequences_deselect_all(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = getattr(context.scene, 'psa_import')
+        pg = context.scene.psa_import
         visible_sequences = get_visible_sequences(pg, pg.sequence_list)
         has_selected_sequences = any(map(lambda sequence: sequence.is_selected, visible_sequences))
         return len(visible_sequences) > 0 and has_selected_sequences
 
     def execute(self, context):
-        pg = getattr(context.scene, 'psa_import')
+        pg = context.scene.psa_import
         visible_sequences = get_visible_sequences(pg, pg.sequence_list)
         for sequence in visible_sequences:
             sequence.is_selected = False
@@ -304,7 +304,7 @@ class PSA_OT_import(Operator, ImportHelper, PsaImportMixin):
         return psa_import_poll(cls, context)
 
     def execute(self, context):
-        pg = getattr(context.scene, 'psa_import')
+        pg = context.scene.psa_import
         options = psa_import_options_from_property_group(
             self, [x.action_name for x in pg.sequence_list if x.is_selected]
         )
@@ -335,7 +335,7 @@ class PSA_OT_import(Operator, ImportHelper, PsaImportMixin):
     def draw(self, context: Context):
         layout = self.layout
         assert layout
-        pg = getattr(context.scene, 'psa_import')
+        pg = context.scene.psa_import
 
         sequences_header, sequences_panel = layout.panel('sequences_panel_id', default_closed=False)
         sequences_header.label(text='Sequences')

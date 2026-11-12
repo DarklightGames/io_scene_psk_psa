@@ -9,7 +9,7 @@ class PSA_UL_export_sequences(UIList):
     bl_idname = 'PSA_UL_export_sequences'
 
     def __init__(self, *args, **kwargs):
-        super(PSA_UL_export_sequences, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         # Show the filtering options by default.
         self.use_filter_show = True
 
@@ -34,7 +34,7 @@ class PSA_UL_export_sequences(UIList):
         # row.label(text=item.action.name, icon='PMARKER' if is_pose_marker else 'ACTION_DATA')
 
     def draw_filter(self, context, layout):
-        pg = getattr(context.scene, 'psa_export')
+        pg = context.scene.psa_export
         row = layout.row()
         subrow = row.row(align=True)
         subrow.prop(pg, 'sequence_filter_name', text='')
@@ -47,7 +47,7 @@ class PSA_UL_export_sequences(UIList):
             subrow.prop(pg, 'sequence_filter_reversed', text='', icon='FRAME_PREV')
 
     def filter_items(self, context, data, prop):
-        pg = getattr(context.scene, 'psa_export')
+        pg = context.scene.psa_export
         actions = getattr(data, prop)
         flt_flags = filter_sequences(pg, actions)
         flt_neworder = list(range(len(actions)))

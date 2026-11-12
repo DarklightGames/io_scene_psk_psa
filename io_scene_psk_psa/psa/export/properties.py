@@ -1,7 +1,7 @@
 import re
 import sys
+from collections.abc import Sequence
 from fnmatch import fnmatch
-from typing import Sequence
 
 import bpy
 from bpy.props import (
@@ -116,7 +116,7 @@ def get_animation_data(pg: 'PSA_PG_export', context: Context) -> AnimData | None
 
 
 def nla_track_search_cb(self, context: Context, edit_text: str):
-    pg = getattr(context.scene, 'psa_export')
+    pg = context.scene.psa_export
     animation_data = get_animation_data(pg, context)
     if animation_data is not None:
         for index, nla_track in enumerate(animation_data.nla_tracks):

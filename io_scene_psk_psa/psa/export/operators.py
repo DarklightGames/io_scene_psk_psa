@@ -1,7 +1,7 @@
 import re
 from abc import abstractmethod
 from collections import Counter
-from typing import Iterable, Sequence, Tuple
+from collections.abc import Iterable, Sequence
 from typing import cast as typing_cast
 
 import bpy
@@ -43,7 +43,7 @@ from .properties import (
 from .ui import PSA_UL_export_sequences
 
 
-def get_sequences_propnames_from_source(sequence_source: str) -> Tuple[str, str]:
+def get_sequences_propnames_from_source(sequence_source: str) -> tuple[str, str]:
     match sequence_source:
         case 'ACTIONS':
             return 'action_list', 'action_list_index'
@@ -177,7 +177,7 @@ def get_sequence_fps(context: Context, fps_source: str, fps_custom: float, actio
             return fps_custom
         case 'ACTION_METADATA':
             # Get the minimum value of action metadata FPS values.
-            return min([typing_cast(PSX_PG_action_export, getattr(action, 'psa_export')).fps for action in actions])
+            return min([typing_cast(PSX_PG_action_export, action.psa_export).fps for action in actions])
         case _:
             assert False, f'Invalid FPS source: {fps_source}'
 
@@ -192,7 +192,7 @@ def get_sequence_compression_ratio(
             # Get the minimum value of action metadata compression ratio values.
             return min(
                 map(
-                    lambda action: typing_cast(PSX_PG_action_export, getattr(action, 'psa_export')).compression_ratio,
+                    lambda action: typing_cast(PSX_PG_action_export, action.psa_export).compression_ratio,
                     actions,
                 )
             )
@@ -209,7 +209,7 @@ def get_timeline_marker_sequence_frame_ranges(
 ) -> dict[str, tuple[int, int]]:
     # Timeline markers need to be sorted so that we can determine the sequence start and end positions.
     sequence_frame_ranges: dict[str, tuple[int, int]] = dict()
-    sorted_timeline_markers = list(sorted(scene.timeline_markers, key=lambda x: x.frame))
+    sorted_timeline_markers = sorted(scene.timeline_markers, key=lambda x: x.frame)
     sorted_timeline_marker_names = [x.name for x in sorted_timeline_markers]
 
     for marker_name in marker_names:
@@ -325,7 +325,7 @@ class PSA_OT_export_collection(Operator, ExportHelper, PsaExportMixin):
 
         try:
             psa = build_psa(context, options)
-            self.report({'INFO'}, f'PSA export successful')
+            self.report({'INFO'}, 'PSA export successful')
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
@@ -393,7 +393,7 @@ class PSA_OT_export_collection(Operator, ExportHelper, PsaExportMixin):
 
             match self.transform_source:
                 case 'SCENE':
-                    transform_source = getattr(context.scene, 'psx_export')
+                    transform_source = context.scene.psx_export
                     flow.enabled = False
                 case 'CUSTOM':
                     transform_source = self
@@ -504,7 +504,7 @@ def create_psa_export_options(
     context: Context, armature_objects: Sequence[Object], pg: PsaExportMixin
 ) -> PsaBuildOptions:
     if len(armature_objects) == 0:
-        raise RuntimeError(f'No armatures')
+        raise RuntimeError('No armatures')
 
     animation_data = armature_objects[0].animation_data
     export_sequences: list[PsaBuildSequence] = []
@@ -517,7 +517,7 @@ def create_psa_export_options(
             case 'ACTIONS':
                 if action is None:
                     return None
-                action_psa_export = typing_cast(PSX_PG_action_export, getattr(action, 'psa_export'))
+                action_psa_export = typing_cast(PSX_PG_action_export, action.psa_export)
                 return action_psa_export.group
             case 'CUSTOM':
                 return group_custom
@@ -621,7 +621,7 @@ def create_psa_export_options(
         case 'SCENE':
             scene = context.scene
             assert scene
-            transform_source = getattr(scene, 'psx_export')
+            transform_source = scene.psx_export
         case 'CUSTOM':
             transform_source = pg
         case _:
@@ -662,7 +662,7 @@ class PSA_OT_export(Operator, ExportHelper):
     def draw(self, context):
         layout = self.layout
         assert layout
-        pg = typing_cast(PSA_PG_export, getattr(context.scene, 'psa_export'))
+        pg = typing_cast(PSA_PG_export, context.scene.psa_export)
 
         # SEQUENCES
         draw_sequences_panel(
@@ -724,7 +724,7 @@ class PSA_OT_export(Operator, ExportHelper):
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
-        pg: PSA_PG_export = getattr(context.scene, 'psa_export')
+        pg: PSA_PG_export = context.scene.psa_export
 
         assert context.view_layer is not None
 
@@ -736,7 +736,7 @@ class PSA_OT_export(Operator, ExportHelper):
             if armature_object.animation_data is None:
                 armature_object.animation_data_create()
 
-        pg = getattr(context.scene, 'psa_export')
+        pg = context.scene.psa_export
         update_actions_and_timeline_markers(context, self.armature_objects, pg)
         populate_bone_collection_list(
             pg.bone_collection_list,
@@ -750,7 +750,7 @@ class PSA_OT_export(Operator, ExportHelper):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        pg = typing_cast(PSA_PG_export, getattr(context.scene, 'psa_export'))
+        pg = typing_cast(PSA_PG_export, context.scene.psa_export)
         options = create_psa_export_options(context, self.armature_objects, pg)
 
         if len(options.sequences) == 0:
@@ -759,7 +759,7 @@ class PSA_OT_export(Operator, ExportHelper):
 
         try:
             psa = build_psa(context, options)
-            self.report({'INFO'}, f'PSA export successful')
+            self.report({'INFO'}, 'PSA export successful')
         except RuntimeError as e:
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
@@ -808,7 +808,7 @@ class PSA_OT_export_sequences_select_all(PsaExportActionsSelectAllOperator):
 
     @classmethod
     def get_psa_export(cls, context: Context) -> PsaExportMixin:
-        return typing_cast(PsaExportMixin, getattr(context.scene, 'psa_export'))
+        return typing_cast(PsaExportMixin, context.scene.psa_export)
 
 
 class PSA_OT_export_collection_sequences_select_all(PsaExportActionsSelectAllOperator):
@@ -826,7 +826,7 @@ class PSA_OT_export_collection_sequences_select_all(PsaExportActionsSelectAllOpe
 
 class PsaExportActionsDeselectAllOperator(PsaExportActionsSelectOperator):
     def execute(self, context):
-        pg = getattr(context.scene, 'psa_export')
+        pg = context.scene.psa_export
         item_list = self.get_item_list(context)
         for sequence in get_visible_sequences(pg, item_list):
             sequence.is_selected = False
@@ -854,7 +854,7 @@ class PSA_OT_export_sequences_deselect_all(PsaExportActionsDeselectAllOperator):
 
     @classmethod
     def get_psa_export(cls, context: Context) -> PsaExportMixin:
-        return typing_cast(PsaExportMixin, getattr(context.scene, 'psa_export'))
+        return typing_cast(PsaExportMixin, context.scene.psa_export)
 
 
 class PSA_OT_export_bone_collections_select_all(Operator):
@@ -865,13 +865,13 @@ class PSA_OT_export_bone_collections_select_all(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = typing_cast(PSA_PG_export, getattr(context.scene, 'psa_export'))
+        pg = typing_cast(PSA_PG_export, context.scene.psa_export)
         item_list = pg.bone_collection_list
         has_unselected_items = any(map(lambda action: not action.is_selected, item_list))
         return len(item_list) > 0 and has_unselected_items
 
     def execute(self, context):
-        pg = typing_cast(PSA_PG_export, getattr(context.scene, 'psa_export'))
+        pg = typing_cast(PSA_PG_export, context.scene.psa_export)
         for item in pg.bone_collection_list:
             item.is_selected = True
         return {'FINISHED'}
@@ -885,13 +885,13 @@ class PSA_OT_export_bone_collections_deselect_all(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = typing_cast(PSA_PG_export, getattr(context.scene, 'psa_export'))
+        pg = typing_cast(PSA_PG_export, context.scene.psa_export)
         item_list = pg.bone_collection_list
         has_selected_actions = any(map(lambda action: action.is_selected, item_list))
         return len(item_list) > 0 and has_selected_actions
 
     def execute(self, context):
-        pg = typing_cast(PSA_PG_export, getattr(context.scene, 'psa_export'))
+        pg = typing_cast(PSA_PG_export, context.scene.psa_export)
         for action in pg.bone_collection_list:
             action.is_selected = False
         return {'FINISHED'}

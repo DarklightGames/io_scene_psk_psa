@@ -12,7 +12,6 @@ def run_before_and_after_tests(tmpdir):
 
     yield
     # Teardown: Run after the tests
-    pass
 
 
 def export_psk_and_read_back(collection_name: str):

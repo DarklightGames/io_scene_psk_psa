@@ -29,7 +29,6 @@ class PsaExportSequenceMixin(PropertyGroup):
 class PSA_PG_export_sequence(PsaExportSequenceMixin):
     """Concrete type for PSA export sequences."""
 
-    pass
 
 class PsaExportMixin(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExportMixin, TransformSourceMixin):
     sequence_source: str
@@ -60,10 +59,10 @@ class PsaExportMixin(PropertyGroup, TransformMixin, ExportSpaceMixin, PsxBoneExp
     group_custom: str
 
 class PSA_PG_export(PsaExportMixin):
-    pass
+    ...
 
 def get_sequences_from_name_and_frame_range(name: str, frame_start: int, frame_end: int):
-    pass
+    ...
 
 def filter_sequences(pg: PsaExportMixin, sequences) -> list[int]:
-    pass
+    ...

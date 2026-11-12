@@ -1,5 +1,5 @@
 from collections import Counter
-from typing import Iterable
+from collections.abc import Iterable
 from typing import cast as typing_cast
 
 import bpy
@@ -684,7 +684,6 @@ def get_collection_export_operator_from_context(context: Context) -> PropertyGro
     return exporter.export_properties
 
 
-from typing import Set
 
 from bpy.types import Depsgraph
 
@@ -702,7 +701,7 @@ def get_materials_for_mesh_objects(depsgraph: Depsgraph, mesh_objects: Iterable[
     Yields unique materials used by the given mesh objects.
     If any mesh has no material slots or any empty material slots, None is yielded at the end.
     """
-    yielded_materials: Set[Material] = set()
+    yielded_materials: set[Material] = set()
     has_none_material = False
     for mesh_object in mesh_objects:
         evaluated_mesh_object = mesh_object.evaluated_get(depsgraph)

@@ -48,7 +48,7 @@ class PSA_PG_import:
     select_text: Text | None
 
 def filter_sequences(pg: PSA_PG_import, sequences) -> list[int]:
-    pass
+    ...
 
 def get_visible_sequences(pg: PSA_PG_import, sequences) -> list[PSA_PG_import_action_list_item]:
-    pass
+    ...

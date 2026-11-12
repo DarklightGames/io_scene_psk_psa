@@ -1,4 +1,5 @@
-from typing import Generic, Iterable, Sized, TypeVar
+from collections.abc import Iterable, Sized
+from typing import Generic, TypeVar
 
 import bpy
 from bpy.props import BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
@@ -37,8 +38,8 @@ class PSX_UL_bone_collection_list(UIList):
     ):
         row = layout.row()
 
-        row.prop(item, 'is_selected', text=getattr(item, 'name'))
-        row.label(text=str(getattr(item, 'count')), icon='BONE_DATA')
+        row.prop(item, 'is_selected', text=item.name)
+        row.label(text=str(item.count), icon='BONE_DATA')
 
         armature_object = bpy.data.objects.get(item.armature_object_name, None)
         if armature_object is None:
@@ -98,7 +99,7 @@ class PSX_PT_action(Panel):
         flow = layout.grid_flow(columns=1)
         flow.use_property_split = True
         flow.use_property_decorate = False
-        psa_export = getattr(action, 'psa_export')
+        psa_export = action.psa_export
         assert psa_export
         flow.prop(psa_export, 'compression_ratio')
         flow.prop(psa_export, 'key_quota')

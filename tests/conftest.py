@@ -1,4 +1,4 @@
-import bpy  # noqa: F401 -- Must be imported first; it puts Blender's bundled modules on `sys.path`.
+import bpy  # noqa: F401, I001 -- Must be imported first; it puts Blender's bundled modules on `sys.path`.
 import addon_utils
 import pytest
 

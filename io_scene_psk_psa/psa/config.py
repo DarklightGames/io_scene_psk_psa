@@ -54,7 +54,7 @@ def read_psa_config(psa_sequence_names: list[str], file_path: str) -> PsaConfig:
 
     if config.has_section('RemoveTracks'):
         for key, value in config.items('RemoveTracks'):
-            match = re.match(rf'^(.+)\.(\d+)$', key)
+            match = re.match(r'^(.+)\.(\d+)$', key)
             if not match:
                 continue
             sequence_name = match.group(1)

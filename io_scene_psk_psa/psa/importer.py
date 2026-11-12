@@ -1,5 +1,5 @@
 import re
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from typing import cast as typing_cast
 
 import bpy
@@ -165,7 +165,7 @@ def _resample_sequence_data_matrix(sequence_data_matrix: np.ndarray, frame_step:
                 source_frame_1_data = sequence_data_matrix[frame_index, bone_index, :]
                 source_frame_2_data = sequence_data_matrix[next_frame_index, bone_index, :]
                 factor = sample_frame_time - frame_index
-                q = Quaternion((source_frame_1_data[:4])).slerp(Quaternion((source_frame_2_data[:4])), factor)
+                q = Quaternion(source_frame_1_data[:4]).slerp(Quaternion(source_frame_2_data[:4]), factor)
                 q.normalize()
                 l = Vector(source_frame_1_data[4:7]).lerp(Vector(source_frame_2_data[4:7]), factor)
                 s = Vector(source_frame_1_data[7:]).lerp(Vector(source_frame_2_data[4:7]), factor)
@@ -264,7 +264,7 @@ def import_psa(
     if len(missing_bone_names) > 0:
         result.warnings.append(
             f"The armature '{armature_object.name}' is missing {len(missing_bone_names)} bones that exist in "
-            'the PSA:\n' + str(list(sorted(missing_bone_names)))
+            'the PSA:\n' + str(sorted(missing_bone_names))
         )
     del armature_bone_names
 
@@ -430,7 +430,7 @@ def import_psa(
             # Note that the f-curve data consists of alternating time and value data.
             target_frame_count = resampled_sequence_data_matrix.shape[0]
             fcurve_data = np.zeros(2 * target_frame_count, dtype=float)
-            fcurve_data[0::2] = range(0, target_frame_count)
+            fcurve_data[0::2] = range(target_frame_count)
 
             for bone_index, import_bone in enumerate(import_bones):
                 if import_bone is None:
@@ -452,7 +452,7 @@ def import_psa(
 
         # Write meta-data.
         if options.should_write_metadata:
-            pg = typing_cast(PSX_PG_action_export, getattr(action, 'psa_export'))
+            pg = typing_cast(PSX_PG_action_export, action.psa_export)
             pg.fps = target_fps
             pg.group = sequence.group.decode('windows-1252', errors='ignore')
 

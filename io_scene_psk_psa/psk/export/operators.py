@@ -1,5 +1,5 @@
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 from typing import cast as typing_cast
 
 import bpy
@@ -134,11 +134,11 @@ class PSK_OT_material_list_move_up(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = typing_cast(PSK_PG_export, getattr(context.scene, 'psk_export'))
+        pg = typing_cast(PSK_PG_export, context.scene.psk_export)
         return pg.material_name_list_index > 0
 
     def execute(self, context):
-        pg = typing_cast(PSK_PG_export, getattr(context.scene, 'psk_export'))
+        pg = typing_cast(PSK_PG_export, context.scene.psk_export)
         pg.material_name_list.move(pg.material_name_list_index, pg.material_name_list_index - 1)
         pg.material_name_list_index -= 1
         return {'FINISHED'}
@@ -152,11 +152,11 @@ class PSK_OT_material_list_move_down(Operator):
 
     @classmethod
     def poll(cls, context):
-        pg = typing_cast(PSK_PG_export, getattr(context.scene, 'psk_export'))
+        pg = typing_cast(PSK_PG_export, context.scene.psk_export)
         return pg.material_name_list_index < len(pg.material_name_list) - 1
 
     def execute(self, context):
-        pg = typing_cast(PSK_PG_export, getattr(context.scene, 'psk_export'))
+        pg = typing_cast(PSK_PG_export, context.scene.psk_export)
         pg.material_name_list.move(pg.material_name_list_index, pg.material_name_list_index + 1)
         pg.material_name_list_index += 1
         return {'FINISHED'}
@@ -261,7 +261,7 @@ def get_psk_build_options_from_property_group(scene: Scene, pg: PskExportMixin) 
 
     match pg.transform_source:
         case 'SCENE':
-            transform_source = getattr(scene, 'psx_export')
+            transform_source = scene.psx_export
         case 'CUSTOM':
             transform_source = pg
         case _:
@@ -312,8 +312,8 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
             if len(result.warnings) > 0:
                 self.report({'WARNING'}, f'PSK export successful with {len(result.warnings)} warnings')
             else:
-                self.report({'INFO'}, f'PSK export successful')
-        except IOError as e:
+                self.report({'INFO'}, 'PSK export successful')
+        except OSError as e:
             self.report({'ERROR'}, f'Failed to write PSK file ({filepath}): {e}')
             return {'CANCELLED'}
         except RuntimeError as e:
@@ -407,7 +407,7 @@ class PSK_OT_export_collection(Operator, ExportHelper, PskExportMixin):
 
             match self.transform_source:
                 case 'SCENE':
-                    transform_source = getattr(context.scene, 'psx_export')
+                    transform_source = context.scene.psx_export
                     flow.enabled = False
                 case 'CUSTOM':
                     transform_source = self
@@ -437,7 +437,7 @@ class PSK_OT_export(Operator, ExportHelper):
             self.report({'ERROR_INVALID_CONTEXT'}, str(e))
             return {'CANCELLED'}
 
-        pg = typing_cast(PSK_PG_export, getattr(context.scene, 'psk_export'))
+        pg = typing_cast(PSK_PG_export, context.scene.psk_export)
 
         populate_bone_collection_list(pg.bone_collection_list, input_objects.armature_objects)
 
@@ -461,7 +461,7 @@ class PSK_OT_export(Operator, ExportHelper):
 
         assert layout
 
-        pg = typing_cast(PSK_PG_export, getattr(context.scene, 'psk_export'))
+        pg = typing_cast(PSK_PG_export, context.scene.psk_export)
 
         # Mesh
         mesh_header, mesh_panel = layout.panel('Mesh', default_closed=False)
@@ -525,7 +525,7 @@ class PSK_OT_export(Operator, ExportHelper):
 
             match pg.transform_source:
                 case 'SCENE':
-                    transform_source = getattr(context.scene, 'psx_export')
+                    transform_source = context.scene.psx_export
                     flow.enabled = False
                 case 'CUSTOM':
                     transform_source = pg
@@ -546,7 +546,7 @@ class PSK_OT_export(Operator, ExportHelper):
             flow.prop(pg, 'should_export_vertex_normals', text='Vertex Normals')
 
     def execute(self, context):
-        pg = getattr(context.scene, 'psk_export')
+        pg = context.scene.psk_export
 
         assert context.scene
 
@@ -561,8 +561,8 @@ class PSK_OT_export(Operator, ExportHelper):
             if len(result.warnings) > 0:
                 self.report({'WARNING'}, f'PSK export successful with {len(result.warnings)} warnings')
             else:
-                self.report({'INFO'}, f'PSK export successful')
-        except IOError as e:
+                self.report({'INFO'}, 'PSK export successful')
+        except OSError as e:
             self.report({'ERROR'}, f'Failed to write PSK file ({self.filepath}): {e}')
             return {'CANCELLED'}
         except RuntimeError as e:

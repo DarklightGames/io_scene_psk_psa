@@ -1,20 +1,21 @@
-from typing import Generic, Iterable, Sized, TypeVar
+from collections.abc import Iterable, Sized
+from typing import Generic, TypeVar
 
 T = TypeVar('T')
 
 # https://docs.blender.org/api/current/bpy.types.bpy_prop_collection_idprop.html#bpy.types.bpy_prop_collection_idprop
 class BpyCollectionProperty(Generic[T], Iterable[T], Sized):
     def add(self) -> T:
-        pass
+        ...
 
     def clear(self) -> None:
-        pass
+        ...
 
     def move(self, src_index: int, dst_index: int):
-        pass
+        ...
 
     def remove(self, index: int):
-        pass
+        ...
 
 class PSX_PG_bone_collection_list_item:
     armature_object_name: str
@@ -49,6 +50,6 @@ class PsxBoneExportMixin:
     bone_collection_list_index: int
 
 class PSX_PG_scene_export(TransformSourceMixin):
-    pass
+    ...
 
 bone_filter_mode_items: tuple[tuple[str, str, str]]

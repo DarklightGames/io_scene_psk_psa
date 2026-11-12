@@ -5,7 +5,7 @@ These functions are used to iterate over objects in a collection or view layer i
 instances. This is useful for exporters that need to traverse the object hierarchy in a predictable order.
 """
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from bpy.types import Collection, LayerCollection, Object, ViewLayer
 from mathutils import Matrix

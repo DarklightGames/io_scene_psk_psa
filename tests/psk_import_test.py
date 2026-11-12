@@ -17,7 +17,6 @@ def run_before_and_after_Tests(tmpdir):
     bpy.ops.wm.read_homefile(app_template='')
     yield
     # Teardown: Run after the tests
-    pass
 
 
 def test_psk_import_all():
